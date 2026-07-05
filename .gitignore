@@ -1,0 +1,13 @@
+# Rahasia — JANGAN pernah di-commit
+.env
+
+# Runtime / data lokal
+node_modules/
+telemetry/*.jsonl
+public/avatars/*
+!public/avatars/.gitkeep
+
+# OS / editor
+Thumbs.db
+Desktop.ini
+.DS_Store

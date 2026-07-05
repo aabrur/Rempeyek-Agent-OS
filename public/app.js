@@ -1,0 +1,338 @@
+/* AGENTIC//OS — app logic */
+const VAULT_NAME = "Obsidian Vault";
+let TOKEN = localStorage.getItem("dashToken") || "";
+let openAgent = null;   // id agent yang detailnya terbuka
+let graph = null, graphLoaded = false;
+let lastReport = null;
+
+const ACCENT = { "claude-code": "#00E5FF", hermes: "#A6FF3C", openclaw: "#4C9BFF", zcode: "#8C5BFF", copilot: "#FFB01F" };
+const TILE_C = ["#00E5FF", "#FF3DD8", "#A6FF3C", "#FFB01F"];
+const PALETTE = ["#00E5FF", "#FF3DD8", "#A6FF3C", "#FFB01F", "#8C5BFF", "#FF4D6A", "#3CFFC8", "#FF8A3C", "#4C9BFF", "#F2FF3C"];
+
+const WORKFLOWS = [
+  { who: "Hermes", t: "Crypto & Market Ops", d: "Trading bot, market analysis, cron & heartbeat 24/7. Real-money hanya dengan approval Boss." },
+  { who: "ZCode", t: "Build & Orchestrate", d: "Interactive coding, software engineering, orkestrasi 200+ skills." },
+  { who: "OpenClaw", t: "Strategic Memo", d: "Analisis bisnis, SWOT, founder-grade docs, persona-driven writing." },
+  { who: "Claude Code", t: "Dev & Vault Ops", d: "Full dev, file ops, MCP, integrasi ekosistem, penjaga konstitusi vault." },
+];
+
+/* ---------- util ---------- */
+function headers() { return TOKEN ? { "x-dash-token": TOKEN } : {}; }
+async function api(path, opts = {}) {
+  const res = await fetch(path, { ...opts, headers: { ...headers(), ...(opts.headers || {}) } });
+  if (res.status === 401) {
+    TOKEN = prompt("Dashboard dikunci token (DASH_TOKEN). Masukkan token:") || "";
+    localStorage.setItem("dashToken", TOKEN);
+    if (TOKEN) return api(path, opts);
+  }
+  return res.json();
+}
+function obsUri(rel) { return `obsidian://open?vault=${encodeURIComponent(VAULT_NAME)}&file=${encodeURIComponent(rel.replace(/\.md$/, ""))}`; }
+function el(html) { const t = document.createElement("template"); t.innerHTML = html.trim(); return t.content.firstChild; }
+function esc(s) { return String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+function pill(status) { return `<span class="pill"><span class="dot ${status}"></span><span class="lbl-${status}">${status}</span></span>`; }
+function ac(id) { return ACCENT[id] || "#8C5BFF"; }
+function gwState(p) {
+  if (!p || p.status === "off") return { cls: "idle", label: "gateway off" };
+  if (p.status === "running") return { cls: "running", label: `running · pid ${p.pid}` };
+  if (p.status === "exited") return { cls: "exited", label: `exited (${p.exitCode})` };
+  return { cls: "error", label: p.status };
+}
+function avatarHtml(a, lg) {
+  const inner = a.avatar ? `<img src="${a.avatar}" alt="${esc(a.name)}">` : (a.icon || "◈");
+  return `<div class="avatar ${lg ? "avatar-lg" : ""}" style="--ac:${ac(a.id)}">${inner}
+    ${lg ? `<button class="avatar-edit" data-act="avatar" data-id="${a.id}" title="Ganti foto profil">✎</button>` : ""}</div>`;
+}
+function actionBtn(a) {
+  const running = a.proc && a.proc.status === "running";
+  if (!a.enabled) return `<button class="btn btn-dim" disabled title="${esc(a.note || "nonaktif")}">setup dulu</button>`;
+  return running
+    ? `<button class="btn btn-stop" data-act="stop" data-id="${a.id}">■ Stop</button>`
+    : `<button class="btn btn-run" data-act="start" data-id="${a.id}">▶ Run</button>`;
+}
+
+/* ---------- render utama ---------- */
+function render(state) {
+  document.getElementById("stamp").textContent = new Date(state.generatedAt).toLocaleTimeString("id-ID");
+  const vp = document.getElementById("vaultPath");
+  vp.textContent = state.vault; vp.title = state.vault;
+
+  const tiles = document.getElementById("statTiles");
+  tiles.innerHTML = "";
+  Object.values(state.stats).forEach((s, i) => tiles.appendChild(el(`<div class="tile" style="--tile-c:${TILE_C[i % 4]}">
+    <div class="tile-top"><span>${esc(s.label)}</span></div>
+    <div class="tile-val">${s.value}</div><div class="tile-sub">live dari vault</div></div>`)));
+
+  const cardHtml = a => {
+    const gw = gwState(a.proc);
+    return `<div class="agent-card ${openAgent === a.id ? "selected" : ""}" style="--ac:${ac(a.id)}" data-open="${a.id}">
+      <div class="card-top">${avatarHtml(a)}${actionBtn(a)}</div>
+      <div class="agent-name">${esc(a.name)}</div>
+      <div class="agent-role">${esc(a.role)}</div>
+      <div class="pill-row">${pill(a.vaultStatus)}
+        <span class="pill"><span class="dot ${gw.cls}"></span><span class="lbl-${gw.cls}">${esc(gw.label)}</span></span></div></div>`;
+  };
+  document.getElementById("agentCards").innerHTML = state.agents.map(cardHtml).join("");
+  document.getElementById("agentGrid").innerHTML = state.agents.map(cardHtml).join("");
+
+  const side = document.getElementById("sideAgents");
+  side.innerHTML = "";
+  state.agents.forEach(a => {
+    const gw = gwState(a.proc);
+    side.appendChild(el(`<div class="side-agent" data-open="${a.id}">
+      ${a.avatar ? `<img class="side-avatar" src="${a.avatar}" alt="">` : `<span class="dot ${gw.cls === "running" ? "running" : a.vaultStatus}"></span>`}
+      <span><b>${esc(a.name)}</b><br>${esc(a.node)}</span></div>`));
+  });
+
+  document.getElementById("reviewCount").textContent = `${state.review.length} open`;
+  const rl = document.getElementById("reviewList");
+  rl.innerHTML = "";
+  if (!state.review.length) rl.appendChild(el(`<div class="empty">Kosong — tambah catatan ke <b>00 Inbox/</b> atau checkbox di <b>Tasks/</b> dan item muncul di sini.</div>`));
+  state.review.slice(0, 8).forEach(r => rl.appendChild(el(`<div class="review-item">
+    <div><span class="t">${esc(r.title)}</span><span class="kind ${r.kind}">${r.kind}</span>
+    <div class="m">${esc(r.meta)}</div></div>
+    <a href="${obsUri(r.meta)}">Buka di Obsidian</a></div>`)));
+
+  const wf = document.getElementById("workflowCards");
+  wf.innerHTML = "";
+  WORKFLOWS.forEach(w => wf.appendChild(el(`<div class="wf">
+    <span class="who">${esc(w.who)}</span><div class="t">${esc(w.t)}</div><div class="d">${esc(w.d)}</div></div>`)));
+
+  const pl = document.getElementById("projectList");
+  pl.innerHTML = "";
+  state.projects.forEach(p => pl.appendChild(el(`<div class="list-item">
+    <div><b>${esc(p.name)}</b><div class="p">${esc(p.rel)}</div></div>
+    <div style="display:flex;gap:12px;align-items:center"><span class="d">${p.updated}</span>
+    <a class="chip" style="text-decoration:none" href="${obsUri(p.rel)}">buka</a></div></div>`)));
+}
+
+/* ---------- detail agent ---------- */
+async function renderDetail() {
+  const box = document.getElementById("agentDetail");
+  if (!openAgent) { box.innerHTML = ""; return; }
+  const d = await api(`/api/agent/${openAgent}/detail`);
+  if (d.error) { box.innerHTML = `<div class="empty">${esc(d.error)}</div>`; return; }
+  const gw = gwState(d.proc);
+  const cl = d.claude;
+
+  const sessions = cl && cl.sessions.length ? cl.sessions.map(s => `<div class="sess">
+      <div class="top"><span>sesi ${esc(s.id)} · ${esc(s.project)}</span>${pill(s.status)}</div>
+      ${s.lastPrompt ? `<div class="prm">❯ ${esc(s.lastPrompt)}</div>` : ""}
+      ${s.lastTool ? `<div class="act">⚙ ${esc(s.lastTool.name)} ${esc(s.lastTool.target)} · ${s.toolCount} tool call</div>` : ""}
+    </div>`).join("") : `<div class="empty">Belum ada sesi 48 jam terakhir.</div>`;
+
+  const subs = cl ? (cl.subagents.length ? cl.subagents.map(s => `<div class="subrow">
+      <span class="ty">${esc(s.type)}</span><span class="nm">${esc(s.desc)}</span>
+      <span class="st st-${s.status}">${s.status === "done" ? "✔ done" : "⟳ running"}</span></div>`).join("")
+      : `<div class="empty">Belum ada subagent yang di-spawn di sesi 48 jam terakhir. Begitu ada Agent/Task spawn, muncul di sini otomatis.</div>`)
+    : null;
+
+  const tele = d.telemetry.length ? d.telemetry.map(t => `<div class="subrow">
+      <span class="ty">${esc(t.type)}</span>
+      <span class="nm">${esc(t.name || "")}${t.detail ? " — " + esc(t.detail) : ""}
+        ${t.progress != null ? `<span class="tele-bar"><i style="width:${Math.min(100, t.progress)}%"></i></span>` : ""}</span>
+      <span class="st">${esc((t.ts || "").slice(11, 16))}</span></div>`).join("")
+    : `<div class="empty">Belum ada telemetry. Agent bisa lapor progres via <code>agentic-os\\telemetry\\${esc(d.id)}.jsonl</code> (lihat README di folder itu).</div>`;
+
+  const lane = d.laneFiles.length ? `<div class="mini-list">${d.laneFiles.map(f =>
+    `<a href="${obsUri(f.rel)}"><span>${esc(f.rel.split("/").pop().replace(".md", ""))}</span><span class="d">${f.updated}</span></a>`).join("")}</div>`
+    : `<div class="empty">Belum ada catatan di lane Brains.</div>`;
+
+  box.innerHTML = `<div class="detail" style="--ac:${ac(d.id)}">
+    <div class="detail-head">
+      ${avatarHtml(d, true)}
+      <div>
+        <h2>${esc(d.name)}</h2>
+        <div class="detail-meta">${esc(d.role)} · ${esc(d.node)} · ${esc(d.command || "gateway belum diisi")}</div>
+        <div class="pill-row" style="margin-top:7px">${pill(d.vaultStatus)}
+          <span class="pill"><span class="dot ${gw.cls}"></span><span class="lbl-${gw.cls}">${esc(gw.label)}</span></span></div>
+      </div>
+      <div class="detail-actions">${actionBtn(d)}
+        <button class="btn btn-dim" data-act="close-detail">✕ tutup</button></div>
+    </div>
+    <div class="detail-grid">
+      ${cl ? `<div class="dsec"><h3>Sesi aktif <span class="cnt">${cl.sessions.length}</span></h3>${sessions}</div>
+      <div class="dsec"><h3>Subagent spawn <span class="cnt">${cl.subagents.length}</span></h3>${subs}</div>` : ""}
+      <div class="dsec"><h3>Telemetry</h3>${tele}</div>
+      <div class="dsec"><h3>Lane vault — Brains/</h3>${lane}</div>
+      <div class="dsec" style="grid-column:1/-1"><h3>Log gateway (live)</h3>
+        <pre class="logpane" id="logpane">${d.log.map(l => `[${l.t}] ${l.s === "err" ? "⚠ " : ""}${esc(l.line)}`).join("\n")}</pre></div>
+    </div>
+  </div>`;
+  const pane = document.getElementById("logpane");
+  if (pane) pane.scrollTop = pane.scrollHeight;
+}
+
+/* ---------- avatar upload ---------- */
+const avatarInput = document.getElementById("avatarFile");
+let avatarTarget = null;
+avatarInput.addEventListener("change", () => {
+  const file = avatarInput.files[0];
+  avatarInput.value = "";
+  if (!file || !avatarTarget) return;
+  const img = new Image();
+  img.onload = async () => {
+    const c = document.createElement("canvas");
+    const S = 256; c.width = S; c.height = S;
+    const x = c.getContext("2d");
+    const s = Math.min(img.width, img.height);
+    x.drawImage(img, (img.width - s) / 2, (img.height - s) / 2, s, s, 0, 0, S, S);
+    const r = await api(`/api/agent/${avatarTarget}/avatar`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ data: c.toDataURL("image/png") }),
+    });
+    if (r.error) alert(r.error);
+    refresh(); renderDetail();
+  };
+  img.src = URL.createObjectURL(file);
+});
+
+/* ---------- graph ---------- */
+async function loadGraph(force) {
+  const canvas = document.getElementById("graphCanvas");
+  if (!graph) {
+    graph = NeuralGraph(canvas, { onOpen: n => window.location.href = obsUri(n.id) });
+    document.getElementById("graphSearch").addEventListener("input", e => graph.setQuery(e.target.value));
+  }
+  if (graphLoaded && !force) { graph.reheat(); return; }
+  const data = await api("/api/graph");
+  graph.setData(data);
+  graphLoaded = true;
+  document.getElementById("graphStats").textContent = `${data.nodes.length} node · ${data.edges.length} link`;
+  document.getElementById("graphLegend").innerHTML = graph.legend()
+    .map(l => `<span class="leg" style="color:${l.color}"><i style="background:${l.color}"></i>${esc(l.name)}</span>`).join("");
+}
+
+/* ---------- reports ---------- */
+function svgBar(days) {
+  const W = 560, H = 170, P = 26;
+  const max = Math.max(1, ...days.map(d => d.count));
+  const bw = (W - P * 2) / days.length;
+  let bars = "";
+  days.forEach((d, i) => {
+    const h = Math.round((d.count / max) * (H - 55));
+    const x = P + i * bw + 3, y = H - 30 - h;
+    bars += `<rect x="${x}" y="${y}" width="${bw - 6}" height="${Math.max(h, 2)}" rx="3" fill="url(#gcy)" filter="url(#glow)"/>
+      <text x="${x + (bw - 6) / 2}" y="${y - 6}" fill="#8E88BE" font-size="9" text-anchor="middle" font-family="Cascadia Mono">${d.count || ""}</text>
+      <text x="${x + (bw - 6) / 2}" y="${H - 14}" fill="#8E88BE" font-size="8" text-anchor="middle" font-family="Cascadia Mono">${d.date.slice(3)}</text>`;
+  });
+  return `<svg class="rep-svg" viewBox="0 0 ${W} ${H}">
+    <defs><linearGradient id="gcy" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0" stop-color="#0A6E7A"/><stop offset="1" stop-color="#00E5FF"/></linearGradient>
+      <filter id="glow"><feGaussianBlur stdDeviation="1.6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
+    ${bars}</svg>`;
+}
+function svgDonut(folders) {
+  const total = folders.reduce((s, f) => s + f.count, 0) || 1;
+  const R = 62, C = 2 * Math.PI * R;
+  let off = 0, segs = "", leg = "";
+  folders.forEach((f, i) => {
+    const frac = f.count / total, col = PALETTE[i % PALETTE.length];
+    segs += `<circle r="${R}" cx="90" cy="90" fill="none" stroke="${col}" stroke-width="20"
+      stroke-dasharray="${(frac * C).toFixed(1)} ${C.toFixed(1)}" stroke-dashoffset="${(-off * C).toFixed(1)}" transform="rotate(-90 90 90)"/>`;
+    leg += `<div class="leg" style="color:${col}"><i style="background:${col}"></i>${esc(f.name)} · ${f.count}</div>`;
+    off += frac;
+  });
+  return `<div style="display:flex;gap:18px;align-items:center;flex-wrap:wrap">
+    <svg width="180" height="180" viewBox="0 0 180 180">${segs}
+      <text x="90" y="86" fill="#EEEBFF" font-size="24" font-weight="700" text-anchor="middle" font-family="Bahnschrift">${total}</text>
+      <text x="90" y="104" fill="#8E88BE" font-size="9" text-anchor="middle" font-family="Cascadia Mono">CATATAN</text></svg>
+    <div class="graph-legend" style="margin:0;flex-direction:column;align-items:flex-start;gap:6px">${leg}</div></div>`;
+}
+function renderReport(r) {
+  const maxT = Math.max(1, ...r.agents.map(a => a.touched7d));
+  document.getElementById("reportArea").innerHTML = `
+  <div class="panel rep-wide" style="margin-top:14px">
+    <div class="rep-head-stats">
+      <div class="rep-stat"><div class="v">${r.totals.notes}</div><div class="l">catatan</div></div>
+      <div class="rep-stat"><div class="v">${r.totals.edges}</div><div class="l">koneksi</div></div>
+      <div class="rep-stat"><div class="v">${r.totals.active7d}</div><div class="l">aktif 7 hari</div></div>
+      <div class="rep-stat"><div class="v">${r.totals.openTasks}</div><div class="l">task terbuka</div></div>
+      <div class="rep-stat"><div class="v">${r.totals.gwRunning}</div><div class="l">gateway jalan</div></div>
+      <div class="rep-stat" style="margin-left:auto"><div class="l">digenerate</div><div class="l" style="color:#EEEBFF">${r.generatedAt.slice(0, 16).replace("T", " ")}</div></div>
+    </div></div>
+  <div class="report-grid">
+    <div class="panel"><div class="panel-head"><h2>AKTIVITAS 14 HARI</h2><span class="chip chip-plain">catatan diubah/hari</span></div>${svgBar(r.days)}</div>
+    <div class="panel"><div class="panel-head"><h2>DISTRIBUSI FOLDER</h2></div>${svgDonut(r.folders)}</div>
+    <div class="panel rep-wide"><div class="panel-head"><h2>STATUS AGENT</h2></div>
+      <table class="rep-table"><tr><th>Agent</th><th>Node</th><th>Catatan lane</th><th>Aktif 7d</th><th></th><th>Terakhir</th><th>Gateway</th></tr>
+      ${r.agents.map(a => `<tr><td>${a.icon} <b>${esc(a.name)}</b></td><td style="font-family:var(--mono);font-size:10px">${esc(a.node)}</td>
+        <td>${a.laneNotes}</td><td>${a.touched7d}</td>
+        <td><div class="rep-bar"><i style="width:${Math.round(a.touched7d / maxT * 100)}%"></i></div></td>
+        <td style="font-family:var(--mono);font-size:10px">${a.lastSeen || "—"}</td>
+        <td><span class="lbl-${a.gw === "running" ? "running" : "idle"}" style="font-family:var(--mono);font-size:10px">${a.gw}</span></td></tr>`).join("")}
+      </table></div>
+    ${r.tasks.length ? `<div class="panel rep-wide"><div class="panel-head"><h2>TASK TERBUKA</h2><span class="chip">${r.totals.openTasks}</span></div>
+      <div class="mini-list">${r.tasks.map(t => `<a href="${obsUri(t.source)}"><span>☐ ${esc(t.text)}</span><span class="d">${esc(t.source)}</span></a>`).join("")}</div></div>` : ""}
+  </div>`;
+}
+
+/* ---------- events ---------- */
+document.body.addEventListener("click", async e => {
+  const av = e.target.closest("[data-act='avatar']");
+  if (av) { e.stopPropagation(); avatarTarget = av.dataset.id; avatarInput.click(); return; }
+  const closeBtn = e.target.closest("[data-act='close-detail']");
+  if (closeBtn) { openAgent = null; renderDetail(); refresh(); return; }
+
+  const btn = e.target.closest("[data-act]");
+  if (btn) {
+    const { act, id } = btn.dataset;
+    if (act === "start" || act === "stop") {
+      e.stopPropagation();
+      btn.disabled = true;
+      const r = await api(`/api/proc/${id}/${act}`, { method: "POST" });
+      if (r.error) alert(r.error);
+      setTimeout(() => { refresh(); if (openAgent) renderDetail(); }, 600);
+      return;
+    }
+  }
+
+  const card = e.target.closest("[data-open]");
+  if (card) {
+    openAgent = card.dataset.open;
+    switchView("agents");
+    renderDetail();
+    refresh();
+    setTimeout(() => { const d = document.getElementById("agentDetail"); if (d.firstChild) d.scrollIntoView({ behavior: "smooth", block: "start" }); }, 120);
+  }
+});
+
+document.getElementById("runAll").addEventListener("click", async () => {
+  const r = await api("/api/proc/start-all", { method: "POST" });
+  const errs = Object.entries(r).filter(([, v]) => v.error).map(([k, v]) => `${k}: ${v.error}`);
+  if (errs.length) alert("Sebagian gagal:\n" + errs.join("\n"));
+  setTimeout(refresh, 800);
+});
+
+document.getElementById("genReport").addEventListener("click", async () => {
+  document.getElementById("reportArea").innerHTML = `<div class="empty">Membangun laporan…</div>`;
+  lastReport = await api("/api/report");
+  renderReport(lastReport);
+  document.getElementById("saveReport").disabled = false;
+});
+document.getElementById("saveReport").addEventListener("click", async () => {
+  const r = await api("/api/report/save", { method: "POST" });
+  if (r.error) return alert(r.error);
+  alert(`Laporan tersimpan di vault:\n${r.rel}`);
+});
+
+function switchView(view) {
+  document.querySelectorAll(".nav-item").forEach(b => b.classList.toggle("active", b.dataset.view === view));
+  document.querySelectorAll(".view").forEach(v => v.classList.toggle("active", v.id === `view-${view}`));
+  if (view === "graph") loadGraph(false);
+}
+document.getElementById("nav").addEventListener("click", e => {
+  const btn = e.target.closest(".nav-item");
+  if (btn) switchView(btn.dataset.view);
+});
+
+/* ---------- loop ---------- */
+async function refresh() {
+  try { render(await api("/api/state")); }
+  catch { document.getElementById("stamp").textContent = "gagal memuat — server mati?"; }
+}
+setInterval(() => { document.getElementById("clock").textContent = new Date().toLocaleString("id-ID"); }, 1000);
+refresh();
+setInterval(refresh, 6000);
+setInterval(() => { if (openAgent && document.getElementById("view-agents").classList.contains("active")) renderDetail(); }, 5000);
+setInterval(() => { if (graphLoaded && document.getElementById("view-graph").classList.contains("active")) loadGraph(true); }, 90000);

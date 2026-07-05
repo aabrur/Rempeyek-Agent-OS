@@ -1,0 +1,10 @@
+{
+  "name": "agentic-os",
+  "version": "1.0.0",
+  "description": "AI-Agent Agentic OS — command center dashboard membaca live dari Obsidian Vault",
+  "private": true,
+  "scripts": {
+    "dev": "node server.js",
+    "start": "node server.js"
+  }
+}

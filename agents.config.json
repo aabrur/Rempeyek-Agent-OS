@@ -1,0 +1,72 @@
+{
+  "workdir": "C:\\Users\\abrur\\AI-Agent",
+  "agents": [
+    {
+      "id": "claude-code",
+      "name": "Claude Code",
+      "icon": "⚫",
+      "role": "Coding & technical specialist",
+      "node": "Node-10",
+      "lane": "ClaudeCode",
+      "enabled": true,
+      "gateway": {
+        "command": "node gateway.mjs",
+        "cwd": "C:\\Users\\abrur\\AI-Agent\\.claude\\.claude-gateway"
+      }
+    },
+    {
+      "id": "hermes",
+      "name": "Hermes",
+      "icon": "🟢",
+      "role": "Crypto, research & ops 24/7",
+      "node": "Node-8",
+      "lane": "Hermes",
+      "enabled": true,
+      "gateway": {
+        "command": "\"C:\\Users\\abrur\\AppData\\Local\\hermes\\hermes-agent\\venv\\Scripts\\hermes.exe\" gateway run",
+        "cwd": "C:\\Users\\abrur\\AppData\\Local\\hermes"
+      }
+    },
+    {
+      "id": "openclaw",
+      "name": "OpenClaw",
+      "icon": "🔵",
+      "role": "Strategy & business analysis",
+      "node": "Node-7",
+      "lane": "OpenClaw",
+      "enabled": true,
+      "gateway": {
+        "command": "openclaw gateway",
+        "cwd": "C:\\Users\\abrur\\AI-Agent\\.openclaw"
+      }
+    },
+    {
+      "id": "zcode",
+      "name": "ZCode",
+      "icon": "🟣",
+      "role": "Interactive coding, 200+ skills",
+      "node": "Node-9/10",
+      "lane": "ZCode",
+      "enabled": false,
+      "note": "CLI `zcode` tidak ditemukan di PATH (folder ~\\.zcode hanya berisi state). Isi gateway.command yang benar lalu set enabled:true.",
+      "gateway": {
+        "command": "",
+        "cwd": "C:\\Users\\abrur\\.zcode"
+      }
+    },
+    {
+      "id": "copilot",
+      "name": "Copilot",
+      "icon": "🟠",
+      "role": "GitHub Copilot CLI (standby)",
+      "node": "Node-11",
+      "lane": "",
+      "enabled": true,
+      "note": "Terinstal (CLI v1.0.68, junction ~/.copilot → AI-Agent\\.copilot). Login dulu: jalankan `copilot` di terminal → /login. Setelah login, set enabled:true (command default: ACP server persisten).",
+      "gateway": {
+        "command": "copilot --acp",
+        "cwd": "C:\\Users\\abrur\\AI-Agent"
+      }
+    }
+  ]
+}

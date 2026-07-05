@@ -1,0 +1,481 @@
+/* Agentic OS — zero-dependency Node server.
+   Dashboard live dari Obsidian Vault + launcher gateway agent.
+   Jalankan: npm run dev  →  http://localhost:4321
+   Remote:   set DASH_TOKEN=rahasia  →  akses wajib pakai token. */
+const http = require("http");
+const fs = require("fs");
+const path = require("path");
+const { spawn, execFile } = require("child_process");
+
+/* muat .env (KEY=VALUE per baris; env var asli menang atas isi file) */
+try {
+  for (const line of fs.readFileSync(path.join(__dirname, ".env"), "utf8").split(/\r?\n/)) {
+    const m = line.match(/^\s*([A-Z_][A-Z0-9_]*)\s*=\s*(.*)\s*$/);
+    if (m && !line.trim().startsWith("#") && process.env[m[1]] === undefined)
+      process.env[m[1]] = m[2].replace(/^["']|["']$/g, "");
+  }
+} catch {}
+
+const PORT = process.env.PORT || 4321;
+const VAULT = process.env.VAULT_PATH || "C:\\Users\\abrur\\AI-Agent\\Obsidian Vault";
+const CONFIG_PATH = process.env.AGENTS_CONFIG || path.join(__dirname, "agents.config.json");
+const TOKEN = process.env.DASH_TOKEN || "";
+const PUBLIC = path.join(__dirname, "public");
+const IGNORE = new Set([".git", ".obsidian", "Assets", "node_modules"]);
+const DAY = 86400000;
+const LOG_MAX = 800;
+const AVATAR_DIR = path.join(PUBLIC, "avatars");
+const TELEMETRY_DIR = path.join(__dirname, "telemetry");
+const CLAUDE_PROJECTS = "C:\\Users\\abrur\\AI-Agent\\.claude\\projects";
+for (const d of [AVATAR_DIR, TELEMETRY_DIR]) { try { fs.mkdirSync(d, { recursive: true }); } catch {} }
+
+function loadConfig() {
+  return JSON.parse(fs.readFileSync(CONFIG_PATH, "utf8"));
+}
+
+/* ---------------- vault scan (view: Command Center) ---------------- */
+function walk(dir, out = [], base = dir) {
+  let entries;
+  try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return out; }
+  for (const e of entries) {
+    if (IGNORE.has(e.name) || e.name.startsWith(".")) continue;
+    const full = path.join(dir, e.name);
+    if (e.isDirectory()) walk(full, out, base);
+    else if (e.name.endsWith(".md")) {
+      let st; try { st = fs.statSync(full); } catch { continue; }
+      out.push({ rel: path.relative(base, full).replace(/\\/g, "/"), mtime: st.mtimeMs });
+    }
+  }
+  return out;
+}
+
+function agentVaultStatus(files, agent) {
+  let last = 0, lastFile = null;
+  for (const f of files) {
+    const hit = (agent.lane && f.rel.startsWith(`Brains/${agent.lane}/`)) ||
+      (f.rel.startsWith("Daily/") && f.rel.toLowerCase().includes(agent.id.replace("-", "")));
+    if (hit && f.mtime > last) { last = f.mtime; lastFile = f.rel; }
+  }
+  const days = last ? Math.floor((Date.now() - last) / DAY) : null;
+  return {
+    vaultStatus: days === null ? "idle" : days === 0 ? "working" : days <= 2 ? "waiting" : "idle",
+    lastFile, lastSeen: last ? new Date(last).toISOString().slice(0, 10) : null,
+  };
+}
+
+function openTasks() {
+  const items = [];
+  let names = [];
+  try { names = fs.readdirSync(path.join(VAULT, "Tasks")).filter(n => n.endsWith(".md")); } catch {}
+  for (const n of names) {
+    const text = fs.readFileSync(path.join(VAULT, "Tasks", n), "utf8");
+    for (const line of text.split(/\r?\n/)) {
+      const m = line.match(/^\s*[-*] \[ \]\s+(.*)/);
+      if (m) items.push({ text: m[1].slice(0, 120), source: `Tasks/${n}` });
+    }
+  }
+  return items;
+}
+
+function buildState() {
+  const cfg = loadConfig();
+  const files = walk(VAULT);
+  const now = Date.now();
+  const tasks = openTasks();
+  const inbox = files.filter(f => f.rel.startsWith("00 Inbox/"));
+  const projects = files.filter(f => f.rel.startsWith("Projects/") && f.rel.split("/").length === 2)
+    .sort((a, b) => b.mtime - a.mtime)
+    .map(f => ({ name: f.rel.replace("Projects/", "").replace(".md", ""), rel: f.rel, updated: new Date(f.mtime).toISOString().slice(0, 10) }));
+  return {
+    vault: VAULT,
+    generatedAt: new Date().toISOString(),
+    stats: {
+      notes: { value: files.length, label: "Total catatan vault" },
+      activeWeek: { value: files.filter(f => now - f.mtime < 7 * DAY).length, label: "Catatan diubah 7 hari terakhir" },
+      openTasks: { value: tasks.length, label: "Checkbox terbuka di Tasks/" },
+      projects: { value: projects.length, label: "Project note aktif" },
+    },
+    agents: cfg.agents.map(a => ({ ...a, gateway: undefined, ...agentVaultStatus(files, a), proc: procInfo(a.id), avatar: avatarUrl(a.id) })),
+    review: [
+      ...inbox.map(f => ({ title: f.rel.split("/").pop().replace(".md", ""), meta: f.rel, kind: "inbox" })),
+      ...tasks.slice(0, 6).map(t => ({ title: t.text, meta: t.source, kind: "task" })),
+    ],
+    projects,
+    knowledge: [...files].sort((a, b) => b.mtime - a.mtime).slice(0, 12)
+      .map(f => ({ rel: f.rel, updated: new Date(f.mtime).toISOString().slice(0, 10) })),
+  };
+}
+
+/* ---------------- process manager (view: Gateway Console) ---------------- */
+const procs = new Map(); // id -> {child,pid,log:[],seq,status,startedAt,exitCode}
+
+function procInfo(id) {
+  const p = procs.get(id);
+  if (!p) return { status: "off" };
+  return { status: p.status, pid: p.pid, startedAt: p.startedAt, exitCode: p.exitCode, logSize: p.seq };
+}
+
+function pushLog(p, stream, chunk) {
+  for (const line of String(chunk).split(/\r?\n/)) {
+    if (!line.trim()) continue;
+    p.log.push({ i: p.seq++, t: new Date().toISOString().slice(11, 19), s: stream, line: line.slice(0, 500) });
+    if (p.log.length > LOG_MAX) p.log.splice(0, p.log.length - LOG_MAX);
+  }
+}
+
+function startProc(id) {
+  const agent = loadConfig().agents.find(a => a.id === id);
+  if (!agent) return { error: `agent '${id}' tidak ada di agents.config.json` };
+  if (!agent.enabled || !agent.gateway || !agent.gateway.command)
+    return { error: agent.note || `gateway '${id}' belum dikonfigurasi (enabled:false)` };
+  const existing = procs.get(id);
+  if (existing && existing.status === "running") return { error: `${id} sudah jalan (pid ${existing.pid})` };
+
+  const cwd = agent.gateway.cwd || loadConfig().workdir;
+  if (!fs.existsSync(cwd)) return { error: `cwd tidak ada: ${cwd}` };
+
+  const p = { log: [], seq: 0, status: "running", startedAt: new Date().toISOString(), exitCode: null };
+  pushLog(p, "sys", `[agentic-os] start: ${agent.gateway.command}  (cwd: ${cwd})`);
+  const child = spawn(agent.gateway.command, [], {
+    cwd, shell: true, windowsHide: true,
+    env: { ...process.env, AGENT_WORKDIR: loadConfig().workdir },
+  });
+  p.child = child; p.pid = child.pid;
+  child.stdout.on("data", d => pushLog(p, "out", d));
+  child.stderr.on("data", d => pushLog(p, "err", d));
+  child.on("exit", (code) => { p.status = "exited"; p.exitCode = code; pushLog(p, "sys", `[agentic-os] exit code ${code}`); });
+  child.on("error", (err) => { p.status = "error"; pushLog(p, "sys", `[agentic-os] spawn error: ${err.message}`); });
+  procs.set(id, p);
+  return { ok: true, pid: child.pid };
+}
+
+function stopProc(id) {
+  const p = procs.get(id);
+  if (!p || p.status !== "running") return { error: `${id} tidak sedang jalan` };
+  pushLog(p, "sys", "[agentic-os] stop diminta — taskkill /T /F");
+  if (process.platform === "win32") execFile("taskkill", ["/pid", String(p.pid), "/T", "/F"], () => {});
+  else { try { process.kill(-p.pid, "SIGTERM"); } catch { try { p.child.kill(); } catch {} } }
+  return { ok: true };
+}
+
+/* ---------------- avatar ---------------- */
+function avatarUrl(id) {
+  for (const ext of ["png", "jpg", "webp"])
+    if (fs.existsSync(path.join(AVATAR_DIR, `${id}.${ext}`))) return `/avatars/${id}.${ext}`;
+  return null;
+}
+function saveAvatar(id, dataUrl) {
+  const m = /^data:image\/(png|jpeg|webp);base64,(.+)$/.exec(dataUrl || "");
+  if (!m) return { error: "format harus data:image/png|jpeg|webp;base64" };
+  const buf = Buffer.from(m[2], "base64");
+  if (buf.length > 3e6) return { error: "maks 3 MB" };
+  const ext = m[1] === "jpeg" ? "jpg" : m[1];
+  for (const e of ["png", "jpg", "webp"]) { try { fs.unlinkSync(path.join(AVATAR_DIR, `${id}.${e}`)); } catch {} }
+  fs.writeFileSync(path.join(AVATAR_DIR, `${id}.${ext}`), buf);
+  return { ok: true, url: `/avatars/${id}.${ext}` };
+}
+
+/* ---------------- graph vault (view: Neural Vault) ---------------- */
+let graphCache = { t: 0, data: null };
+function buildGraph() {
+  if (graphCache.data && Date.now() - graphCache.t < 60000) return graphCache.data;
+  const files = walk(VAULT);
+  const nodes = new Map(); // rel -> node
+  const byTitle = new Map(); // lowercase basename -> rel
+  for (const f of files) {
+    const label = f.rel.split("/").pop().replace(/\.md$/, "");
+    const folder = f.rel.includes("/") ? f.rel.split("/")[0] : "(root)";
+    nodes.set(f.rel, { id: f.rel, label, folder, mtime: f.mtime, deg: 0 });
+    if (!byTitle.has(label.toLowerCase())) byTitle.set(label.toLowerCase(), f.rel);
+  }
+  const edges = [];
+  const seen = new Set();
+  for (const f of files) {
+    let text; try { text = fs.readFileSync(path.join(VAULT, f.rel), "utf8"); } catch { continue; }
+    for (const m of text.matchAll(/\[\[([^\]|#\n]+)/g)) {
+      const target = byTitle.get(m[1].trim().toLowerCase());
+      if (!target || target === f.rel) continue;
+      const key = f.rel < target ? f.rel + "|" + target : target + "|" + f.rel;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      edges.push({ s: f.rel, t: target });
+      nodes.get(f.rel).deg++; nodes.get(target).deg++;
+    }
+  }
+  graphCache = { t: Date.now(), data: { nodes: [...nodes.values()], edges, generatedAt: new Date().toISOString() } };
+  return graphCache.data;
+}
+
+/* ------- aktivitas Claude Code: sesi + subagent dari transcript jsonl ------- */
+function tailRead(file, bytes) {
+  try {
+    const size = fs.statSync(file).size;
+    const fd = fs.openSync(file, "r");
+    const len = Math.min(bytes, size);
+    const buf = Buffer.alloc(len);
+    fs.readSync(fd, buf, 0, len, size - len);
+    fs.closeSync(fd);
+    return buf.toString("utf8");
+  } catch { return ""; }
+}
+function toolTarget(name, input) {
+  if (!input) return "";
+  const t = input.file_path || input.path || input.pattern || input.description ||
+    (input.command ? String(input.command) : "") || input.prompt || "";
+  return String(t).replace(/^C:\\Users\\abrur\\/i, "").slice(0, 90);
+}
+function claudeActivity() {
+  const sessions = [];
+  let dirs = [];
+  try { dirs = fs.readdirSync(CLAUDE_PROJECTS, { withFileTypes: true }).filter(d => d.isDirectory()); } catch { return { sessions, subagents: [] }; }
+  const cutoff = Date.now() - 2 * DAY;
+  const cand = [];
+  for (const d of dirs) {
+    const dir = path.join(CLAUDE_PROJECTS, d.name);
+    let names = []; try { names = fs.readdirSync(dir).filter(n => n.endsWith(".jsonl")); } catch { continue; }
+    for (const n of names) {
+      let st; try { st = fs.statSync(path.join(dir, n)); } catch { continue; }
+      if (st.mtimeMs > cutoff) cand.push({ file: path.join(dir, n), dir: d.name, mtime: st.mtimeMs, id: n.replace(".jsonl", "") });
+    }
+  }
+  cand.sort((a, b) => b.mtime - a.mtime);
+  const allAgents = [];
+  for (const c of cand.slice(0, 8)) {
+    const lines = tailRead(c.file, 400000).split("\n");
+    let lastTool = null, lastPrompt = null, toolCount = 0;
+    const spawns = new Map(); // tool_use id -> spawn
+    const results = new Set();
+    for (const line of lines) {
+      if (!line.trim() || line[0] !== "{") continue;
+      let o; try { o = JSON.parse(line); } catch { continue; }
+      const msg = o.message;
+      if (!msg || o.isSidechain) continue;
+      const content = msg.content;
+      if (msg.role === "user") {
+        if (typeof content === "string" && !content.startsWith("<")) lastPrompt = content.slice(0, 160);
+        if (Array.isArray(content)) for (const b of content) {
+          if (b.type === "text" && b.text && !b.text.startsWith("<")) lastPrompt = b.text.slice(0, 160);
+          if (b.type === "tool_result" && b.tool_use_id) results.add(b.tool_use_id);
+        }
+      }
+      if (msg.role === "assistant" && Array.isArray(content)) for (const b of content) {
+        if (b.type !== "tool_use") continue;
+        toolCount++;
+        lastTool = { name: b.name, target: toolTarget(b.name, b.input), ts: o.timestamp || null };
+        if (b.name === "Agent" || b.name === "Task")
+          spawns.set(b.id, {
+            session: c.id.slice(0, 8), ts: o.timestamp || null,
+            desc: (b.input && (b.input.description || "")) || "(tanpa deskripsi)",
+            type: (b.input && (b.input.subagent_type || "general-purpose")) || "general-purpose",
+            status: "running",
+          });
+      }
+    }
+    for (const [tid, sp] of spawns) { if (results.has(tid)) sp.status = "done"; allAgents.push(sp); }
+    const ageMin = (Date.now() - c.mtime) / 60000;
+    sessions.push({
+      id: c.id.slice(0, 8),
+      project: c.dir.replace(/^C--/, "C:/").replace(/-/g, "/"),
+      lastActivity: new Date(c.mtime).toISOString(),
+      status: ageMin < 5 ? "working" : ageMin < 120 ? "waiting" : "idle",
+      lastPrompt, lastTool, toolCount,
+    });
+  }
+  return { sessions, subagents: allAgents.reverse().slice(0, 20) };
+}
+
+/* ------- telemetry lintas-agent: agentic-os/telemetry/<id>.jsonl ------- */
+function readTelemetry(id) {
+  const file = path.join(TELEMETRY_DIR, `${id}.jsonl`);
+  if (!fs.existsSync(file)) return [];
+  const out = [];
+  for (const line of tailRead(file, 100000).split("\n")) {
+    if (!line.trim()) continue;
+    try { const o = JSON.parse(line); if (o && o.type) out.push(o); } catch {}
+  }
+  return out.slice(-30).reverse();
+}
+
+function agentDetail(id) {
+  const agent = loadConfig().agents.find(a => a.id === id);
+  if (!agent) return { error: `agent '${id}' tidak dikenal` };
+  const p = procs.get(id);
+  const files = walk(VAULT);
+  const laneFiles = files
+    .filter(f => agent.lane && f.rel.startsWith(`Brains/${agent.lane}/`))
+    .sort((a, b) => b.mtime - a.mtime).slice(0, 8)
+    .map(f => ({ rel: f.rel, updated: new Date(f.mtime).toISOString().slice(0, 16).replace("T", " ") }));
+  return {
+    id, name: agent.name, icon: agent.icon, role: agent.role, node: agent.node,
+    enabled: agent.enabled, note: agent.note || null, avatar: avatarUrl(id),
+    cwd: agent.gateway && agent.gateway.cwd, command: agent.gateway && agent.gateway.command,
+    proc: procInfo(id), ...agentVaultStatus(files, agent),
+    log: p ? p.log.slice(-40) : [],
+    laneFiles, telemetry: readTelemetry(id),
+    claude: id === "claude-code" ? claudeActivity() : null,
+  };
+}
+
+/* ---------------- report generator ---------------- */
+function buildReport() {
+  const cfg = loadConfig();
+  const files = walk(VAULT);
+  const now = Date.now();
+  const days = [];
+  for (let i = 13; i >= 0; i--) {
+    const d0 = new Date(now - i * DAY); d0.setHours(0, 0, 0, 0);
+    const d1 = d0.getTime() + DAY;
+    days.push({
+      date: d0.toISOString().slice(5, 10),
+      count: files.filter(f => f.mtime >= d0.getTime() && f.mtime < d1).length,
+    });
+  }
+  const folders = {};
+  for (const f of files) { const top = f.rel.includes("/") ? f.rel.split("/")[0] : "(root)"; folders[top] = (folders[top] || 0) + 1; }
+  const tasks = openTasks();
+  const graph = buildGraph();
+  const agents = cfg.agents.map(a => {
+    const vs = agentVaultStatus(files, a);
+    return {
+      id: a.id, name: a.name, icon: a.icon, node: a.node, avatar: avatarUrl(a.id),
+      laneNotes: a.lane ? files.filter(f => f.rel.startsWith(`Brains/${a.lane}/`)).length : 0,
+      touched7d: a.lane ? files.filter(f => f.rel.startsWith(`Brains/${a.lane}/`) && now - f.mtime < 7 * DAY).length : 0,
+      lastSeen: vs.lastSeen, vaultStatus: vs.vaultStatus, gw: procInfo(a.id).status,
+    };
+  });
+  return {
+    generatedAt: localISO(),
+    totals: {
+      notes: files.length, edges: graph.edges.length, openTasks: tasks.length,
+      active7d: files.filter(f => now - f.mtime < 7 * DAY).length,
+      gwRunning: [...procs.values()].filter(p => p.status === "running").length,
+    },
+    days, folders: Object.entries(folders).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count),
+    agents, tasks: tasks.slice(0, 10),
+  };
+}
+function reportMarkdown(r) {
+  const bar = n => "█".repeat(Math.min(n, 30)) || "·";
+  const lines = [
+    "---",
+    `title: "Laporan Agentic OS ${r.generatedAt.slice(0, 10)}"`,
+    `date: ${r.generatedAt.slice(0, 10)}`,
+    "type: report",
+    "created_by: agentic-os-dashboard",
+    "tags: [report, agentic-os]",
+    "---", "",
+    `# Laporan Agentic OS — ${r.generatedAt.slice(0, 16).replace("T", " ")}`, "",
+    `| Metrik | Nilai |`, `|---|---|`,
+    `| Total catatan vault | ${r.totals.notes} |`,
+    `| Koneksi antar catatan (wikilink) | ${r.totals.edges} |`,
+    `| Catatan aktif 7 hari | ${r.totals.active7d} |`,
+    `| Task terbuka | ${r.totals.openTasks} |`,
+    `| Gateway sedang jalan | ${r.totals.gwRunning} |`, "",
+    "## Aktivitas 14 hari (catatan diubah/hari)", "", "```",
+    ...r.days.map(d => `${d.date}  ${String(d.count).padStart(3)}  ${bar(d.count)}`),
+    "```", "",
+    "## Distribusi folder", "", `| Folder | Catatan |`, `|---|---|`,
+    ...r.folders.map(f => `| ${f.name} | ${f.count} |`), "",
+    "## Status agent", "", `| Agent | Node | Catatan lane | Aktif 7d | Terakhir | Gateway |`, `|---|---|---|---|---|---|`,
+    ...r.agents.map(a => `| ${a.icon} ${a.name} | ${a.node} | ${a.laneNotes} | ${a.touched7d} | ${a.lastSeen || "-"} | ${a.gw} |`), "",
+  ];
+  if (r.tasks.length) lines.push("## Task terbuka (maks 10)", "", ...r.tasks.map(t => `- [ ] ${t.text} _(${t.source})_`), "");
+  lines.push("---", "_Digenerate otomatis dari dashboard Agentic OS._");
+  return lines.join("\n");
+}
+function localISO(d = new Date()) {
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString();
+}
+function saveReport() {
+  const r = buildReport();
+  const dir = path.join(VAULT, "Reports");
+  fs.mkdirSync(dir, { recursive: true });
+  const l = localISO();
+  const name = `Laporan ${l.slice(0, 10)} ${l.slice(11, 16).replace(":", ".")}.md`;
+  fs.writeFileSync(path.join(dir, name), reportMarkdown(r), "utf8");
+  return { ok: true, rel: `Reports/${name}` };
+}
+
+function readBody(req, cb) {
+  let body = "";
+  req.on("data", d => { body += d; if (body.length > 5e6) { req.destroy(); } });
+  req.on("end", () => cb(body));
+}
+
+/* ---------------- http ---------------- */
+function authorized(req, url) {
+  if (!TOKEN) return true; // tanpa token: dashboard lokal biasa
+  const q = new URL(url, "http://x").searchParams.get("token");
+  return req.headers["x-dash-token"] === TOKEN || q === TOKEN;
+}
+function json(res, code, obj) {
+  res.writeHead(code, { "Content-Type": "application/json; charset=utf-8" });
+  res.end(JSON.stringify(obj));
+}
+
+const MIME = { ".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".svg": "image/svg+xml", ".png": "image/png", ".jpg": "image/jpeg", ".webp": "image/webp", ".md": "text/markdown; charset=utf-8" };
+
+const server = http.createServer((req, res) => {
+  const url = (req.url || "/").split("?")[0];
+
+  if (url.startsWith("/api/")) {
+    if (!authorized(req, req.url)) return json(res, 401, { error: "token salah/kosong — set header x-dash-token" });
+    try {
+      if (url === "/api/state") return json(res, 200, buildState());
+      if (url === "/api/procs") {
+        const cfg = loadConfig();
+        return json(res, 200, cfg.agents.map(a => ({ id: a.id, name: a.name, icon: a.icon, enabled: a.enabled, note: a.note || null, cwd: a.gateway && a.gateway.cwd, command: a.gateway && a.gateway.command, ...procInfo(a.id) })));
+      }
+      let m = url.match(/^\/api\/proc\/([\w-]+)\/(start|stop|log)$/);
+      if (m) {
+        const [, id, action] = m;
+        if (action === "log") {
+          const p = procs.get(id);
+          const since = Number(new URL(req.url, "http://x").searchParams.get("since") || 0);
+          return json(res, 200, { lines: p ? p.log.filter(l => l.i >= since) : [], next: p ? p.seq : 0, ...procInfo(id) });
+        }
+        if (req.method !== "POST") return json(res, 405, { error: "POST only" });
+        const r = action === "start" ? startProc(id) : stopProc(id);
+        return json(res, r.error ? 400 : 200, r);
+      }
+      if (url === "/api/proc/start-all" && req.method === "POST") {
+        const results = {};
+        for (const a of loadConfig().agents) if (a.enabled) results[a.id] = startProc(a.id);
+        return json(res, 200, results);
+      }
+      if (url === "/api/graph") return json(res, 200, buildGraph());
+      if (url === "/api/report") return json(res, 200, buildReport());
+      if (url === "/api/report/save" && req.method === "POST") return json(res, 200, saveReport());
+      m = url.match(/^\/api\/agent\/([\w-]+)\/detail$/);
+      if (m) { const d = agentDetail(m[1]); return json(res, d.error ? 404 : 200, d); }
+      m = url.match(/^\/api\/agent\/([\w-]+)\/avatar$/);
+      if (m && req.method === "POST") {
+        const id = m[1];
+        if (!loadConfig().agents.some(a => a.id === id)) return json(res, 404, { error: "agent tidak dikenal" });
+        return readBody(req, body => {
+          let data; try { data = JSON.parse(body).data; } catch { return json(res, 400, { error: "body harus JSON {data}" }); }
+          const r = saveAvatar(id, data);
+          json(res, r.error ? 400 : 200, r);
+        });
+      }
+      return json(res, 404, { error: "unknown api" });
+    } catch (err) { return json(res, 500, { error: String(err) }); }
+  }
+
+  const rel = url === "/" ? "index.html" : url.slice(1);
+  const file = path.normalize(path.join(PUBLIC, rel));
+  if (!file.startsWith(PUBLIC) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) {
+    res.writeHead(404, { "Content-Type": "text/plain" }); return res.end("not found");
+  }
+  res.writeHead(200, { "Content-Type": MIME[path.extname(file)] || "application/octet-stream" });
+  res.end(fs.readFileSync(file));
+});
+
+process.on("exit", () => { for (const id of procs.keys()) stopProc(id); });
+
+server.listen(PORT, () => {
+  console.log(`\n  Agentic OS jalan di  http://localhost:${PORT}`);
+  console.log(`  Vault sumber data:   ${VAULT}`);
+  console.log(`  Config agent:        ${CONFIG_PATH}`);
+  console.log(TOKEN ? "  Auth: token AKTIF (x-dash-token)" : "  Auth: tanpa token (lokal). Untuk remote: set DASH_TOKEN.\n");
+});

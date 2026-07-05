@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AGENTIC//OS — Neural Command Deck</title>
+<link rel="stylesheet" href="style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧠</text></svg>">
+</head>
+<body>
+<div class="bg-grid" aria-hidden="true"></div>
+<div class="bg-glow" aria-hidden="true"></div>
+
+<div class="shell">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">◈</div>
+      <div>
+        <div class="brand-name">AGENTIC<span class="brand-slash">//</span>OS</div>
+        <div class="brand-sub">neural command deck</div>
+      </div>
+    </div>
+    <nav id="nav">
+      <button class="nav-item active" data-view="command"><span class="nav-ico">▦</span> Command Center</button>
+      <button class="nav-item" data-view="agents"><span class="nav-ico">◉</span> Agents</button>
+      <button class="nav-item" data-view="graph"><span class="nav-ico">✳</span> Neural Vault</button>
+      <button class="nav-item" data-view="reports"><span class="nav-ico">▤</span> Reports</button>
+      <button class="nav-item" data-view="projects"><span class="nav-ico">▧</span> Projects</button>
+    </nav>
+    <div class="side-label">AGENTS</div>
+    <div id="sideAgents" class="side-agents"></div>
+    <div class="side-foot">
+      <span id="clock"></span>
+      <span id="vaultPath" title=""></span>
+    </div>
+  </aside>
+
+  <main class="main">
+    <!-- COMMAND CENTER -->
+    <section id="view-command" class="view active">
+      <header class="page-head">
+        <h1>COMMAND CENTER</h1>
+        <div class="page-meta">Data live dari Obsidian Vault · <span id="stamp"></span></div>
+      </header>
+      <div id="statTiles" class="tiles"></div>
+
+      <div class="section-row">
+        <div class="section-label">AGENTS &amp; GATEWAYS</div>
+        <button id="runAll" class="btn btn-primary">▶ RUN SEMUA GATEWAY</button>
+      </div>
+      <div id="agentCards" class="agent-row"></div>
+
+      <div class="two-col">
+        <div class="panel">
+          <div class="panel-head"><h2>NEEDS REVIEW</h2><span id="reviewCount" class="chip"></span></div>
+          <div id="reviewList" class="review-list"></div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><h2>PRIMARY WORKFLOWS</h2><span class="chip chip-plain">routing</span></div>
+          <div id="workflowCards" class="workflow-grid"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- AGENTS -->
+    <section id="view-agents" class="view">
+      <header class="page-head">
+        <h1>AGENTS</h1>
+        <div class="page-meta">Klik agent untuk detail: sesi aktif, subagent yang di-spawn, log gateway, telemetry. Klik foto untuk ganti avatar.</div>
+      </header>
+      <div id="agentGrid" class="agent-row agent-row-wide"></div>
+      <div id="agentDetail"></div>
+    </section>
+
+    <!-- NEURAL VAULT (GRAPH) -->
+    <section id="view-graph" class="view view-flush">
+      <div class="graph-bar">
+        <div class="graph-title">NEURAL VAULT <span id="graphStats" class="graph-stats"></span></div>
+        <input id="graphSearch" class="graph-search" type="search" placeholder="cari catatan…" autocomplete="off">
+        <div id="graphLegend" class="graph-legend"></div>
+      </div>
+      <div class="graph-wrap"><canvas id="graphCanvas"></canvas>
+        <div class="graph-hint">drag = geser · scroll = zoom · klik node = buka di Obsidian</div>
+      </div>
+    </section>
+
+    <!-- REPORTS -->
+    <section id="view-reports" class="view">
+      <header class="page-head">
+        <h1>REPORTS</h1>
+        <div class="page-meta">Laporan otomatis dari vault + status gateway, dengan visualisasi. Bisa disimpan sebagai catatan markdown ke <code>Reports/</code> di vault.</div>
+      </header>
+      <div class="section-row">
+        <div class="section-label">GENERATOR</div>
+        <div style="display:flex;gap:10px">
+          <button id="genReport" class="btn btn-primary">⟳ GENERATE LAPORAN</button>
+          <button id="saveReport" class="btn btn-run" disabled>💾 SIMPAN KE VAULT</button>
+        </div>
+      </div>
+      <div id="reportArea"><div class="empty">Klik <b>GENERATE LAPORAN</b> untuk membangun laporan dari kondisi vault sekarang.</div></div>
+    </section>
+
+    <!-- PROJECTS -->
+    <section id="view-projects" class="view">
+      <header class="page-head"><h1>PROJECTS</h1>
+        <div class="page-meta">Semua project note di <code>Projects/</code></div></header>
+      <div id="projectList" class="list-panel"></div>
+    </section>
+  </main>
+</div>
+
+<input type="file" id="avatarFile" accept="image/png,image/jpeg,image/webp" hidden>
+<script src="graph.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
