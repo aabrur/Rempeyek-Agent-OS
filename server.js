@@ -95,7 +95,7 @@ function buildState() {
       openTasks: { value: tasks.length, label: "Checkbox terbuka di Tasks/" },
       projects: { value: projects.length, label: "Project note aktif" },
     },
-    agents: cfg.agents.map(a => ({ ...a, gateway: undefined, ...agentVaultStatus(files, a), proc: procInfo(a.id), avatar: avatarUrl(a.id) })),
+    agents: cfg.agents.map(a => ({ ...a, gateway: undefined, actions: gwActions(a), ...agentVaultStatus(files, a), proc: procInfo(a.id), avatar: avatarUrl(a.id) })),
     review: [
       ...inbox.map(f => ({ title: f.rel.split("/").pop().replace(".md", ""), meta: f.rel, kind: "inbox" })),
       ...tasks.slice(0, 6).map(t => ({ title: t.text, meta: t.source, kind: "task" })),
@@ -106,13 +106,43 @@ function buildState() {
   };
 }
 
-/* ---------------- process manager (view: Gateway Console) ---------------- */
-const procs = new Map(); // id -> {child,pid,log:[],seq,status,startedAt,exitCode}
+/* ---------------- gateway controller ----------------
+   Dashboard memanggil command gateway ASLI tiap agent (start/stop/restart/status/run).
+   - start/stop/restart/status : command pendek (jalan → tampung output → selesai),
+     dikelola OS service manager (schtasks/systemd) → tetap hidup walau dashboard ditutup.
+   - run : foreground, di-own dashboard (log live), berhenti saat dashboard/tombol stop.
+   procs = proses `run` yang di-own dashboard. gwCache = hasil status terakhir per agent. */
+const procs = new Map();   // id -> {child,pid,log:[],seq,status,startedAt,exitCode}
+const gwCache = new Map();  // id -> {running,text,at,exitCode}
+
+function agentById(id) { return loadConfig().agents.find(a => a.id === id); }
+function gwActions(agent) { return (agent && agent.gateway && agent.gateway.actions) || []; }
+
+function detectRunning(text) {
+  const t = (text || "").toLowerCase();
+  if (/not running|tidak (sedang )?jalan|belum jalan|\bstopped\b|\binactive\b|no gateway|not installed|no running/.test(t)) return false;
+  if (/\brunning\b|\bactive\b|\bpid[:\s#]|listening on|is up\b/.test(t)) return true;
+  return false;
+}
 
 function procInfo(id) {
   const p = procs.get(id);
-  if (!p) return { status: "off" };
-  return { status: p.status, pid: p.pid, startedAt: p.startedAt, exitCode: p.exitCode, logSize: p.seq };
+  const c = gwCache.get(id);
+  // proses run yang di-own dashboard menang kalau masih hidup
+  if (p && p.status === "running")
+    return { status: "running", mode: "owned", pid: p.pid, startedAt: p.startedAt, exitCode: null, logSize: p.seq, reason: null, statusText: c && c.text || null, checkedAt: c && new Date(c.at).toISOString() || null };
+  let reason = null;
+  if (p && (p.status === "exited" || p.status === "error")) {
+    const out = p.log.filter(l => l.s === "out" || l.s === "err");
+    reason = (out.length ? out[out.length - 1].line : (p.log.length ? p.log[p.log.length - 1].line : "")).slice(0, 140);
+  }
+  if (c) {
+    const firstLine = c.text ? c.text.split(/\r?\n/).find(l => l.trim()) || "" : "";
+    return { status: c.running ? "running" : "stopped", mode: "service", exitCode: c.exitCode, logSize: p ? p.seq : 0,
+      reason: reason || (!c.running ? firstLine.slice(0, 140) : null), statusText: c.text, checkedAt: new Date(c.at).toISOString() };
+  }
+  if (p) return { status: p.status, mode: "owned", pid: p.pid, startedAt: p.startedAt, exitCode: p.exitCode, logSize: p.seq, reason, statusText: null };
+  return { status: "off" };
 }
 
 function pushLog(p, stream, chunk) {
@@ -123,39 +153,85 @@ function pushLog(p, stream, chunk) {
   }
 }
 
-function startProc(id) {
-  const agent = loadConfig().agents.find(a => a.id === id);
-  if (!agent) return { error: `agent '${id}' tidak ada di agents.config.json` };
-  if (!agent.enabled || !agent.gateway || !agent.gateway.command)
-    return { error: agent.note || `gateway '${id}' belum dikonfigurasi (enabled:false)` };
-  const existing = procs.get(id);
-  if (existing && existing.status === "running") return { error: `${id} sudah jalan (pid ${existing.pid})` };
+/* command pendek: start/stop/restart/status → jalankan `<bin> <action>`, tampung output */
+function gwCtl(id, action, cb) {
+  const agent = agentById(id);
+  if (!agent) return cb({ error: `agent '${id}' tidak dikenal` });
+  const g = agent.gateway;
+  if (!agent.enabled || !g || !g.bin) return cb({ error: agent.note || `gateway '${id}' belum siap (enabled:false)` });
+  if (!gwActions(agent).includes(action)) return cb({ error: `aksi '${action}' tidak didukung ${agent.name}` });
+  const cwd = g.cwd || loadConfig().workdir;
+  if (!fs.existsSync(cwd)) return cb({ error: `cwd tidak ada: ${cwd}` });
 
-  const cwd = agent.gateway.cwd || loadConfig().workdir;
+  const cmd = `${g.bin} ${action}`;
+  let out = "", done = false;
+  const finish = (obj) => { if (done) return; done = true; clearTimeout(timer); cb(obj); };
+  let child;
+  try { child = spawn(cmd, [], { cwd, shell: true, windowsHide: true, env: { ...process.env, AGENT_WORKDIR: loadConfig().workdir } }); }
+  catch (e) { return cb({ error: `gagal spawn: ${e.message}` }); }
+  const timer = setTimeout(() => { try { child.kill(); } catch {} finish({ error: `timeout 45s: ${cmd}` }); }, 45000);
+  child.stdout.on("data", d => { out += d; });
+  child.stderr.on("data", d => { out += d; });
+  child.on("error", err => finish({ error: `gagal jalankan: ${err.message}` }));
+  child.on("exit", code => {
+    const text = out.trim().slice(0, 4000);
+    const running = detectRunning(text);
+    if (action === "status" || action === "start" || action === "restart") gwCache.set(id, { running, text, at: Date.now(), exitCode: code });
+    else if (action === "stop") gwCache.set(id, { running: false, text, at: Date.now(), exitCode: code });
+    finish({ ok: code === 0, code, action, running, output: text });
+  });
+}
+
+/* run: foreground, di-own dashboard, log live */
+function gwRun(id) {
+  const agent = agentById(id);
+  if (!agent) return { error: `agent '${id}' tidak dikenal` };
+  const g = agent.gateway;
+  if (!agent.enabled || !g || !g.bin) return { error: agent.note || `gateway '${id}' belum siap (enabled:false)` };
+  if (!gwActions(agent).includes("run")) return { error: `${agent.name} tidak mendukung 'run'` };
+  const existing = procs.get(id);
+  if (existing && existing.status === "running") return { error: `${id} sudah jalan owned (pid ${existing.pid})` };
+  const cwd = g.cwd || loadConfig().workdir;
   if (!fs.existsSync(cwd)) return { error: `cwd tidak ada: ${cwd}` };
 
+  const cmd = g.runCmd || `${g.bin} run`;
   const p = { log: [], seq: 0, status: "running", startedAt: new Date().toISOString(), exitCode: null };
-  pushLog(p, "sys", `[agentic-os] start: ${agent.gateway.command}  (cwd: ${cwd})`);
-  const child = spawn(agent.gateway.command, [], {
-    cwd, shell: true, windowsHide: true,
-    env: { ...process.env, AGENT_WORKDIR: loadConfig().workdir },
-  });
+  pushLog(p, "sys", `[agentic-os] run (owned): ${cmd}  (cwd: ${cwd})`);
+  let child;
+  try { child = spawn(cmd, [], { cwd, shell: true, windowsHide: true, env: { ...process.env, AGENT_WORKDIR: loadConfig().workdir } }); }
+  catch (e) { return { error: `gagal spawn: ${e.message}` }; }
   p.child = child; p.pid = child.pid;
   child.stdout.on("data", d => pushLog(p, "out", d));
   child.stderr.on("data", d => pushLog(p, "err", d));
-  child.on("exit", (code) => { p.status = "exited"; p.exitCode = code; pushLog(p, "sys", `[agentic-os] exit code ${code}`); });
-  child.on("error", (err) => { p.status = "error"; pushLog(p, "sys", `[agentic-os] spawn error: ${err.message}`); });
+  child.on("exit", code => { p.status = "exited"; p.exitCode = code; pushLog(p, "sys", `[agentic-os] exit code ${code}`); });
+  child.on("error", err => { p.status = "error"; pushLog(p, "sys", `[agentic-os] spawn error: ${err.message}`); });
   procs.set(id, p);
-  return { ok: true, pid: child.pid };
+  return { ok: true, pid: child.pid, mode: "run (owned)" };
 }
 
-function stopProc(id) {
+/* matikan proses run yang di-own dashboard (kalau ada) */
+function killOwned(id) {
   const p = procs.get(id);
-  if (!p || p.status !== "running") return { error: `${id} tidak sedang jalan` };
-  pushLog(p, "sys", "[agentic-os] stop diminta — taskkill /T /F");
+  if (!p || p.status !== "running" || !p.pid) return false;
+  pushLog(p, "sys", "[agentic-os] stop owned — taskkill /T /F");
   if (process.platform === "win32") execFile("taskkill", ["/pid", String(p.pid), "/T", "/F"], () => {});
   else { try { process.kill(-p.pid, "SIGTERM"); } catch { try { p.child.kill(); } catch {} } }
-  return { ok: true };
+  return true;
+}
+
+/* stop = matikan owned run (kalau ada) + panggil native `gateway stop` (kalau didukung) */
+function gwStop(id, cb) {
+  const agent = agentById(id);
+  const killed = killOwned(id);
+  if (agent && gwActions(agent).includes("stop"))
+    return gwCtl(id, "stop", r => cb({ ...r, ownedKilled: killed }));
+  cb({ ok: true, ownedKilled: killed, note: killed ? "proses run (owned) dihentikan" : `${agent ? agent.name : id} tidak punya native stop & tidak ada proses owned` });
+}
+
+/* refresh status semua agent yang mendukungnya (dipanggil berkala) */
+function pollAllStatus() {
+  for (const a of loadConfig().agents)
+    if (a.enabled && a.gateway && gwActions(a).includes("status")) gwCtl(a.id, "status", () => {});
 }
 
 /* ---------------- avatar ---------------- */
@@ -308,7 +384,7 @@ function agentDetail(id) {
   return {
     id, name: agent.name, icon: agent.icon, role: agent.role, node: agent.node,
     enabled: agent.enabled, note: agent.note || null, avatar: avatarUrl(id),
-    cwd: agent.gateway && agent.gateway.cwd, command: agent.gateway && agent.gateway.command,
+    cwd: agent.gateway && agent.gateway.cwd, bin: agent.gateway && agent.gateway.bin, actions: gwActions(agent),
     proc: procInfo(id), ...agentVaultStatus(files, agent),
     log: p ? p.log.slice(-40) : [],
     laneFiles, telemetry: readTelemetry(id),
@@ -424,9 +500,9 @@ const server = http.createServer((req, res) => {
       if (url === "/api/state") return json(res, 200, buildState());
       if (url === "/api/procs") {
         const cfg = loadConfig();
-        return json(res, 200, cfg.agents.map(a => ({ id: a.id, name: a.name, icon: a.icon, enabled: a.enabled, note: a.note || null, cwd: a.gateway && a.gateway.cwd, command: a.gateway && a.gateway.command, ...procInfo(a.id) })));
+        return json(res, 200, cfg.agents.map(a => ({ id: a.id, name: a.name, icon: a.icon, enabled: a.enabled, note: a.note || null, cwd: a.gateway && a.gateway.cwd, bin: a.gateway && a.gateway.bin, actions: gwActions(a), ...procInfo(a.id) })));
       }
-      let m = url.match(/^\/api\/proc\/([\w-]+)\/(start|stop|log)$/);
+      let m = url.match(/^\/api\/proc\/([\w-]+)\/(start|stop|restart|status|run|log)$/);
       if (m) {
         const [, id, action] = m;
         if (action === "log") {
@@ -435,13 +511,17 @@ const server = http.createServer((req, res) => {
           return json(res, 200, { lines: p ? p.log.filter(l => l.i >= since) : [], next: p ? p.seq : 0, ...procInfo(id) });
         }
         if (req.method !== "POST") return json(res, 405, { error: "POST only" });
-        const r = action === "start" ? startProc(id) : stopProc(id);
-        return json(res, r.error ? 400 : 200, r);
+        if (action === "run") { const r = gwRun(id); return json(res, r.error ? 400 : 200, r); }
+        if (action === "stop") return gwStop(id, r => json(res, r.error ? 400 : 200, r));
+        return gwCtl(id, action, r => json(res, r.error ? 400 : 200, r)); // start | restart | status
       }
       if (url === "/api/proc/start-all" && req.method === "POST") {
+        const list = loadConfig().agents.filter(a => a.enabled && a.gateway && gwActions(a).includes("start"));
+        if (!list.length) return json(res, 200, {});
         const results = {};
-        for (const a of loadConfig().agents) if (a.enabled) results[a.id] = startProc(a.id);
-        return json(res, 200, results);
+        let pending = list.length;
+        list.forEach(a => gwCtl(a.id, "start", r => { results[a.id] = r; if (--pending === 0) json(res, 200, results); }));
+        return;
       }
       if (url === "/api/graph") return json(res, 200, buildGraph());
       if (url === "/api/report") return json(res, 200, buildReport());
@@ -471,11 +551,13 @@ const server = http.createServer((req, res) => {
   res.end(fs.readFileSync(file));
 });
 
-process.on("exit", () => { for (const id of procs.keys()) stopProc(id); });
+process.on("exit", () => { for (const id of procs.keys()) killOwned(id); });
 
 server.listen(PORT, () => {
   console.log(`\n  Agentic OS jalan di  http://localhost:${PORT}`);
   console.log(`  Vault sumber data:   ${VAULT}`);
   console.log(`  Config agent:        ${CONFIG_PATH}`);
   console.log(TOKEN ? "  Auth: token AKTIF (x-dash-token)" : "  Auth: tanpa token (lokal). Untuk remote: set DASH_TOKEN.\n");
+  setTimeout(pollAllStatus, 3000);       // status awal
+  setInterval(pollAllStatus, 25000);     // refresh status gateway tiap 25s
 });

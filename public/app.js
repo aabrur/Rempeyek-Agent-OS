@@ -33,22 +33,31 @@ function esc(s) { return String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;"
 function pill(status) { return `<span class="pill"><span class="dot ${status}"></span><span class="lbl-${status}">${status}</span></span>`; }
 function ac(id) { return ACCENT[id] || "#8C5BFF"; }
 function gwState(p) {
-  if (!p || p.status === "off") return { cls: "idle", label: "gateway off" };
-  if (p.status === "running") return { cls: "running", label: `running · pid ${p.pid}` };
-  if (p.status === "exited") return { cls: "exited", label: `exited (${p.exitCode})` };
-  return { cls: "error", label: p.status };
+  if (!p || p.status === "off") return { cls: "idle", label: "belum dicek", tip: "" };
+  if (p.status === "running") return { cls: "running", label: p.mode === "owned" ? `running · owned pid ${p.pid}` : "running · service", tip: p.statusText || "" };
+  if (p.status === "stopped") return { cls: "idle", label: "stopped", tip: p.statusText || "" };
+  if (p.status === "exited") return { cls: "exited", label: `exited (${p.exitCode})`, tip: p.reason || "" };
+  return { cls: "error", label: p.status, tip: p.reason || "" };
+}
+function gwPill(gw) {
+  return `<span class="pill" title="${esc(gw.tip)}"><span class="dot ${gw.cls}"></span>` +
+    `<span class="lbl-${gw.cls}">${esc(gw.label)}</span></span>`;
 }
 function avatarHtml(a, lg) {
   const inner = a.avatar ? `<img src="${a.avatar}" alt="${esc(a.name)}">` : (a.icon || "◈");
   return `<div class="avatar ${lg ? "avatar-lg" : ""}" style="--ac:${ac(a.id)}">${inner}
     ${lg ? `<button class="avatar-edit" data-act="avatar" data-id="${a.id}" title="Ganti foto profil">✎</button>` : ""}</div>`;
 }
-function actionBtn(a) {
-  const running = a.proc && a.proc.status === "running";
+const ACT_LABEL = { start: "▶ Start", stop: "■ Stop", restart: "↻ Restart", status: "◇ Status", run: "⚡ Run" };
+const ACT_CLS = { start: "btn-run", stop: "btn-stop", restart: "btn-dim", status: "btn-dim", run: "btn-dim" };
+function gwButtons(a, compact) {
   if (!a.enabled) return `<button class="btn btn-dim" disabled title="${esc(a.note || "nonaktif")}">setup dulu</button>`;
-  return running
-    ? `<button class="btn btn-stop" data-act="stop" data-id="${a.id}">■ Stop</button>`
-    : `<button class="btn btn-run" data-act="start" data-id="${a.id}">▶ Run</button>`;
+  const acts = a.actions || [];
+  const running = a.proc && a.proc.status === "running";
+  let pick;
+  if (compact) pick = running ? ["stop"] : (acts.includes("start") ? ["start"] : acts.slice(0, 1));
+  else pick = acts.slice();
+  return pick.map(act => `<button class="btn ${ACT_CLS[act] || "btn-dim"}" data-act="${act}" data-id="${a.id}">${ACT_LABEL[act] || act}</button>`).join("");
 }
 
 /* ---------- render utama ---------- */
@@ -66,11 +75,10 @@ function render(state) {
   const cardHtml = a => {
     const gw = gwState(a.proc);
     return `<div class="agent-card ${openAgent === a.id ? "selected" : ""}" style="--ac:${ac(a.id)}" data-open="${a.id}">
-      <div class="card-top">${avatarHtml(a)}${actionBtn(a)}</div>
+      <div class="card-top">${avatarHtml(a)}<div class="card-btns">${gwButtons(a, true)}</div></div>
       <div class="agent-name">${esc(a.name)}</div>
       <div class="agent-role">${esc(a.role)}</div>
-      <div class="pill-row">${pill(a.vaultStatus)}
-        <span class="pill"><span class="dot ${gw.cls}"></span><span class="lbl-${gw.cls}">${esc(gw.label)}</span></span></div></div>`;
+      <div class="pill-row">${pill(a.vaultStatus)}${gwPill(gw)}</div></div>`;
   };
   document.getElementById("agentCards").innerHTML = state.agents.map(cardHtml).join("");
   document.getElementById("agentGrid").innerHTML = state.agents.map(cardHtml).join("");
@@ -138,25 +146,32 @@ async function renderDetail() {
     `<a href="${obsUri(f.rel)}"><span>${esc(f.rel.split("/").pop().replace(".md", ""))}</span><span class="d">${f.updated}</span></a>`).join("")}</div>`
     : `<div class="empty">Belum ada catatan di lane Brains.</div>`;
 
+  const checked = d.proc && d.proc.checkedAt ? new Date(d.proc.checkedAt).toLocaleTimeString("id-ID") : null;
+  const statusOut = d.proc && d.proc.statusText
+    ? `<pre class="logpane" style="height:130px" id="statusout">${esc(d.proc.statusText)}</pre>`
+    : `<div class="empty">Klik <b>Status</b> untuk cek kondisi gateway lewat command aslinya.</div>`;
+
   box.innerHTML = `<div class="detail" style="--ac:${ac(d.id)}">
     <div class="detail-head">
       ${avatarHtml(d, true)}
       <div>
         <h2>${esc(d.name)}</h2>
-        <div class="detail-meta">${esc(d.role)} · ${esc(d.node)} · ${esc(d.command || "gateway belum diisi")}</div>
-        <div class="pill-row" style="margin-top:7px">${pill(d.vaultStatus)}
-          <span class="pill"><span class="dot ${gw.cls}"></span><span class="lbl-${gw.cls}">${esc(gw.label)}</span></span></div>
+        <div class="detail-meta">${esc(d.role)} · ${esc(d.node)} · <code>${esc(d.bin || "gateway N/A")}</code></div>
+        <div class="pill-row" style="margin-top:7px">${pill(d.vaultStatus)}${gwPill(gw)}</div>
       </div>
-      <div class="detail-actions">${actionBtn(d)}
-        <button class="btn btn-dim" data-act="close-detail">✕ tutup</button></div>
+      <div class="detail-actions"><button class="btn btn-dim" data-act="close-detail">✕ tutup</button></div>
     </div>
     <div class="detail-grid">
+      <div class="dsec" style="grid-column:1/-1"><h3>Kontrol gateway ${checked ? `<span class="cnt" style="text-transform:none;letter-spacing:0">· dicek ${checked}</span>` : ""}</h3>
+        <div class="gw-ctl">${gwButtons(d, false) || `<span class="muted">${esc(d.note || "tidak ada aksi")}</span>`}</div>
+        ${d.note ? `<div class="gw-note">ℹ ${esc(d.note)}</div>` : ""}
+        ${statusOut}</div>
       ${cl ? `<div class="dsec"><h3>Sesi aktif <span class="cnt">${cl.sessions.length}</span></h3>${sessions}</div>
       <div class="dsec"><h3>Subagent spawn <span class="cnt">${cl.subagents.length}</span></h3>${subs}</div>` : ""}
       <div class="dsec"><h3>Telemetry</h3>${tele}</div>
       <div class="dsec"><h3>Lane vault — Brains/</h3>${lane}</div>
-      <div class="dsec" style="grid-column:1/-1"><h3>Log gateway (live)</h3>
-        <pre class="logpane" id="logpane">${d.log.map(l => `[${l.t}] ${l.s === "err" ? "⚠ " : ""}${esc(l.line)}`).join("\n")}</pre></div>
+      <div class="dsec" style="grid-column:1/-1"><h3>Log gateway run (owned, live)</h3>
+        <pre class="logpane" id="logpane">${d.log.length ? d.log.map(l => `[${l.t}] ${l.s === "err" ? "⚠ " : ""}${esc(l.line)}`).join("\n") : "(belum ada — muncul kalau kamu klik Run / foreground)"}</pre></div>
     </div>
   </div>`;
   const pane = document.getElementById("logpane");
@@ -275,16 +290,20 @@ document.body.addEventListener("click", async e => {
   if (closeBtn) { openAgent = null; renderDetail(); refresh(); return; }
 
   const btn = e.target.closest("[data-act]");
-  if (btn) {
+  if (btn && ["start", "stop", "restart", "status", "run"].includes(btn.dataset.act)) {
+    e.stopPropagation();
     const { act, id } = btn.dataset;
-    if (act === "start" || act === "stop") {
-      e.stopPropagation();
-      btn.disabled = true;
-      const r = await api(`/api/proc/${id}/${act}`, { method: "POST" });
-      if (r.error) alert(r.error);
-      setTimeout(() => { refresh(); if (openAgent) renderDetail(); }, 600);
-      return;
+    const label = btn.textContent;
+    btn.disabled = true; btn.textContent = "…";
+    const r = await api(`/api/proc/${id}/${act}`, { method: "POST" });
+    btn.textContent = label; btn.disabled = false;
+    if (r.error) alert(r.error);
+    else if (r.output && (act === "status" || !openAgent)) {
+      // tampilkan output command kalau detail tidak terbuka; kalau terbuka, detail sudah menampilkannya
+      if (!openAgent) alert(`${id} · ${act}:\n\n${r.output}`);
     }
+    setTimeout(() => { refresh(); if (openAgent) renderDetail(); }, act === "status" ? 200 : 900);
+    return;
   }
 
   const card = e.target.closest("[data-open]");

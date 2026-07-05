@@ -10,8 +10,9 @@
       "lane": "ClaudeCode",
       "enabled": true,
       "gateway": {
-        "command": "node gateway.mjs",
-        "cwd": "C:\\Users\\abrur\\AI-Agent\\.claude\\.claude-gateway"
+        "bin": "claude-gateway",
+        "cwd": "C:\\Users\\abrur\\AI-Agent\\.claude\\.claude-gateway",
+        "actions": ["start", "stop", "restart", "status", "run"]
       }
     },
     {
@@ -23,8 +24,9 @@
       "lane": "Hermes",
       "enabled": true,
       "gateway": {
-        "command": "\"C:\\Users\\abrur\\AppData\\Local\\hermes\\hermes-agent\\venv\\Scripts\\hermes.exe\" gateway run",
-        "cwd": "C:\\Users\\abrur\\AppData\\Local\\hermes"
+        "bin": "\"C:\\Users\\abrur\\AppData\\Local\\hermes\\hermes-agent\\venv\\Scripts\\hermes.exe\" gateway",
+        "cwd": "C:\\Users\\abrur\\AppData\\Local\\hermes",
+        "actions": ["start", "stop", "restart", "status", "run"]
       }
     },
     {
@@ -36,8 +38,9 @@
       "lane": "OpenClaw",
       "enabled": true,
       "gateway": {
-        "command": "openclaw gateway",
-        "cwd": "C:\\Users\\abrur\\AI-Agent\\.openclaw"
+        "bin": "openclaw gateway",
+        "cwd": "C:\\Users\\abrur\\AI-Agent\\.openclaw",
+        "actions": ["start", "stop", "restart", "status", "run"]
       }
     },
     {
@@ -48,11 +51,8 @@
       "node": "Node-9/10",
       "lane": "ZCode",
       "enabled": false,
-      "note": "CLI `zcode` tidak ditemukan di PATH (folder ~\\.zcode hanya berisi state). Isi gateway.command yang benar lalu set enabled:true.",
-      "gateway": {
-        "command": "",
-        "cwd": "C:\\Users\\abrur\\.zcode"
-      }
+      "note": "Tidak ada CLI `zcode` di PATH — folder ~\\.zcode hanya berisi state/config (db, log, certs, credentials, bot-state), bukan binary. Tidak ada command gateway yang bisa dipanggil. Install/expose CLI-nya dulu.",
+      "gateway": null
     },
     {
       "id": "copilot",
@@ -61,11 +61,13 @@
       "role": "GitHub Copilot CLI (standby)",
       "node": "Node-11",
       "lane": "",
-      "enabled": true,
-      "note": "Terinstal (CLI v1.0.68, junction ~/.copilot → AI-Agent\\.copilot). Login dulu: jalankan `copilot` di terminal → /login. Setelah login, set enabled:true (command default: ACP server persisten).",
+      "enabled": false,
+      "note": "Copilot CLI TIDAK punya subcommand `gateway` (cek: subcommand yang ada cuma login/mcp/plugin/skill/update/version). Yang tersedia hanya mode server ACP via flag `copilot --acp`. Login dulu (`copilot` → /login), lalu set enabled:true untuk pakai tombol Run (mode --acp, owned oleh dashboard).",
       "gateway": {
-        "command": "copilot --acp",
-        "cwd": "C:\\Users\\abrur\\AI-Agent"
+        "bin": "copilot",
+        "cwd": "C:\\Users\\abrur\\AI-Agent",
+        "actions": ["run"],
+        "runCmd": "copilot --acp"
       }
     }
   ]
