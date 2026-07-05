@@ -18,18 +18,24 @@ const WORKFLOWS = [
 
 /* ---------- util ---------- */
 function headers() { return TOKEN ? { "x-dash-token": TOKEN } : {}; }
-async function api(path, opts = {}) {
-  const res = await fetch(path, { ...opts, headers: { ...headers(), ...(opts.headers || {}) } });
-  if (res.status === 401) {
-    TOKEN = prompt("Dashboard dikunci token (DASH_TOKEN). Masukkan token:") || "";
-    localStorage.setItem("dashToken", TOKEN);
-    if (TOKEN) return api(path, opts);
-  }
-  return res.json();
+/* api() selalu balik objek (tak pernah throw): R7/R8 fetch dibungkus try/catch + AbortSignal timeout,
+   R6/F12 retry 401 pakai counter maksimal 2 (bukan rekursi tak terbatas). */
+async function api(path, opts = {}, attempt = 0) {
+  try {
+    const res = await fetch(path, { ...opts, headers: { ...headers(), ...(opts.headers || {}) }, signal: AbortSignal.timeout(8000) });
+    if (res.status === 401) {
+      if (attempt >= 2) return { error: "unauthorized" };
+      TOKEN = prompt("Dashboard dikunci token (DASH_TOKEN). Masukkan token:") || "";
+      localStorage.setItem("dashToken", TOKEN);
+      if (TOKEN) return api(path, opts, attempt + 1);
+      return { error: "unauthorized" };
+    }
+    return await res.json();
+  } catch (e) { return { error: e && e.name === "TimeoutError" ? "timeout" : (e && e.message) || "network error" }; }
 }
 function obsUri(rel) { return `obsidian://open?vault=${encodeURIComponent(VAULT_NAME)}&file=${encodeURIComponent(rel.replace(/\.md$/, ""))}`; }
 function el(html) { const t = document.createElement("template"); t.innerHTML = html.trim(); return t.content.firstChild; }
-function esc(s) { return String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+function esc(s) { return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
 function pill(status) { return `<span class="pill"><span class="dot ${status}"></span><span class="lbl-${status}">${status}</span></span>`; }
 function ac(id) { return ACCENT[id] || "#8C5BFF"; }
 function gwState(p) {
@@ -61,8 +67,13 @@ function gwButtons(a, compact) {
 }
 
 /* ---------- render utama ---------- */
+let _lastStateKey = "";
 function render(state) {
   document.getElementById("stamp").textContent = new Date(state.generatedAt).toLocaleTimeString("id-ID");
+  // F2: dirty-check — kalau data (selain timestamp) tak berubah, skip rebuild DOM berat (cegah layout thrash + scroll jump)
+  const key = JSON.stringify({ ...state, generatedAt: 0 });
+  if (key === _lastStateKey) return;
+  _lastStateKey = key;
   const vp = document.getElementById("vaultPath");
   vp.textContent = state.vault; vp.title = state.vault;
 
@@ -121,19 +132,24 @@ async function renderDetail() {
   const d = await api(`/api/agent/${openAgent}/detail`);
   if (d.error) { box.innerHTML = `<div class="empty">${esc(d.error)}</div>`; return; }
   const gw = gwState(d.proc);
-  const cl = d.claude;
+  const act = d.activity || { sessions: [], subagents: [] };
+  const isTele = d.source === "telemetry";   // Claude = transcript, lainnya = telemetry
 
-  const sessions = cl && cl.sessions.length ? cl.sessions.map(s => `<div class="sess">
-      <div class="top"><span>sesi ${esc(s.id)} · ${esc(s.project)}</span>${pill(s.status)}</div>
+  const sessions = act.sessions.length ? act.sessions.map(s => `<div class="sess">
+      <div class="top"><span>${esc(s.id)}${s.project ? " · " + esc(s.project) : ""}</span>${pill(s.status)}</div>
       ${s.lastPrompt ? `<div class="prm">❯ ${esc(s.lastPrompt)}</div>` : ""}
       ${s.lastTool ? `<div class="act">⚙ ${esc(s.lastTool.name)} ${esc(s.lastTool.target)} · ${s.toolCount} tool call</div>` : ""}
-    </div>`).join("") : `<div class="empty">Belum ada sesi 48 jam terakhir.</div>`;
+    </div>`).join("")
+    : `<div class="empty">${isTele
+        ? `Belum ada aktivitas. Agent lapor task via telemetry <code>agentic-os\\telemetry\\${esc(d.id)}.jsonl</code> (type <code>task_start/progress/done</code>).`
+        : "Belum ada sesi 48 jam terakhir."}</div>`;
 
-  const subs = cl ? (cl.subagents.length ? cl.subagents.map(s => `<div class="subrow">
-      <span class="ty">${esc(s.type)}</span><span class="nm">${esc(s.desc)}</span>
+  const subs = act.subagents.length ? act.subagents.map(s => `<div class="subrow">
+      <span class="ty">${esc(s.type)}</span><span class="nm">${esc(s.desc)}${s.detail ? " — " + esc(s.detail) : ""}</span>
       <span class="st st-${s.status}">${s.status === "done" ? "✔ done" : "⟳ running"}</span></div>`).join("")
-      : `<div class="empty">Belum ada subagent yang di-spawn di sesi 48 jam terakhir. Begitu ada Agent/Task spawn, muncul di sini otomatis.</div>`)
-    : null;
+    : `<div class="empty">${isTele
+        ? `Belum ada subagent/task. Lapor via telemetry (type <code>subagent_start/done</code>) → muncul di sini otomatis.`
+        : "Belum ada subagent yang di-spawn di sesi 48 jam terakhir. Begitu ada Agent/Task spawn, muncul otomatis."}</div>`;
 
   const tele = d.telemetry.length ? d.telemetry.map(t => `<div class="subrow">
       <span class="ty">${esc(t.type)}</span>
@@ -166,9 +182,9 @@ async function renderDetail() {
         <div class="gw-ctl">${gwButtons(d, false) || `<span class="muted">${esc(d.note || "tidak ada aksi")}</span>`}</div>
         ${d.note ? `<div class="gw-note">ℹ ${esc(d.note)}</div>` : ""}
         ${statusOut}</div>
-      ${cl ? `<div class="dsec"><h3>Sesi aktif <span class="cnt">${cl.sessions.length}</span></h3>${sessions}</div>
-      <div class="dsec"><h3>Subagent spawn <span class="cnt">${cl.subagents.length}</span></h3>${subs}</div>` : ""}
-      <div class="dsec"><h3>Telemetry</h3>${tele}</div>
+      <div class="dsec"><h3>Sesi / Aktivitas <span class="cnt">${act.sessions.length}</span></h3>${sessions}</div>
+      <div class="dsec"><h3>Subagent / Task <span class="cnt">${act.subagents.length}</span></h3>${subs}</div>
+      <div class="dsec"><h3>Telemetry <span class="cnt">${d.telemetry.length}</span></h3>${tele}</div>
       <div class="dsec"><h3>Lane vault — Brains/</h3>${lane}</div>
       <div class="dsec" style="grid-column:1/-1"><h3>Log gateway run (owned, live)</h3>
         <pre class="logpane" id="logpane">${d.log.length ? d.log.map(l => `[${l.t}] ${l.s === "err" ? "⚠ " : ""}${esc(l.line)}`).join("\n") : "(belum ada — muncul kalau kamu klik Run / foreground)"}</pre></div>
@@ -186,7 +202,9 @@ avatarInput.addEventListener("change", () => {
   avatarInput.value = "";
   if (!file || !avatarTarget) return;
   const img = new Image();
+  const url = URL.createObjectURL(file);
   img.onload = async () => {
+    URL.revokeObjectURL(url);              // F13/R15: lepas blob URL, cegah memory leak
     const c = document.createElement("canvas");
     const S = 256; c.width = S; c.height = S;
     const x = c.getContext("2d");
@@ -199,7 +217,8 @@ avatarInput.addEventListener("change", () => {
     if (r.error) alert(r.error);
     refresh(); renderDetail();
   };
-  img.src = URL.createObjectURL(file);
+  img.onerror = () => { URL.revokeObjectURL(url); alert("gagal baca gambar"); };
+  img.src = url;
 });
 
 /* ---------- graph ---------- */
@@ -211,6 +230,10 @@ async function loadGraph(force) {
   }
   if (graphLoaded && !force) { graph.reheat(); return; }
   const data = await api("/api/graph");
+  if (!data || data.error || !Array.isArray(data.nodes)) {   // guard: jangan setData undefined kalau server error
+    document.getElementById("graphStats").textContent = `graph gagal dimuat (${(data && data.error) || "?"})`;
+    return;
+  }
   graph.setData(data);
   graphLoaded = true;
   document.getElementById("graphStats").textContent = `${data.nodes.length} node · ${data.edges.length} link`;
@@ -347,11 +370,14 @@ document.getElementById("nav").addEventListener("click", e => {
 
 /* ---------- loop ---------- */
 async function refresh() {
-  try { render(await api("/api/state")); }
-  catch { document.getElementById("stamp").textContent = "gagal memuat — server mati?"; }
+  const state = await api("/api/state");
+  if (!state || state.error) { document.getElementById("stamp").textContent = `gagal memuat (${(state && state.error) || "server mati?"})`; return; }
+  render(state);
 }
+const visible = () => document.visibilityState === "visible";   // F3: jangan polling saat tab hidden
 setInterval(() => { document.getElementById("clock").textContent = new Date().toLocaleString("id-ID"); }, 1000);
 refresh();
-setInterval(refresh, 6000);
-setInterval(() => { if (openAgent && document.getElementById("view-agents").classList.contains("active")) renderDetail(); }, 5000);
-setInterval(() => { if (graphLoaded && document.getElementById("view-graph").classList.contains("active")) loadGraph(true); }, 90000);
+setInterval(() => { if (visible()) refresh(); }, 6000);
+setInterval(() => { if (visible() && openAgent && document.getElementById("view-agents").classList.contains("active")) renderDetail(); }, 5000);
+setInterval(() => { if (visible() && graphLoaded && document.getElementById("view-graph").classList.contains("active")) loadGraph(true); }, 90000);
+document.addEventListener("visibilitychange", () => { if (visible()) refresh(); });   // refresh langsung saat tab balik aktif

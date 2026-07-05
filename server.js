@@ -1,11 +1,12 @@
-/* Agentic OS — zero-dependency Node server.
+﻿/* Agentic OS â€” zero-dependency Node server.
    Dashboard live dari Obsidian Vault + launcher gateway agent.
-   Jalankan: npm run dev  →  http://localhost:4321
-   Remote:   set DASH_TOKEN=rahasia  →  akses wajib pakai token. */
+   Jalankan: npm run dev  â†’  http://localhost:4321
+   Remote:   set DASH_TOKEN=rahasia  â†’  akses wajib pakai token. */
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
 const { spawn, execFile } = require("child_process");
+const crypto = require("crypto");
 
 /* muat .env (KEY=VALUE per baris; env var asli menang atas isi file) */
 try {
@@ -17,7 +18,7 @@ try {
 } catch {}
 
 const PORT = process.env.PORT || 4321;
-const VAULT = process.env.VAULT_PATH || "C:\\Users\\abrur\\AI-Agent\\Obsidian Vault";
+const VAULT = process.env.VAULT_PATH || "C:\\Users\\abrur\\Obsidian Vault";
 const CONFIG_PATH = process.env.AGENTS_CONFIG || path.join(__dirname, "agents.config.json");
 const TOKEN = process.env.DASH_TOKEN || "";
 const PUBLIC = path.join(__dirname, "public");
@@ -26,27 +27,48 @@ const DAY = 86400000;
 const LOG_MAX = 800;
 const AVATAR_DIR = path.join(PUBLIC, "avatars");
 const TELEMETRY_DIR = path.join(__dirname, "telemetry");
-const CLAUDE_PROJECTS = "C:\\Users\\abrur\\AI-Agent\\.claude\\projects";
+const CLAUDE_PROJECTS = "C:\\Users\\abrur\\.claude\\projects";
 for (const d of [AVATAR_DIR, TELEMETRY_DIR]) { try { fs.mkdirSync(d, { recursive: true }); } catch {} }
 
+/* loadConfig: memoize by mtime (B6) + tahan config rusak mid-edit â†’ return last-good (R10) */
+let _cfgCache = { mtime: 0, data: null };
 function loadConfig() {
-  return JSON.parse(fs.readFileSync(CONFIG_PATH, "utf8"));
+  try {
+    const st = fs.statSync(CONFIG_PATH);
+    if (_cfgCache.data && st.mtimeMs === _cfgCache.mtime) return _cfgCache.data;
+    const data = JSON.parse(fs.readFileSync(CONFIG_PATH, "utf8"));
+    _cfgCache = { mtime: st.mtimeMs, data };
+    return data;
+  } catch (e) {
+    if (_cfgCache.data) { console.error("[config] parse gagal, pakai last-good:", e.message); return _cfgCache.data; }
+    throw e;
+  }
 }
 
 /* ---------------- vault scan (view: Command Center) ---------------- */
-function walk(dir, out = [], base = dir) {
+function walk(dir, out = [], base = dir, depth = 0) {
+  if (depth > 100) return out;               // R14: cegah rekursi tak henti (nest dalam)
   let entries;
   try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return out; }
   for (const e of entries) {
     if (IGNORE.has(e.name) || e.name.startsWith(".")) continue;
+    if (e.isSymbolicLink()) continue;        // R14: skip symlink/junction â†’ cegah loop
     const full = path.join(dir, e.name);
-    if (e.isDirectory()) walk(full, out, base);
+    if (e.isDirectory()) walk(full, out, base, depth + 1);
     else if (e.name.endsWith(".md")) {
       let st; try { st = fs.statSync(full); } catch { continue; }
       out.push({ rel: path.relative(base, full).replace(/\\/g, "/"), mtime: st.mtimeMs });
     }
   }
   return out;
+}
+
+/* snapshot vault ber-TTL pendek: dedupe re-walk saat banyak endpoint/tab minta dalam 1 tick (B1/B3) */
+let _walkCache = { t: 0, data: null };
+function walkVault() {
+  if (_walkCache.data && Date.now() - _walkCache.t < 3000) return _walkCache.data;
+  _walkCache = { t: Date.now(), data: walk(VAULT) };
+  return _walkCache.data;
 }
 
 function agentVaultStatus(files, agent) {
@@ -68,7 +90,7 @@ function openTasks() {
   let names = [];
   try { names = fs.readdirSync(path.join(VAULT, "Tasks")).filter(n => n.endsWith(".md")); } catch {}
   for (const n of names) {
-    const text = fs.readFileSync(path.join(VAULT, "Tasks", n), "utf8");
+    let text; try { text = fs.readFileSync(path.join(VAULT, "Tasks", n), "utf8"); } catch { continue; }
     for (const line of text.split(/\r?\n/)) {
       const m = line.match(/^\s*[-*] \[ \]\s+(.*)/);
       if (m) items.push({ text: m[1].slice(0, 120), source: `Tasks/${n}` });
@@ -79,7 +101,7 @@ function openTasks() {
 
 function buildState() {
   const cfg = loadConfig();
-  const files = walk(VAULT);
+  const files = walkVault();
   const now = Date.now();
   const tasks = openTasks();
   const inbox = files.filter(f => f.rel.startsWith("00 Inbox/"));
@@ -108,8 +130,8 @@ function buildState() {
 
 /* ---------------- gateway controller ----------------
    Dashboard memanggil command gateway ASLI tiap agent (start/stop/restart/status/run).
-   - start/stop/restart/status : command pendek (jalan → tampung output → selesai),
-     dikelola OS service manager (schtasks/systemd) → tetap hidup walau dashboard ditutup.
+   - start/stop/restart/status : command pendek (jalan â†’ tampung output â†’ selesai),
+     dikelola OS service manager (schtasks/systemd) â†’ tetap hidup walau dashboard ditutup.
    - run : foreground, di-own dashboard (log live), berhenti saat dashboard/tombol stop.
    procs = proses `run` yang di-own dashboard. gwCache = hasil status terakhir per agent. */
 const procs = new Map();   // id -> {child,pid,log:[],seq,status,startedAt,exitCode}
@@ -121,7 +143,7 @@ function gwActions(agent) { return (agent && agent.gateway && agent.gateway.acti
 function detectRunning(text) {
   const t = (text || "").toLowerCase();
   if (/not running|tidak (sedang )?jalan|belum jalan|\bstopped\b|\binactive\b|no gateway|not installed|no running/.test(t)) return false;
-  if (/\brunning\b|\bactive\b|\bpid[:\s#]|listening on|is up\b/.test(t)) return true;
+  if (/\brunning\b|\bactive\b|\bpid[:\s#]*\d|listening on|is up\b/.test(t)) return true;
   return false;
 }
 
@@ -146,14 +168,23 @@ function procInfo(id) {
 }
 
 function pushLog(p, stream, chunk) {
-  for (const line of String(chunk).split(/\r?\n/)) {
-    if (!line.trim()) continue;
-    p.log.push({ i: p.seq++, t: new Date().toISOString().slice(11, 19), s: stream, line: line.slice(0, 500) });
-    if (p.log.length > LOG_MAX) p.log.splice(0, p.log.length - LOG_MAX);
-  }
+  try {
+    for (const line of String(chunk).split(/\r?\n/)) {
+      if (!line.trim()) continue;
+      p.log.push({ i: p.seq++, t: new Date().toISOString().slice(11, 19), s: stream, line: line.slice(0, 500) });
+      if (p.log.length > LOG_MAX) p.log.splice(0, p.log.length - LOG_MAX);
+    }
+  } catch (e) { /* R19: jangan biarkan throw di event 'data' escape handler */ }
 }
 
-/* command pendek: start/stop/restart/status → jalankan `<bin> <action>`, tampung output */
+/* R2: tree-kill konsisten (Win: taskkill /T, POSIX: kill process group) â€” dipakai owned-run & timeout gwCtl */
+function killTree(pid, child) {
+  if (!pid) { try { child && child.kill(); } catch {} return; }
+  if (process.platform === "win32") { try { execFile("taskkill", ["/pid", String(pid), "/T", "/F"], () => {}); } catch {} }
+  else { try { process.kill(-pid, "SIGKILL"); } catch { try { child && child.kill(); } catch {} } }
+}
+
+/* command pendek: start/stop/restart/status â†’ jalankan `<bin> <action>`, tampung output */
 function gwCtl(id, action, cb) {
   const agent = agentById(id);
   if (!agent) return cb({ error: `agent '${id}' tidak dikenal` });
@@ -169,7 +200,7 @@ function gwCtl(id, action, cb) {
   let child;
   try { child = spawn(cmd, [], { cwd, shell: true, windowsHide: true, env: { ...process.env, AGENT_WORKDIR: loadConfig().workdir } }); }
   catch (e) { return cb({ error: `gagal spawn: ${e.message}` }); }
-  const timer = setTimeout(() => { try { child.kill(); } catch {} finish({ error: `timeout 45s: ${cmd}` }); }, 45000);
+  const timer = setTimeout(() => { killTree(child.pid, child); finish({ error: `timeout 30s: ${cmd}` }); }, 30000);
   child.stdout.on("data", d => { out += d; });
   child.stderr.on("data", d => { out += d; });
   child.on("error", err => finish({ error: `gagal jalankan: ${err.message}` }));
@@ -204,7 +235,7 @@ function gwRun(id) {
   child.stdout.on("data", d => pushLog(p, "out", d));
   child.stderr.on("data", d => pushLog(p, "err", d));
   child.on("exit", code => { p.status = "exited"; p.exitCode = code; pushLog(p, "sys", `[agentic-os] exit code ${code}`); });
-  child.on("error", err => { p.status = "error"; pushLog(p, "sys", `[agentic-os] spawn error: ${err.message}`); });
+  child.on("error", err => { p.status = "error"; p.exitCode = -1; pushLog(p, "sys", `[agentic-os] spawn error: ${err.message}`); });
   procs.set(id, p);
   return { ok: true, pid: child.pid, mode: "run (owned)" };
 }
@@ -213,9 +244,8 @@ function gwRun(id) {
 function killOwned(id) {
   const p = procs.get(id);
   if (!p || p.status !== "running" || !p.pid) return false;
-  pushLog(p, "sys", "[agentic-os] stop owned — taskkill /T /F");
-  if (process.platform === "win32") execFile("taskkill", ["/pid", String(p.pid), "/T", "/F"], () => {});
-  else { try { process.kill(-p.pid, "SIGTERM"); } catch { try { p.child.kill(); } catch {} } }
+  pushLog(p, "sys", "[agentic-os] stop owned â€” tree-kill");
+  killTree(p.pid, p.child);
   return true;
 }
 
@@ -228,10 +258,16 @@ function gwStop(id, cb) {
   cb({ ok: true, ownedKilled: killed, note: killed ? "proses run (owned) dihentikan" : `${agent ? agent.name : id} tidak punya native stop & tidak ada proses owned` });
 }
 
-/* refresh status semua agent yang mendukungnya (dipanggil berkala) */
+/* refresh status semua agent yang mendukungnya (dipanggil berkala).
+   R4: in-flight guard â€” jangan spawn status baru kalau yang lama belum selesai (cegah overlap/pileup). */
+const polling = new Set();
 function pollAllStatus() {
-  for (const a of loadConfig().agents)
-    if (a.enabled && a.gateway && gwActions(a).includes("status")) gwCtl(a.id, "status", () => {});
+  let agents; try { agents = loadConfig().agents; } catch { return; }
+  for (const a of agents)
+    if (a.enabled && a.gateway && gwActions(a).includes("status") && !polling.has(a.id)) {
+      polling.add(a.id);
+      gwCtl(a.id, "status", () => polling.delete(a.id));
+    }
 }
 
 /* ---------------- avatar ---------------- */
@@ -255,7 +291,8 @@ function saveAvatar(id, dataUrl) {
 let graphCache = { t: 0, data: null };
 function buildGraph() {
   if (graphCache.data && Date.now() - graphCache.t < 60000) return graphCache.data;
-  const files = walk(VAULT);
+  try {
+  const files = walkVault();
   const nodes = new Map(); // rel -> node
   const byTitle = new Map(); // lowercase basename -> rel
   for (const f of files) {
@@ -280,6 +317,10 @@ function buildGraph() {
   }
   graphCache = { t: Date.now(), data: { nodes: [...nodes.values()], edges, generatedAt: new Date().toISOString() } };
   return graphCache.data;
+  } catch (e) {
+    if (graphCache.data) return graphCache.data;   // R18: jangan poison cache ke null
+    return { nodes: [], edges: [], generatedAt: new Date().toISOString(), error: e.message };
+  }
 }
 
 /* ------- aktivitas Claude Code: sesi + subagent dari transcript jsonl ------- */
@@ -372,11 +413,37 @@ function readTelemetry(id) {
   return out.slice(-30).reverse();
 }
 
+/* Aktivitas seragam untuk agent non-Claude: turunkan sesi + subagent dari telemetry mereka
+   sendiri (bukan data palsu), shape sama dengan claudeActivity() supaya UI render identik. */
+function telemetryActivity(events) {
+  const subagents = [], subSeen = new Set();
+  const sessions = [], taskSeen = new Set();
+  for (const e of events) {   // events: newest-first (readTelemetry)
+    if (e.type === "subagent_start" || e.type === "subagent_done") {
+      const key = e.name || e.detail || "";
+      if (subSeen.has(key)) continue; subSeen.add(key);
+      subagents.push({ type: "subagent", desc: e.name || "(subagent)", detail: e.detail || "",
+        status: e.type === "subagent_done" ? "done" : "running", ts: e.ts || null });
+    } else if (e.type === "task_start" || e.type === "task_progress" || e.type === "task_done") {
+      const key = e.name || "";
+      if (taskSeen.has(key)) continue; taskSeen.add(key);   // status terbaru per task (newest-first)
+      const ageMin = e.ts ? (Date.now() - Date.parse(e.ts)) / 60000 : 1e9;
+      sessions.push({ id: (e.name || "task").slice(0, 8), project: e.detail || "",
+        lastActivity: e.ts || null,
+        status: e.type === "task_done" ? "idle" : (ageMin < 30 ? "working" : "waiting"),
+        lastPrompt: e.name || null, lastTool: null,
+        toolCount: typeof e.progress === "number" ? e.progress : 0 });
+    }
+  }
+  return { sessions: sessions.slice(0, 8), subagents: subagents.slice(0, 20) };
+}
+
 function agentDetail(id) {
   const agent = loadConfig().agents.find(a => a.id === id);
   if (!agent) return { error: `agent '${id}' tidak dikenal` };
   const p = procs.get(id);
-  const files = walk(VAULT);
+  const files = walkVault();
+  const tele = readTelemetry(id);
   const laneFiles = files
     .filter(f => agent.lane && f.rel.startsWith(`Brains/${agent.lane}/`))
     .sort((a, b) => b.mtime - a.mtime).slice(0, 8)
@@ -387,15 +454,17 @@ function agentDetail(id) {
     cwd: agent.gateway && agent.gateway.cwd, bin: agent.gateway && agent.gateway.bin, actions: gwActions(agent),
     proc: procInfo(id), ...agentVaultStatus(files, agent),
     log: p ? p.log.slice(-40) : [],
-    laneFiles, telemetry: readTelemetry(id),
-    claude: id === "claude-code" ? claudeActivity() : null,
+    laneFiles, telemetry: tele,
+    // activity seragam semua agent: Claude dari transcript, lainnya dari telemetry mereka
+    activity: id === "claude-code" ? claudeActivity() : telemetryActivity(tele),
+    source: id === "claude-code" ? "transcript" : "telemetry",
   };
 }
 
 /* ---------------- report generator ---------------- */
 function buildReport() {
   const cfg = loadConfig();
-  const files = walk(VAULT);
+  const files = walkVault();
   const now = Date.now();
   const days = [];
   for (let i = 13; i >= 0; i--) {
@@ -424,14 +493,14 @@ function buildReport() {
     totals: {
       notes: files.length, edges: graph.edges.length, openTasks: tasks.length,
       active7d: files.filter(f => now - f.mtime < 7 * DAY).length,
-      gwRunning: [...procs.values()].filter(p => p.status === "running").length,
+      gwRunning: cfg.agents.filter(a => procInfo(a.id).status === "running").length,
     },
     days, folders: Object.entries(folders).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count),
     agents, tasks: tasks.slice(0, 10),
   };
 }
 function reportMarkdown(r) {
-  const bar = n => "█".repeat(Math.min(n, 30)) || "·";
+  const bar = n => "â–ˆ".repeat(Math.min(n, 30)) || "Â·";
   const lines = [
     "---",
     `title: "Laporan Agentic OS ${r.generatedAt.slice(0, 10)}"`,
@@ -440,7 +509,7 @@ function reportMarkdown(r) {
     "created_by: agentic-os-dashboard",
     "tags: [report, agentic-os]",
     "---", "",
-    `# Laporan Agentic OS — ${r.generatedAt.slice(0, 16).replace("T", " ")}`, "",
+    `# Laporan Agentic OS â€” ${r.generatedAt.slice(0, 16).replace("T", " ")}`, "",
     `| Metrik | Nilai |`, `|---|---|`,
     `| Total catatan vault | ${r.totals.notes} |`,
     `| Koneksi antar catatan (wikilink) | ${r.totals.edges} |`,
@@ -463,26 +532,41 @@ function localISO(d = new Date()) {
   return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString();
 }
 function saveReport() {
-  const r = buildReport();
-  const dir = path.join(VAULT, "Reports");
-  fs.mkdirSync(dir, { recursive: true });
-  const l = localISO();
-  const name = `Laporan ${l.slice(0, 10)} ${l.slice(11, 16).replace(":", ".")}.md`;
-  fs.writeFileSync(path.join(dir, name), reportMarkdown(r), "utf8");
-  return { ok: true, rel: `Reports/${name}` };
+  try {
+    const r = buildReport();
+    const dir = path.join(VAULT, "Reports");
+    fs.mkdirSync(dir, { recursive: true });
+    const l = localISO();
+    const name = `Laporan ${l.slice(0, 10)} ${l.slice(11, 19).replace(/:/g, ".")}.md`;  // detik â†’ tak saling timpa
+    fs.writeFileSync(path.join(dir, name), reportMarkdown(r), "utf8");
+    return { ok: true, rel: `Reports/${name}` };
+  } catch (e) { return { error: `gagal simpan laporan: ${e.message}` }; }
 }
 
-function readBody(req, cb) {
-  let body = "";
-  req.on("data", d => { body += d; if (body.length > 5e6) { req.destroy(); } });
-  req.on("end", () => cb(body));
+function readBody(req, res, cb) {
+  let body = "", aborted = false;
+  req.on("data", d => {
+    body += d;
+    if (body.length > 5e6 && !aborted) {           // R5: balas 413, jangan biarkan client hang
+      aborted = true;
+      res.writeHead(413, { "Content-Type": "application/json; charset=utf-8" });
+      res.end(JSON.stringify({ error: "body melebihi 5MB" }));
+      req.destroy();
+    }
+  });
+  req.on("end", () => { if (!aborted) cb(body); });
 }
 
 /* ---------------- http ---------------- */
-function authorized(req, url) {
+/* S1: bandingkan token konstan-waktu (anti timing attack). S2: header saja, tak lagi terima ?token= */
+function safeEq(a, b) {
+  const ba = Buffer.from(String(a || "")), bb = Buffer.from(String(b || ""));
+  if (ba.length !== bb.length) return false;
+  return crypto.timingSafeEqual(ba, bb);
+}
+function authorized(req) {
   if (!TOKEN) return true; // tanpa token: dashboard lokal biasa
-  const q = new URL(url, "http://x").searchParams.get("token");
-  return req.headers["x-dash-token"] === TOKEN || q === TOKEN;
+  return safeEq(req.headers["x-dash-token"], TOKEN);
 }
 function json(res, code, obj) {
   res.writeHead(code, { "Content-Type": "application/json; charset=utf-8" });
@@ -495,7 +579,7 @@ const server = http.createServer((req, res) => {
   const url = (req.url || "/").split("?")[0];
 
   if (url.startsWith("/api/")) {
-    if (!authorized(req, req.url)) return json(res, 401, { error: "token salah/kosong — set header x-dash-token" });
+    if (!authorized(req)) return json(res, 401, { error: "token salah/kosong â€” set header x-dash-token" });
     try {
       if (url === "/api/state") return json(res, 200, buildState());
       if (url === "/api/procs") {
@@ -532,26 +616,52 @@ const server = http.createServer((req, res) => {
       if (m && req.method === "POST") {
         const id = m[1];
         if (!loadConfig().agents.some(a => a.id === id)) return json(res, 404, { error: "agent tidak dikenal" });
-        return readBody(req, body => {
+        return readBody(req, res, body => {
           let data; try { data = JSON.parse(body).data; } catch { return json(res, 400, { error: "body harus JSON {data}" }); }
           const r = saveAvatar(id, data);
           json(res, r.error ? 400 : 200, r);
         });
       }
       return json(res, 404, { error: "unknown api" });
-    } catch (err) { return json(res, 500, { error: String(err) }); }
+    } catch (err) { console.error("[api]", (err && err.stack) || err); return json(res, 500, { error: "internal error" }); }  // S12: jangan echo detail internal
   }
 
-  const rel = url === "/" ? "index.html" : url.slice(1);
+  // S5: path-traversal guard pakai path.relative (bukan startsWith), + decode URL
+  let rel; try { rel = url === "/" ? "index.html" : decodeURIComponent(url.slice(1)); } catch { res.writeHead(400); return res.end("bad request"); }
   const file = path.normalize(path.join(PUBLIC, rel));
-  if (!file.startsWith(PUBLIC) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) {
-    res.writeHead(404, { "Content-Type": "text/plain" }); return res.end("not found");
+  const relToPublic = path.relative(PUBLIC, file);
+  if (relToPublic.startsWith("..") || path.isAbsolute(relToPublic)) {
+    res.writeHead(403, { "Content-Type": "text/plain" }); return res.end("forbidden");
   }
-  res.writeHead(200, { "Content-Type": MIME[path.extname(file)] || "application/octet-stream" });
-  res.end(fs.readFileSync(file));
+  try {
+    if (!fs.existsSync(file) || fs.statSync(file).isDirectory()) {
+      res.writeHead(404, { "Content-Type": "text/plain" }); return res.end("not found");
+    }
+    res.writeHead(200, { "Content-Type": MIME[path.extname(file)] || "application/octet-stream" });
+    res.end(fs.readFileSync(file));
+  } catch { res.writeHead(500, { "Content-Type": "text/plain" }); res.end("error"); }
 });
 
+/* R1+R3: shutdown & crash handler â€” SIGINT/SIGTERM/SIGHUP + uncaughtException tidak dijangkau
+   process.on("exit") (event loop mati di 'exit', taskkill async tak sempat). Di sini masih ada loop. */
+let shuttingDown = false;
+function shutdown(sig) {
+  if (shuttingDown) return; shuttingDown = true;
+  console.error(`[agentic-os] shutdown (${sig}) â€” hentikan proses owned`);
+  for (const id of procs.keys()) killOwned(id);
+  try { server.close(); } catch {}
+  setTimeout(() => process.exit(0), 500);   // beri waktu taskkill async
+}
+for (const sig of ["SIGINT", "SIGTERM", "SIGHUP"]) process.on(sig, () => shutdown(sig));
+process.on("uncaughtException", e => { console.error("[uncaughtException]", (e && e.stack) || e); shutdown("uncaughtException"); });
+process.on("unhandledRejection", e => { console.error("[unhandledRejection]", (e && e.stack) || e); });
 process.on("exit", () => { for (const id of procs.keys()) killOwned(id); });
+
+server.on("error", e => {
+  if (e.code === "EADDRINUSE") { console.error(`\n  Port ${PORT} sudah dipakai. Jalankan di port lain: set PORT=4322 lalu npm run dev\n`); }
+  else console.error("[server]", (e && e.stack) || e);
+  process.exit(1);
+});
 
 server.listen(PORT, () => {
   console.log(`\n  Agentic OS jalan di  http://localhost:${PORT}`);
@@ -559,5 +669,5 @@ server.listen(PORT, () => {
   console.log(`  Config agent:        ${CONFIG_PATH}`);
   console.log(TOKEN ? "  Auth: token AKTIF (x-dash-token)" : "  Auth: tanpa token (lokal). Untuk remote: set DASH_TOKEN.\n");
   setTimeout(pollAllStatus, 3000);       // status awal
-  setInterval(pollAllStatus, 25000);     // refresh status gateway tiap 25s
+  setInterval(pollAllStatus, 45000);     // R4: interval (45s) > timeout gwCtl (30s) + in-flight guard
 });

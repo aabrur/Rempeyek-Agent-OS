@@ -11,7 +11,7 @@
       "enabled": true,
       "gateway": {
         "bin": "claude-gateway",
-        "cwd": "C:\\Users\\abrur\\AI-Agent\\.claude\\.claude-gateway",
+        "cwd": "C:\\Users\\abrur\\.claude-gateway",
         "actions": ["start", "stop", "restart", "status", "run"]
       }
     },
@@ -23,6 +23,8 @@
       "node": "Node-8",
       "lane": "Hermes",
       "enabled": true,
+      "owner": "native-service",
+      "note": "Single-owner = native service (schtask Hermes_Gateway, 24/7). Dashboard dipakai untuk observability + remote command (start/stop/restart/status). `run` (owned foreground) hanya untuk debug — Hermes singleton, sudah pakai --replace agar tak bentrok instance service. Path & cwd terverifikasi benar 2026-07-05 (Claude Code).",
       "gateway": {
         "bin": "\"C:\\Users\\abrur\\AppData\\Local\\hermes\\hermes-agent\\venv\\Scripts\\hermes.exe\" gateway",
         "cwd": "C:\\Users\\abrur\\AppData\\Local\\hermes",
@@ -37,37 +39,13 @@
       "node": "Node-7",
       "lane": "OpenClaw",
       "enabled": true,
+      "owner": "native-service",
+      "note": "Single-owner = native service (Scheduled Task \"OpenClaw Gateway\", 24/7 di port 18789, launcher .openclaw\\gateway.cmd). Dashboard dipakai untuk observability + remote command (start/stop/restart/status → kelola service schtask). `run` (owned foreground) hanya untuk debug — bentrok dengan service yang sudah jalan, jadi runCmd pakai --force (kill listener lama di port dulu). 2026-07-05 (Claude Code): cwd diperbaiki ke home baru + service di-reinstall (gateway.cmd hilang saat migrasi home → start gagal result=1; `openclaw gateway install --force` regenerate launcher, start kini Running/probe ok).",
       "gateway": {
         "bin": "openclaw gateway",
-        "cwd": "C:\\Users\\abrur\\AI-Agent\\.openclaw",
+        "cwd": "C:\\Users\\abrur\\.openclaw",
+        "runCmd": "openclaw gateway run --force",
         "actions": ["start", "stop", "restart", "status", "run"]
-      }
-    },
-    {
-      "id": "zcode",
-      "name": "ZCode",
-      "icon": "🟣",
-      "role": "Interactive coding, 200+ skills",
-      "node": "Node-9/10",
-      "lane": "ZCode",
-      "enabled": false,
-      "note": "Tidak ada CLI `zcode` di PATH — folder ~\\.zcode hanya berisi state/config (db, log, certs, credentials, bot-state), bukan binary. Tidak ada command gateway yang bisa dipanggil. Install/expose CLI-nya dulu.",
-      "gateway": null
-    },
-    {
-      "id": "copilot",
-      "name": "Copilot",
-      "icon": "🟠",
-      "role": "GitHub Copilot CLI (standby)",
-      "node": "Node-11",
-      "lane": "",
-      "enabled": false,
-      "note": "Copilot CLI TIDAK punya subcommand `gateway` (cek: subcommand yang ada cuma login/mcp/plugin/skill/update/version). Yang tersedia hanya mode server ACP via flag `copilot --acp`. Login dulu (`copilot` → /login), lalu set enabled:true untuk pakai tombol Run (mode --acp, owned oleh dashboard).",
-      "gateway": {
-        "bin": "copilot",
-        "cwd": "C:\\Users\\abrur\\AI-Agent",
-        "actions": ["run"],
-        "runCmd": "copilot --acp"
       }
     }
   ]
