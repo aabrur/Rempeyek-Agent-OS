@@ -104,7 +104,8 @@ function buildState() {
   const files = walkVault();
   const now = Date.now();
   const tasks = openTasks();
-  const inbox = files.filter(f => f.rel.startsWith("00 Inbox/"));
+  const um = uptimeMap();                       // R#2: uptime 24 jam per agent (1x baca file)
+  const inbox = files.filter(f => f.rel.startsWith("Inbox/"));
   const projects = files.filter(f => f.rel.startsWith("Projects/") && f.rel.split("/").length === 2)
     .sort((a, b) => b.mtime - a.mtime)
     .map(f => ({ name: f.rel.replace("Projects/", "").replace(".md", ""), rel: f.rel, updated: new Date(f.mtime).toISOString().slice(0, 10) }));
@@ -118,7 +119,7 @@ function buildState() {
       openTasks: { value: tasks.length, label: "Checkbox terbuka di Tasks/" },
       projects: { value: projects.length, label: "Project note aktif" },
     },
-    agents: cfg.agents.map(a => ({ ...a, gateway: undefined, actions: gwActions(a), canSummon: !!(a.gateway && a.gateway.home && a.gateway.trigger), ...agentVaultStatus(files, a), proc: procInfo(a.id), avatar: avatarUrl(a.id) })),
+    agents: cfg.agents.map(a => ({ ...a, gateway: undefined, actions: gwActions(a), canSummon: !!(a.gateway && a.gateway.home && a.gateway.trigger), ...agentVaultStatus(files, a), proc: procInfo(a.id), avatar: avatarUrl(a.id), uptime: um[a.id] || null })),
     review: [
       ...inbox.map(f => ({ title: f.rel.split("/").pop().replace(".md", ""), meta: f.rel, kind: "inbox" })),
       ...tasks.slice(0, 6).map(t => ({ title: t.text, meta: t.source, kind: "task" })),
@@ -185,6 +186,52 @@ function killTree(pid, child) {
   else { try { process.kill(-pid, "SIGKILL"); } catch { try { child && child.kill(); } catch {} } }
 }
 
+/* ROADMAP #1: alert saat agent turun (running â†’ down) atau run exit non-zero.
+   Durable = 1 note ke vault Inbox/ (auto muncul di Needs Review). Toast Windows = best-effort. */
+function notifyWindows(title, msg) {
+  if (process.platform !== "win32") return;
+  const q = s => String(s).replace(/'/g, "''").slice(0, 200);
+  const ps = `Add-Type -AssemblyName System.Windows.Forms; Add-Type -AssemblyName System.Drawing; ` +
+    `$n = New-Object System.Windows.Forms.NotifyIcon; $n.Icon = [System.Drawing.SystemIcons]::Warning; $n.Visible = $true; ` +
+    `$n.ShowBalloonTip(8000, '${q(title)}', '${q(msg)}', [System.Windows.Forms.ToolTipIcon]::Warning); ` +
+    `Start-Sleep -Seconds 9; $n.Dispose()`;
+  try { spawn("powershell", ["-NoProfile", "-WindowStyle", "Hidden", "-Command", ps], { detached: true, windowsHide: true, stdio: "ignore" }).unref(); } catch {}
+}
+function alertDown(id, reason) {
+  const agent = agentById(id);
+  const name = agent ? agent.name : id;
+  const stamp = localISO();
+  try {
+    const dir = path.join(VAULT, "Inbox");
+    fs.mkdirSync(dir, { recursive: true });
+    const fname = `ALERT ${name} ${stamp.slice(0, 10)} ${stamp.slice(11, 19).replace(/:/g, ".")}.md`;
+    fs.writeFileSync(path.join(dir, fname),
+      `---\ntype: alert\nagent: ${id}\ncreated: ${stamp}\ntags: [alert, agentic-os]\n---\n\n` +
+      `# âš  ${name} â€” gateway down\n\n- Waktu: ${stamp.slice(0, 19).replace("T", " ")}\n- Sebab: ${reason}\n- Sumber: agentic-os dashboard (deteksi otomatis)\n`, "utf8");
+  } catch (e) { console.error("[alert] gagal tulis inbox:", e.message); }
+  notifyWindows(`âš  ${name} down`, reason);
+}
+
+/* ROADMAP #2: catat tiap poll status ke telemetry/uptime.jsonl (ts + up 0/1) â†’ strip uptime 24 jam.
+   ponytail: append-only, dibaca via tailRead (cap byte). File tumbuh ~poll/hariâ€”rotasi nanti kalau perlu. */
+function logUptime(id, running) {
+  try { fs.appendFileSync(path.join(TELEMETRY_DIR, "uptime.jsonl"), JSON.stringify({ ts: Date.now(), id, up: running ? 1 : 0 }) + "\n"); } catch {}
+}
+function uptimeMap() {
+  const cutoff = Date.now() - DAY;
+  const acc = {};
+  for (const line of tailRead(path.join(TELEMETRY_DIR, "uptime.jsonl"), 500000).split("\n")) {
+    if (!line.trim()) continue;
+    let o; try { o = JSON.parse(line); } catch { continue; }
+    if (!o || !o.id || !o.ts || o.ts < cutoff) continue;
+    const a = acc[o.id] || (acc[o.id] = { up: 0, total: 0 });
+    a.total++; if (o.up) a.up++;
+  }
+  const out = {};
+  for (const id in acc) out[id] = { pct: Math.round(acc[id].up / acc[id].total * 100), samples: acc[id].total };
+  return out;
+}
+
 /* command pendek: start/stop/restart/status â†’ jalankan `<bin> <action>`, tampung output */
 function gwCtl(id, action, cb) {
   const agent = agentById(id);
@@ -208,8 +255,12 @@ function gwCtl(id, action, cb) {
   child.on("exit", code => {
     const text = out.trim().slice(0, 4000);
     const running = detectRunning(text);
-    if (action === "status" || action === "start" || action === "restart") gwCache.set(id, { running, text, at: Date.now(), exitCode: code });
-    else if (action === "stop") gwCache.set(id, { running: false, text, at: Date.now(), exitCode: code });
+    if (action === "status" || action === "start" || action === "restart") {
+      const prev = gwCache.get(id);                    // R#1: deteksi transisi running â†’ down
+      gwCache.set(id, { running, text, at: Date.now(), exitCode: code });
+      logUptime(id, running);
+      if (prev && prev.running && !running) alertDown(id, `gateway turun (terdeteksi saat ${action})`);
+    } else if (action === "stop") { gwCache.set(id, { running: false, text, at: Date.now(), exitCode: code }); logUptime(id, false); }
     finish({ ok: code === 0, code, action, running, output: text });
   });
 }
@@ -235,7 +286,8 @@ function gwRun(id) {
   p.child = child; p.pid = child.pid;
   child.stdout.on("data", d => pushLog(p, "out", d));
   child.stderr.on("data", d => pushLog(p, "err", d));
-  child.on("exit", code => { p.status = "exited"; p.exitCode = code; pushLog(p, "sys", `[agentic-os] exit code ${code}`); });
+  child.on("exit", code => { p.status = "exited"; p.exitCode = code; pushLog(p, "sys", `[agentic-os] exit code ${code}`);
+    if (code !== 0) { const last = p.log.filter(l => l.s === "out" || l.s === "err").slice(-1)[0]; alertDown(id, `run (owned) exit code ${code}${last ? " â€” " + last.line : ""}`); } });
   child.on("error", err => { p.status = "error"; p.exitCode = -1; pushLog(p, "sys", `[agentic-os] spawn error: ${err.message}`); });
   procs.set(id, p);
   return { ok: true, pid: child.pid, mode: "run (owned)" };
@@ -714,4 +766,13 @@ server.listen(PORT, () => {
   console.log(TOKEN ? "  Auth: token AKTIF (x-dash-token)" : "  Auth: tanpa token (lokal). Untuk remote: set DASH_TOKEN.\n");
   setTimeout(pollAllStatus, 3000);       // status awal
   setInterval(pollAllStatus, 45000);     // R4: interval (45s) > timeout gwCtl (30s) + in-flight guard
+  setTimeout(runDailyBridge, 10000);     // R#2: jalankan daily-bridge sekali di awal
+  setInterval(runDailyBridge, 3600000);  // R#2: lalu tiap jam (dulu ada tapi tak pernah dipanggil)
 });
+
+/* R#2: jalankan scripts/hermes-daily-bridge.cjs (sync telemetry + vault daily note) */
+function runDailyBridge() {
+  const f = path.join(__dirname, "scripts", "hermes-daily-bridge.cjs");
+  if (!fs.existsSync(f)) return;
+  execFile(process.execPath, [f], { windowsHide: true, env: process.env }, e => { if (e) console.error("[daily-bridge]", e.message); });
+}

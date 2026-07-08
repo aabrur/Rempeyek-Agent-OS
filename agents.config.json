@@ -10,9 +10,10 @@
       "node": "Node-10",
       "lane": "ClaudeCode",
       "enabled": true,
+      "note": "Gateway = claude-gateway (npm bin global). State-dir-nya `.claude\\.claude-gateway`, jadi cwd HARUS home `.claude` (bukan `.claude-gateway` di root — folder itu tak ada, bikin semua aksi gagal di guard cwd). Diperbaiki 2026-07-08 (Claude Code): cwd .claude-gateway → .claude, kini status/start/stop/restart/run jalan.",
       "gateway": {
         "bin": "claude-gateway",
-        "cwd": "C:\\Users\\abrur\\.claude-gateway",
+        "cwd": "C:\\Users\\abrur\\.claude",
         "home": "C:\\Users\\abrur\\.claude",
         "trigger": "claude",
         "actions": ["start", "stop", "restart", "status", "run"]

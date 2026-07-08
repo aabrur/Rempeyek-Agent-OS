@@ -3,23 +3,25 @@
 > Prinsip: **fitur harus bayar sewa** — kepakai buat keputusan/operasi. Yang cuma
 > dipandangin = hiasan, buang. YAGNI: jangan bangun buat masalah yang belum ada.
 
-## 🔴 Tier 1 — nutup lubang nyata (prioritas)
+## 🔴 Tier 1 — nutup lubang nyata (prioritas) — ✅ SELESAI 2026-07-08
 
-### 1. Alert waktu agent mati
+> #1, #2, #3 terpasang & terverifikasi (Claude Code). Detail per-item di bawah.
+
+### 1. ✅ Alert waktu agent mati
 - **Masalah:** Hermes/OpenClaw 24/7. Kalau tumbang jam 3 pagi, baru ketahuan pas buka
   dashboard. Status di-poll tiap 45s, deteksi via regex teks (`detectRunning`) — rapuh.
 - **Solusi:** saat status `running → down` atau `run` exit non-zero → tulis 1 baris ke
   `Inbox/` vault (muncul di Needs Review) + notifikasi desktop Windows. Opsional push HP.
 - **Nilai:** inti dari klaim "24/7 ops". Tanpa ini observability setengah.
 
-### 2. Riwayat uptime + wire daily-bridge
+### 2. ✅ Riwayat uptime + wire daily-bridge
 - **Masalah:** dashboard cuma tahu status **sekarang**. Nggak bisa jawab "Hermes nyala
   full semalam?". `scripts/hermes-daily-bridge.cjs` **ada tapi nggak dijalanin** scheduler.
 - **Solusi:** server catat tiap poll ke `telemetry/uptime.jsonl` (ts + status) → strip
   uptime 24 jam di kartu agent. Jalanin daily-bridge tiap jam dari server.
 - **Nilai:** "status now" → "status sepanjang waktu" = monitoring beneran.
 
-### 3. Telemetry gampang diisi (fix akar panel kosong)
+### 3. ✅ Telemetry gampang diisi (fix akar panel kosong)
 - **Masalah:** panel Sesi/Subagent/Telemetry kosong (Copilot/OpenClaw) karena agent harus
   nulis JSONL manual — jarang kejadian.
 - **Solusi:** helper 1-baris (`report.cmd "task" 50` atau fungsi kecil) yang agent tinggal

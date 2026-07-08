@@ -19,9 +19,30 @@ Format per baris:
 - Khusus **Claude Code**, dashboard juga membaca langsung transcript sesi di
   `.claude\projects\` (sesi aktif, tool terakhir, spawn subagent) tanpa perlu file ini.
 
-Contoh append dari PowerShell:
+## Cara gampang — helper `report` (disarankan)
+
+Ketimbang nulis JSONL manual, pakai wrapper 1-baris di root repo:
+
+```
+report <id> "<nama task>" [progress 0-100] [detail...]
+```
+
+- `progress` **0** → `task_start`, **100** → `task_done`, lainnya/kosong → `task_progress`
+- id: `claude-code` | `hermes` | `openclaw` | `zcode` | `copilot`
+
+Contoh:
+
+```
+report hermes "Scan market BTC" 0  "mulai 4 exchange"
+report hermes "Scan market BTC" 50 "2/4 exchange selesai"
+report hermes "Scan market BTC" 100 "laporan di vault"
+```
+
+Dari mana saja: `report.cmd` (root) atau `node scripts/report.cjs ...`.
+
+## Append manual dari PowerShell (kalau perlu)
 
 ```powershell
 '{"ts":"' + (Get-Date -Format o) + '","type":"task_start","name":"Deploy X"}' |
-  Add-Content "C:\Users\abrur\AI-Agent\agentic-os\telemetry\hermes.jsonl"
+  Add-Content "C:\Users\abrur\Rempeyek-agent-os\telemetry\hermes.jsonl"
 ```

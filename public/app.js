@@ -49,6 +49,13 @@ function gwPill(gw) {
   return `<span class="pill" title="${esc(gw.tip)}"><span class="dot ${gw.cls}"></span>` +
     `<span class="lbl-${gw.cls}">${esc(gw.label)}</span></span>`;
 }
+/* ROADMAP #2: chip uptime 24 jam (reuse pill/dot — tanpa CSS baru) */
+function uptimeChip(u) {
+  if (!u || !u.samples) return "";
+  const cls = u.pct >= 90 ? "running" : u.pct >= 50 ? "exited" : "error";
+  return `<span class="pill" title="uptime 24 jam · ${u.samples} sampel poll"><span class="dot ${cls}"></span>` +
+    `<span class="lbl-${cls}">${u.pct}% up 24h</span></span>`;
+}
 function avatarHtml(a, lg) {
   const inner = a.avatar ? `<img src="${a.avatar}" alt="${esc(a.name)}">` : (a.icon || "◈");
   return `<div class="avatar ${lg ? "avatar-lg" : ""}" style="--ac:${ac(a.id)}">${inner}
@@ -117,7 +124,7 @@ function render(state) {
       <div class="card-top">${avatarHtml(a)}<div class="card-btns">${gwButtons(a, true)}</div></div>
       <div class="agent-name">${esc(a.name)}</div>
       <div class="agent-role">${esc(a.role)}</div>
-      <div class="pill-row">${pill(a.vaultStatus)}${gwPill(gw)}</div></div>`;
+      <div class="pill-row">${pill(a.vaultStatus)}${gwPill(gw)}${uptimeChip(a.uptime)}</div></div>`;
   };
   document.getElementById("agentCards").innerHTML = state.agents.map(cardHtml).join("");
   document.getElementById("agentGrid").innerHTML = state.agents.map(cardHtml).join("");
@@ -134,7 +141,7 @@ function render(state) {
   document.getElementById("reviewCount").textContent = `${state.review.length} open`;
   const rl = document.getElementById("reviewList");
   rl.innerHTML = "";
-  if (!state.review.length) rl.appendChild(el(`<div class="empty">Kosong — tambah catatan ke <b>00 Inbox/</b> atau checkbox di <b>Tasks/</b> dan item muncul di sini.</div>`));
+  if (!state.review.length) rl.appendChild(el(`<div class="empty">Kosong — tambah catatan ke <b>Inbox/</b> atau checkbox di <b>Tasks/</b> dan item muncul di sini.</div>`));
   state.review.slice(0, 8).forEach(r => rl.appendChild(el(`<div class="review-item">
     <div><span class="t">${esc(r.title)}</span><span class="kind ${r.kind}">${r.kind}</span>
     <div class="m">${esc(r.meta)}</div></div>
