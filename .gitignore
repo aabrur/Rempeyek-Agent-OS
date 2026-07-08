@@ -4,6 +4,7 @@
 # Runtime / data lokal
 node_modules/
 telemetry/*.jsonl
+telemetry/logs/
 public/avatars/*
 !public/avatars/.gitkeep
 

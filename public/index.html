@@ -54,6 +54,11 @@
       <div class="two-col">
         <div class="panel">
           <div class="panel-head"><h2>NEEDS REVIEW</h2><span id="reviewCount" class="chip"></span></div>
+          <form id="taskForm" class="task-form">
+            <select id="taskAgent" title="Tujukan ke agent"></select>
+            <input id="taskTitle" type="text" placeholder="Kasih task ke agent… (Enter kirim)" maxlength="200" autocomplete="off">
+            <button class="btn btn-run" type="submit">＋ Kirim</button>
+          </form>
           <div id="reviewList" class="review-list"></div>
         </div>
         <div class="panel">

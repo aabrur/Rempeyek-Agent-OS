@@ -28,16 +28,20 @@
   panggil. Friksi turun → panel keisi.
 - **Nilai:** observability jadi nyata, bukan teater kosong.
 
-## 🟡 Tier 2 — solid, bukan darurat
+## 🟡 Tier 2 — solid, bukan darurat — ✅ SELESAI 2026-07-08
 
-### 4. Log gateway disimpan ke disk
+### 4. ✅ Log gateway disimpan ke disk
 - Log `run` sekarang cuma di memori (800 baris, `pushLog`) → **hilang saat restart**.
   Append ke file per-agent (rotasi) biar selamat dari restart & bisa di-scroll balik.
+- **Selesai:** `pushLog` append JSONL ke `telemetry/logs/<id>.log` (rotasi naif 1 MB),
+  detail agent fallback ke disk pasca-restart (`readDiskLog`).
 
-### 5. Kirim task ke agent dari dashboard
+### 5. ✅ Kirim task ke agent dari dashboard
 - Sekarang dashboard cuma **baca + kontrol gateway**. Tambah kotak "kasih task" → tulis ke
   `Tasks/`/`Inbox/` vault + tag agent → muncul di Needs Review, agent ambil sendiri.
   Dashboard: **pasif → bisa nyuruh**. Sesuai model vault-sebagai-papan-tugas.
+- **Selesai:** form di panel Needs Review → `POST /api/task` → checkbox ke
+  `Tasks/Inbox Tasks.md` (`createTask`) → langsung nongol di Needs Review.
 
 ## 🟢 Tier 3 — ide tambahan yang berguna (lanjutan)
 

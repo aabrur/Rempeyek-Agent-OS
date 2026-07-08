@@ -27,8 +27,10 @@ const DAY = 86400000;
 const LOG_MAX = 800;
 const AVATAR_DIR = path.join(PUBLIC, "avatars");
 const TELEMETRY_DIR = path.join(__dirname, "telemetry");
+const LOG_DIR = path.join(TELEMETRY_DIR, "logs");   // R#4: log run per-agent, selamat dari restart
+const LOG_FILE_MAX = 1_000_000;                     // 1 MB/agent → rotasi naif (simpan separuh ekor)
 const CLAUDE_PROJECTS = "C:\\Users\\abrur\\.claude\\projects";
-for (const d of [AVATAR_DIR, TELEMETRY_DIR]) { try { fs.mkdirSync(d, { recursive: true }); } catch {} }
+for (const d of [AVATAR_DIR, TELEMETRY_DIR, LOG_DIR]) { try { fs.mkdirSync(d, { recursive: true }); } catch {} }
 
 /* loadConfig: memoize by mtime (B6) + tahan config rusak mid-edit â†’ return last-good (R10) */
 let _cfgCache = { mtime: 0, data: null };
@@ -171,12 +173,37 @@ function procInfo(id) {
 
 function pushLog(p, stream, chunk) {
   try {
+    const disk = [];
     for (const line of String(chunk).split(/\r?\n/)) {
       if (!line.trim()) continue;
-      p.log.push({ i: p.seq++, t: new Date().toISOString().slice(11, 19), s: stream, line: line.slice(0, 500) });
+      const entry = { i: p.seq++, t: new Date().toISOString().slice(11, 19), s: stream, line: line.slice(0, 500) };
+      p.log.push(entry);
+      disk.push({ t: entry.t, s: entry.s, line: entry.line });
       if (p.log.length > LOG_MAX) p.log.splice(0, p.log.length - LOG_MAX);
     }
+    if (disk.length) appendDiskLog(p.id, disk);       // R#4: persist ke disk
   } catch (e) { /* R19: jangan biarkan throw di event 'data' escape handler */ }
+}
+/* R#4: append log run ke telemetry/logs/<id>.log (JSONL) + rotasi naif saat > LOG_FILE_MAX */
+function appendDiskLog(id, entries) {
+  if (!id || !entries || !entries.length) return;
+  try {
+    const f = path.join(LOG_DIR, `${id}.log`);
+    fs.appendFileSync(f, entries.map(e => JSON.stringify(e)).join("\n") + "\n");
+    if (fs.statSync(f).size > LOG_FILE_MAX) {
+      const buf = fs.readFileSync(f);
+      fs.writeFileSync(f, buf.slice(buf.length - Math.floor(LOG_FILE_MAX / 2)));
+    }
+  } catch {}
+}
+/* R#4: baca ekor log disk (dipakai detail agent setelah restart, saat proc in-memory hilang) */
+function readDiskLog(id, n) {
+  const out = [];
+  for (const line of tailRead(path.join(LOG_DIR, `${id}.log`), 80000).split("\n")) {
+    if (!line.trim()) continue;
+    try { const o = JSON.parse(line); out.push({ i: 0, t: o.t, s: o.s, line: o.line }); } catch {}
+  }
+  return out.slice(-n);
 }
 
 /* R2: tree-kill konsisten (Win: taskkill /T, POSIX: kill process group) â€” dipakai owned-run & timeout gwCtl */
@@ -207,9 +234,9 @@ function alertDown(id, reason) {
     const fname = `ALERT ${name} ${stamp.slice(0, 10)} ${stamp.slice(11, 19).replace(/:/g, ".")}.md`;
     fs.writeFileSync(path.join(dir, fname),
       `---\ntype: alert\nagent: ${id}\ncreated: ${stamp}\ntags: [alert, agentic-os]\n---\n\n` +
-      `# âš  ${name} â€” gateway down\n\n- Waktu: ${stamp.slice(0, 19).replace("T", " ")}\n- Sebab: ${reason}\n- Sumber: agentic-os dashboard (deteksi otomatis)\n`, "utf8");
+      `# ⚠ ${name} — gateway down\n\n- Waktu: ${stamp.slice(0, 19).replace("T", " ")}\n- Sebab: ${reason}\n- Sumber: agentic-os dashboard (deteksi otomatis)\n`, "utf8");
   } catch (e) { console.error("[alert] gagal tulis inbox:", e.message); }
-  notifyWindows(`âš  ${name} down`, reason);
+  notifyWindows(`⚠ ${name} down`, reason);
 }
 
 /* ROADMAP #2: catat tiap poll status ke telemetry/uptime.jsonl (ts + up 0/1) â†’ strip uptime 24 jam.
@@ -278,7 +305,7 @@ function gwRun(id) {
   if (!fs.existsSync(cwd)) return { error: `cwd tidak ada: ${cwd}` };
 
   const cmd = g.runCmd || `${g.bin} run`;
-  const p = { log: [], seq: 0, status: "running", startedAt: new Date().toISOString(), exitCode: null };
+  const p = { id, log: [], seq: 0, status: "running", startedAt: new Date().toISOString(), exitCode: null };
   pushLog(p, "sys", `[agentic-os] run (owned): ${cmd}  (cwd: ${cwd})`);
   let child;
   try { child = spawn(cmd, [], { cwd, shell: true, windowsHide: true, env: { ...process.env, AGENT_WORKDIR: loadConfig().workdir } }); }
@@ -537,7 +564,7 @@ function agentDetail(id) {
     cwd: agent.gateway && agent.gateway.cwd, bin: agent.gateway && agent.gateway.bin, actions: gwActions(agent),
     canSummon: !!(agent.gateway && agent.gateway.home && agent.gateway.trigger),
     proc: procInfo(id), ...agentVaultStatus(files, agent),
-    log: p ? p.log.slice(-40) : [],
+    log: p && p.log.length ? p.log.slice(-40) : readDiskLog(id, 40),   // R#4: fallback ke disk pasca-restart
     laneFiles, telemetry: tele,
     // activity seragam semua agent: Claude dari transcript, lainnya dari telemetry mereka
     activity: id === "claude-code" ? claudeActivity() : telemetryActivity(tele),
@@ -627,6 +654,28 @@ function saveReport() {
   } catch (e) { return { error: `gagal simpan laporan: ${e.message}` }; }
 }
 
+/* R#5: kirim task ke agent dari dashboard â†’ tulis checkbox ke vault Tasks/Inbox Tasks.md.
+   openTasks() scan semua Tasks/*.md â†’ otomatis muncul di Needs Review (kind task), agent ambil sendiri. */
+function createTask(agentId, title, detail) {
+  title = String(title || "").trim().replace(/[\r\n]+/g, " ").slice(0, 200);
+  if (!title) return { error: "judul task kosong" };
+  const agent = loadConfig().agents.find(a => a.id === agentId);
+  const who = agent ? agent.name : (agentId ? agentId : "Umum");
+  const date = localISO().slice(0, 10);
+  const extra = detail ? `  ·  ${String(detail).trim().replace(/[\r\n]+/g, " ").slice(0, 300)}` : "";
+  try {
+    const dir = path.join(VAULT, "Tasks");
+    fs.mkdirSync(dir, { recursive: true });
+    const file = path.join(dir, "Inbox Tasks.md");
+    const line = `- [ ] ${title} — ${who} — ${date}${extra}\n`;   // — = em-dash bersih (hindari mojibake)
+    if (!fs.existsSync(file))
+      fs.writeFileSync(file, `# 📥 Inbox Tasks\n\n> Task dari dashboard. Agent ambil → tandai \`[x]\` saat selesai.\n\n${line}`, "utf8");
+    else
+      fs.appendFileSync(file, line, "utf8");
+    return { ok: true, rel: "Tasks/Inbox Tasks.md", line: line.trim() };
+  } catch (e) { return { error: `gagal tulis task: ${e.message}` }; }
+}
+
 function readBody(req, res, cb) {
   let body = "", aborted = false;
   req.on("data", d => {
@@ -706,6 +755,12 @@ const server = http.createServer((req, res) => {
       if (url === "/api/graph") return json(res, 200, buildGraph());
       if (url === "/api/report") return json(res, 200, buildReport());
       if (url === "/api/report/save" && req.method === "POST") return json(res, 200, saveReport());
+      if (url === "/api/task" && req.method === "POST")
+        return readBody(req, res, body => {
+          let d; try { d = JSON.parse(body); } catch { return json(res, 400, { error: "body harus JSON {agent,title,detail?}" }); }
+          const r = createTask(d.agent, d.title, d.detail);
+          json(res, r.error ? 400 : 200, r);
+        });
       m = url.match(/^\/api\/agent\/([\w-]+)\/detail$/);
       if (m) { const d = agentDetail(m[1]); return json(res, d.error ? 404 : 200, d); }
       m = url.match(/^\/api\/agent\/([\w-]+)\/avatar$/);

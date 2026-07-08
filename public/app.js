@@ -138,6 +138,14 @@ function render(state) {
       <span><b>${esc(a.name)}</b><br>${esc(a.node)}</span></div>`));
   });
 
+  // R#5: isi dropdown agent di form "kasih task" (jaga pilihan user saat refresh)
+  const sel = document.getElementById("taskAgent");
+  if (sel) {
+    const cur = sel.value;
+    const opts = state.agents.map(a => `<option value="${a.id}">${esc(a.icon || "")} ${esc(a.name)}</option>`).join("");
+    if (sel.dataset.sig !== opts) { sel.innerHTML = opts; sel.dataset.sig = opts; if (cur) sel.value = cur; }
+  }
+
   document.getElementById("reviewCount").textContent = `${state.review.length} open`;
   const rl = document.getElementById("reviewList");
   rl.innerHTML = "";
@@ -398,6 +406,21 @@ document.body.addEventListener("click", async e => {
 
 function closeMenus() { document.querySelectorAll(".gw-menu.open").forEach(m => m.classList.remove("open")); }
 document.addEventListener("click", e => { if (!e.target.closest(".gw-split")) closeMenus(); });
+
+/* R#5: kirim task ke agent → tulis ke vault Tasks/, muncul di Needs Review */
+document.getElementById("taskForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  const title = document.getElementById("taskTitle").value.trim();
+  const agent = document.getElementById("taskAgent").value;
+  if (!title) return;
+  const btn = e.target.querySelector("button[type=submit]");
+  const lbl = btn.textContent; btn.disabled = true; btn.textContent = "…";
+  const r = await api("/api/task", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ agent, title }) });
+  btn.textContent = lbl; btn.disabled = false;
+  if (r.error) return alert(r.error);
+  document.getElementById("taskTitle").value = "";
+  refresh();   // task baru langsung nongol di Needs Review
+});
 
 document.getElementById("runAll").addEventListener("click", async () => {
   const r = await api("/api/proc/start-all", { method: "POST" });
