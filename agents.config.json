@@ -1,5 +1,6 @@
 {
-  "workdir": "C:\\Users\\abrur\\AI-Agent",
+  "workdir": "C:\\Users\\abrur",
+  "agency": "AGENTIC//OS",
   "agents": [
     {
       "id": "claude-code",
@@ -12,6 +13,8 @@
       "gateway": {
         "bin": "claude-gateway",
         "cwd": "C:\\Users\\abrur\\.claude-gateway",
+        "home": "C:\\Users\\abrur\\.claude",
+        "trigger": "claude",
         "actions": ["start", "stop", "restart", "status", "run"]
       }
     },
@@ -26,8 +29,11 @@
       "owner": "native-service",
       "note": "Single-owner = native service (schtask Hermes_Gateway, 24/7). Dashboard dipakai untuk observability + remote command (start/stop/restart/status). `run` (owned foreground) hanya untuk debug — Hermes singleton, sudah pakai --replace agar tak bentrok instance service. Path & cwd terverifikasi benar 2026-07-05 (Claude Code).",
       "gateway": {
-        "bin": "\"C:\\Users\\abrur\\AppData\\Local\\hermes\\hermes-agent\\venv\\Scripts\\hermes.exe\" gateway",
-        "cwd": "C:\\Users\\abrur\\AppData\\Local\\hermes",
+        "bin": "C:\\Users\\abrur\\AppData\\Local\\hermes\\hermes-agent\\venv\\Scripts\\hermes.exe",
+        "cwd": "C:\\Users\\abrur\\agentic-os",
+        "home": "C:\\Users\\abrur",
+        "trigger": "C:\\Users\\abrur\\AppData\\Local\\hermes\\hermes-agent\\venv\\Scripts\\hermes.exe",
+        "runCmd": "C:\\Users\\abrur\\AppData\\Local\\hermes\\hermes-agent\\venv\\Scripts\\hermes.exe",
         "actions": ["start", "stop", "restart", "status", "run"]
       }
     },
@@ -44,8 +50,25 @@
       "gateway": {
         "bin": "openclaw gateway",
         "cwd": "C:\\Users\\abrur\\.openclaw",
+        "home": "C:\\Users\\abrur\\.openclaw",
+        "trigger": "openclaw",
         "runCmd": "openclaw gateway run --force",
         "actions": ["start", "stop", "restart", "status", "run"]
+      }
+    },
+    {
+      "id": "copilot",
+      "name": "Copilot CLI",
+      "icon": "⬜",
+      "role": "Coding assistant CLI",
+      "node": "Node-12",
+      "lane": "Copilot",
+      "enabled": true,
+      "note": "Copilot CLI (Node-12, Our Family). Manual CLI — TIDAK punya subcommand `gateway` (cuma login/mcp/plugin/skill/update/--acp), jadi bukan dashboard-controlled: tak ada start/stop/status. Dashboard hanya untuk observability + tombol Panggil (buka terminal admin di .copilot lalu jalankan `copilot`). Status hidup dari telemetry, bukan dari catatan vault.",
+      "gateway": {
+        "home": "C:\\Users\\abrur\\.copilot",
+        "trigger": "copilot",
+        "actions": []
       }
     }
   ]

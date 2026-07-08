@@ -110,6 +110,7 @@ function buildState() {
     .map(f => ({ name: f.rel.replace("Projects/", "").replace(".md", ""), rel: f.rel, updated: new Date(f.mtime).toISOString().slice(0, 10) }));
   return {
     vault: VAULT,
+    agency: cfg.agency || "AGENTIC//OS",
     generatedAt: new Date().toISOString(),
     stats: {
       notes: { value: files.length, label: "Total catatan vault" },
@@ -117,7 +118,7 @@ function buildState() {
       openTasks: { value: tasks.length, label: "Checkbox terbuka di Tasks/" },
       projects: { value: projects.length, label: "Project note aktif" },
     },
-    agents: cfg.agents.map(a => ({ ...a, gateway: undefined, actions: gwActions(a), ...agentVaultStatus(files, a), proc: procInfo(a.id), avatar: avatarUrl(a.id) })),
+    agents: cfg.agents.map(a => ({ ...a, gateway: undefined, actions: gwActions(a), canSummon: !!(a.gateway && a.gateway.home && a.gateway.trigger), ...agentVaultStatus(files, a), proc: procInfo(a.id), avatar: avatarUrl(a.id) })),
     review: [
       ...inbox.map(f => ({ title: f.rel.split("/").pop().replace(".md", ""), meta: f.rel, kind: "inbox" })),
       ...tasks.slice(0, 6).map(t => ({ title: t.text, meta: t.source, kind: "task" })),
@@ -240,6 +241,36 @@ function gwRun(id) {
   return { ok: true, pid: child.pid, mode: "run (owned)" };
 }
 
+/* terminal: buka Windows Terminal (elevated/admin) yang cd ke folder default & auto-run trigger.
+   TIDAK di-own dashboard (detached + unref) â€” makanya Stop/Stop-all tak menutup terminal CLI/TUI ini. */
+function gwTerminal(id, mode) {
+  const agent = agentById(id);
+  if (!agent) return { error: `agent '${id}' tidak dikenal` };
+  const g = agent.gateway;
+  if (!agent.enabled || !g) return { error: agent.note || `gateway '${id}' belum siap (enabled:false)` };
+  let dir, cmd;
+  if (mode === "summon") {
+    if (!g.trigger) return { error: `${agent.name} belum punya trigger untuk dipanggil` };
+    dir = g.home || loadConfig().workdir; cmd = g.trigger;
+  } else if (mode === "start") { if (!g.bin) return { error: `${agent.name} tak punya gateway` }; dir = g.cwd || loadConfig().workdir; cmd = `${g.bin} start`; }
+  else if (mode === "run") { if (!g.bin) return { error: `${agent.name} tak punya gateway` }; dir = g.cwd || loadConfig().workdir; cmd = g.runCmd || `${g.bin} run`; }
+  else return { error: `mode terminal '${mode}' tidak dikenal (summon|start|run)` };
+  if (!fs.existsSync(dir)) return { error: `folder tidak ada: ${dir}` };
+
+  // ponytail: dir & cmd dari config (trusted). Escape single-quote untuk untai PowerShell.
+  const q = s => String(s).replace(/'/g, "''");
+  const ps =
+    `$d='${q(dir)}'; $c='${q(cmd)}'; ` +
+    `$wt = Get-Command wt.exe -ErrorAction SilentlyContinue; ` +
+    `if ($wt) { Start-Process wt.exe -Verb RunAs -ArgumentList '-d',$d,'powershell','-NoExit','-Command',$c } ` +
+    `else { Start-Process powershell -Verb RunAs -ArgumentList '-NoExit','-Command',("Set-Location -LiteralPath '" + $d + "'; " + $c) }`;
+  try {
+    const child = spawn("powershell", ["-NoProfile", "-Command", ps], { detached: true, windowsHide: true, stdio: "ignore" });
+    child.unref();
+    return { ok: true, mode, dir, cmd, terminal: true };
+  } catch (e) { return { error: `gagal buka terminal: ${e.message}` }; }
+}
+
 /* matikan proses run yang di-own dashboard (kalau ada) */
 function killOwned(id) {
   const p = procs.get(id);
@@ -272,7 +303,7 @@ function pollAllStatus() {
 
 /* ---------------- avatar ---------------- */
 function avatarUrl(id) {
-  for (const ext of ["png", "jpg", "webp"])
+  for (const ext of ["png", "jpg", "webp", "svg"])   // svg = placeholder sementara; raster (upload) menang duluan
     if (fs.existsSync(path.join(AVATAR_DIR, `${id}.${ext}`))) return `/avatars/${id}.${ext}`;
   return null;
 }
@@ -282,7 +313,7 @@ function saveAvatar(id, dataUrl) {
   const buf = Buffer.from(m[2], "base64");
   if (buf.length > 3e6) return { error: "maks 3 MB" };
   const ext = m[1] === "jpeg" ? "jpg" : m[1];
-  for (const e of ["png", "jpg", "webp"]) { try { fs.unlinkSync(path.join(AVATAR_DIR, `${id}.${e}`)); } catch {} }
+  for (const e of ["png", "jpg", "webp", "svg"]) { try { fs.unlinkSync(path.join(AVATAR_DIR, `${id}.${e}`)); } catch {} }
   fs.writeFileSync(path.join(AVATAR_DIR, `${id}.${ext}`), buf);
   return { ok: true, url: `/avatars/${id}.${ext}` };
 }
@@ -452,6 +483,7 @@ function agentDetail(id) {
     id, name: agent.name, icon: agent.icon, role: agent.role, node: agent.node,
     enabled: agent.enabled, note: agent.note || null, avatar: avatarUrl(id),
     cwd: agent.gateway && agent.gateway.cwd, bin: agent.gateway && agent.gateway.bin, actions: gwActions(agent),
+    canSummon: !!(agent.gateway && agent.gateway.home && agent.gateway.trigger),
     proc: procInfo(id), ...agentVaultStatus(files, agent),
     log: p ? p.log.slice(-40) : [],
     laneFiles, telemetry: tele,
@@ -565,8 +597,16 @@ function safeEq(a, b) {
   return crypto.timingSafeEqual(ba, bb);
 }
 function authorized(req) {
-  if (!TOKEN) return true; // tanpa token: dashboard lokal biasa
-  return safeEq(req.headers["x-dash-token"], TOKEN);
+  if (!TOKEN) return true;
+  const remote = req.socket && (req.socket.remoteAddress || req.connection && req.connection.remoteAddress || "");
+  if (/^(127\.0\.0\.1|::1|::ffff:127\.0\.0\.1)$/.test(remote)) return true;
+  const a = Buffer.from(String(req.headers["x-dash-token"] || ""));
+  if (a.length !== TOKEN.length) return safeEq(Buffer.alloc(TOKEN.length, 0), TOKEN);
+  return timingSafeCompare(a, TOKEN);
+}
+function timingSafeCompare(a, b) {
+  if (a.length !== b.length) return crypto.timingSafeEqual(Buffer.alloc(a.length, 0), b);
+  return crypto.timingSafeEqual(a, b);
 }
 function json(res, code, obj) {
   res.writeHead(code, { "Content-Type": "application/json; charset=utf-8" });
@@ -586,7 +626,7 @@ const server = http.createServer((req, res) => {
         const cfg = loadConfig();
         return json(res, 200, cfg.agents.map(a => ({ id: a.id, name: a.name, icon: a.icon, enabled: a.enabled, note: a.note || null, cwd: a.gateway && a.gateway.cwd, bin: a.gateway && a.gateway.bin, actions: gwActions(a), ...procInfo(a.id) })));
       }
-      let m = url.match(/^\/api\/proc\/([\w-]+)\/(start|stop|restart|status|run|log)$/);
+      let m = url.match(/^\/api\/proc\/([\w-]+)\/(start|stop|restart|status|run|log|terminal)$/);
       if (m) {
         const [, id, action] = m;
         if (action === "log") {
@@ -595,6 +635,10 @@ const server = http.createServer((req, res) => {
           return json(res, 200, { lines: p ? p.log.filter(l => l.i >= since) : [], next: p ? p.seq : 0, ...procInfo(id) });
         }
         if (req.method !== "POST") return json(res, 405, { error: "POST only" });
+        if (action === "terminal") {
+          const mode = new URL(req.url, "http://x").searchParams.get("mode") || "summon";
+          const r = gwTerminal(id, mode); return json(res, r.error ? 400 : 200, r);
+        }
         if (action === "run") { const r = gwRun(id); return json(res, r.error ? 400 : 200, r); }
         if (action === "stop") return gwStop(id, r => json(res, r.error ? 400 : 200, r));
         return gwCtl(id, action, r => json(res, r.error ? 400 : 200, r)); // start | restart | status

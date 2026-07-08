@@ -56,14 +56,37 @@ function avatarHtml(a, lg) {
 }
 const ACT_LABEL = { start: "▶ Start", stop: "■ Stop", restart: "↻ Restart", status: "◇ Status", run: "⚡ Run" };
 const ACT_CLS = { start: "btn-run", stop: "btn-stop", restart: "btn-dim", status: "btn-dim", run: "btn-dim" };
+function gwBtn(act, id) { return `<button class="btn ${ACT_CLS[act] || "btn-dim"}" data-act="${act}" data-id="${id}">${ACT_LABEL[act] || act}</button>`; }
+/* Start = split button: klik utama buka terminal admin + panggil agent; caret = pilihan terminal lain + start headless */
+function startSplit(a) {
+  return `<div class="gw-split">
+    <button class="btn btn-run gw-main" data-term="summon" data-id="${a.id}" title="Buka terminal admin di folder ${esc(a.id)} + panggil agent">▶ Start</button>
+    <button class="btn btn-run gw-caret" data-menu="${a.id}" title="Pilihan terminal">▾</button>
+    <div class="gw-menu" data-menufor="${a.id}">
+      <button data-term="summon" data-id="${a.id}">⧉ Open terminal · panggil agent</button>
+      <button data-term="start" data-id="${a.id}">⧉ Gateway start · terminal</button>
+      <button data-term="run" data-id="${a.id}">⧉ Gateway run · terminal</button>
+      <div class="gw-menu-sep"></div>
+      <button data-act="start" data-id="${a.id}">◇ Start headless (background)</button>
+    </div>
+  </div>`;
+}
+function summonBtn(a) {
+  return `<button class="btn btn-run" data-term="summon" data-id="${a.id}" title="Buka terminal admin + panggil ${esc(a.name)}">⧉ Panggil</button>`;
+}
 function gwButtons(a, compact) {
   if (!a.enabled) return `<button class="btn btn-dim" disabled title="${esc(a.note || "nonaktif")}">setup dulu</button>`;
   const acts = a.actions || [];
   const running = a.proc && a.proc.status === "running";
-  let pick;
-  if (compact) pick = running ? ["stop"] : (acts.includes("start") ? ["start"] : acts.slice(0, 1));
-  else pick = acts.slice();
-  return pick.map(act => `<button class="btn ${ACT_CLS[act] || "btn-dim"}" data-act="${act}" data-id="${a.id}">${ACT_LABEL[act] || act}</button>`).join("");
+  const hasStart = acts.includes("start");
+  if (compact) {
+    if (running) return gwBtn("stop", a.id);
+    if (hasStart) return startSplit(a);
+    return a.canSummon ? summonBtn(a) : (acts[0] ? gwBtn(acts[0], a.id) : "");
+  }
+  // detail: split Start (gateway) atau tombol Panggil (non-gateway spt Copilot) + sisa aksi headless
+  const rest = acts.filter(x => x !== "start").map(x => gwBtn(x, a.id)).join("");
+  return (hasStart ? startSplit(a) : (a.canSummon ? summonBtn(a) : "")) + rest;
 }
 
 /* ---------- render utama ---------- */
@@ -76,6 +99,11 @@ function render(state) {
   _lastStateKey = key;
   const vp = document.getElementById("vaultPath");
   vp.textContent = state.vault; vp.title = state.vault;
+  if (state.agency) {
+    const bn = document.querySelector(".brand-name");
+    if (bn && bn.textContent !== state.agency) bn.textContent = state.agency;
+    document.title = `${state.agency} — Neural Command Deck`;
+  }
 
   const tiles = document.getElementById("statTiles");
   tiles.innerHTML = "";
@@ -99,7 +127,7 @@ function render(state) {
   state.agents.forEach(a => {
     const gw = gwState(a.proc);
     side.appendChild(el(`<div class="side-agent" data-open="${a.id}">
-      ${a.avatar ? `<img class="side-avatar" src="${a.avatar}" alt="">` : `<span class="dot ${gw.cls === "running" ? "running" : a.vaultStatus}"></span>`}
+      ${a.avatar ? `<img class="side-avatar" src="${a.avatar}" alt="">` : `<span class="dot ${gw.cls === "running" ? "running" : "idle"}" title="gateway ${gw.label}"></span>`}
       <span><b>${esc(a.name)}</b><br>${esc(a.node)}</span></div>`));
   });
 
@@ -312,6 +340,28 @@ document.body.addEventListener("click", async e => {
   const closeBtn = e.target.closest("[data-act='close-detail']");
   if (closeBtn) { openAgent = null; renderDetail(); refresh(); return; }
 
+  const menuBtn = e.target.closest("[data-menu]");
+  if (menuBtn) {
+    e.stopPropagation();
+    const menu = menuBtn.parentElement.querySelector(".gw-menu");
+    const willOpen = menu && !menu.classList.contains("open");
+    closeMenus();
+    if (willOpen) menu.classList.add("open");
+    return;
+  }
+
+  const term = e.target.closest("[data-term]");
+  if (term) {
+    e.stopPropagation();
+    const { term: mode, id } = term.dataset;
+    closeMenus();
+    const lbl = term.textContent; term.disabled = true; term.textContent = "…";
+    const r = await api(`/api/proc/${id}/terminal?mode=${mode}`, { method: "POST" });
+    term.textContent = lbl; term.disabled = false;
+    if (r.error) alert(r.error);
+    return;
+  }
+
   const btn = e.target.closest("[data-act]");
   if (btn && ["start", "stop", "restart", "status", "run"].includes(btn.dataset.act)) {
     e.stopPropagation();
@@ -338,6 +388,9 @@ document.body.addEventListener("click", async e => {
     setTimeout(() => { const d = document.getElementById("agentDetail"); if (d.firstChild) d.scrollIntoView({ behavior: "smooth", block: "start" }); }, 120);
   }
 });
+
+function closeMenus() { document.querySelectorAll(".gw-menu.open").forEach(m => m.classList.remove("open")); }
+document.addEventListener("click", e => { if (!e.target.closest(".gw-split")) closeMenus(); });
 
 document.getElementById("runAll").addEventListener("click", async () => {
   const r = await api("/api/proc/start-all", { method: "POST" });

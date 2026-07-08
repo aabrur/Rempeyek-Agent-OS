@@ -85,7 +85,8 @@ function NeuralGraph(canvas, opts = {}) {
     dpr = window.devicePixelRatio || 1;
     const w = canvas.clientWidth, h = canvas.clientHeight;
     if (!w || !h) return;
-    if (canvas.width !== w * dpr) { canvas.width = w * dpr; canvas.height = h * dpr; }
+    // cek width DAN height: kalau height berubah tanpa width, buffer lama tak ke-clear → sisa piksel "berantakan" di bawah
+    if (canvas.width !== w * dpr || canvas.height !== h * dpr) { canvas.width = w * dpr; canvas.height = h * dpr; }
   }
   function toScreen(n) {
     return {
