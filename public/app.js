@@ -4,6 +4,7 @@ let TOKEN = localStorage.getItem("dashToken") || "";
 let openAgent = null;   // id agent yang detailnya terbuka
 let graph = null, graphLoaded = false;
 let lastReport = null;
+let AGENTS = {};   // R#10: id -> agent (buat cek owner: native-service di guard konfirmasi)
 
 const ACCENT = { "claude-code": "#00E5FF", hermes: "#A6FF3C", openclaw: "#4C9BFF", zcode: "#8C5BFF", copilot: "#FFB01F" };
 const TILE_C = ["#00E5FF", "#FF3DD8", "#A6FF3C", "#FFB01F"];
@@ -104,6 +105,13 @@ function render(state) {
   const key = JSON.stringify({ ...state, generatedAt: 0 });
   if (key === _lastStateKey) return;
   _lastStateKey = key;
+  AGENTS = {}; state.agents.forEach(a => AGENTS[a.id] = a);   // R#10
+  // R#11: banner kalau config rusak (server pakai last-good diam-diam kalau tak ada ini)
+  const cb = document.getElementById("configBanner");
+  if (cb) {
+    if (state.configError) { cb.hidden = false; cb.innerHTML = `⚠ <b>agents.config.json rusak</b> — pakai config terakhir yang valid. <code>${esc(state.configError.msg)}</code> · perbaiki file lalu dashboard auto-reload.`; }
+    else cb.hidden = true;
+  }
   const vp = document.getElementById("vaultPath");
   vp.textContent = state.vault; vp.title = state.vault;
   if (state.agency) {
@@ -153,7 +161,9 @@ function render(state) {
   state.review.slice(0, 8).forEach(r => rl.appendChild(el(`<div class="review-item">
     <div><span class="t">${esc(r.title)}</span><span class="kind ${r.kind}">${r.kind}</span>
     <div class="m">${esc(r.meta)}</div></div>
-    <a href="${obsUri(r.meta)}">Buka di Obsidian</a></div>`)));
+    <div class="review-act">
+      ${r.kind === "task" ? `<button class="btn btn-run btn-mini" data-done="${esc(r.meta)}" data-text="${esc(r.title)}" title="Tandai selesai (tulis [x] ke vault)">✓ selesai</button>` : ""}
+      <a href="${obsUri(r.meta)}">Buka di Obsidian</a></div></div>`)));
 
   const wf = document.getElementById("workflowCards");
   wf.innerHTML = "";
@@ -348,6 +358,32 @@ function renderReport(r) {
   </div>`;
 }
 
+/* ---------- OPS: vault health (#9) + schedule (#8) ---------- */
+function ageLabel(h) { return h == null ? "—" : h < 1 ? "<1 jam" : h < 48 ? `${h} jam` : `${Math.round(h / 24)} hari`; }
+async function loadOps() {
+  const vh = document.getElementById("vaultHealth"), sl = document.getElementById("scheduleList");
+  if (!vh || !sl) return;
+  const [h, s] = await Promise.all([api("/api/vault-health"), api("/api/schedule")]);
+  if (h && !h.error) {
+    const gitCls = !h.gitOk ? "error" : h.gitAgeH > 48 ? "exited" : "running";
+    const bkCls = h.backupAgeH == null ? "idle" : h.backupAgeH > 48 ? "error" : "running";
+    vh.innerHTML = `
+      <div class="vh-row"><span class="dot ${gitCls}"></span><span class="vh-k">Commit git terakhir</span>
+        <span class="vh-v">${h.gitOk ? ageLabel(h.gitAgeH) + " lalu" : "belum git init"}</span></div>
+      <div class="vh-row"><span class="dot ${bkCls}"></span><span class="vh-k">Backup terakhir</span>
+        <span class="vh-v">${h.backup == null ? "set BACKUP_PATH" : (h.backupAgeH == null ? "tak ketemu" : ageLabel(h.backupAgeH) + " lalu")}</span></div>
+      <div class="vh-hint">${esc(h.vault)}</div>`;
+  } else vh.innerHTML = `<div class="empty">gagal muat vault health</div>`;
+  if (Array.isArray(s) && s.length) {
+    sl.innerHTML = s.map(t => {
+      const cls = t.error ? "error" : t.ok ? "running" : "exited";
+      return `<div class="sched-row"><span class="dot ${cls}"></span>
+        <span class="sched-a">${t.icon || ""} ${esc(t.agent)}</span>
+        <span class="sched-d">${t.error ? esc(t.error) : `last: ${esc(t.lastRun || "—")} · result ${esc(t.lastResult ?? "—")} · next ${esc(t.nextRun || "—")}`}</span></div>`;
+    }).join("");
+  } else sl.innerHTML = `<div class="empty">Tak ada agent dengan <code>schtask</code> di config.</div>`;
+}
+
 /* ---------- events ---------- */
 document.body.addEventListener("click", async e => {
   const av = e.target.closest("[data-act='avatar']");
@@ -377,10 +413,24 @@ document.body.addEventListener("click", async e => {
     return;
   }
 
+  // Bonus: tandai task selesai dari dashboard → tulis [x] ke vault
+  const done = e.target.closest("[data-done]");
+  if (done) {
+    e.stopPropagation();
+    const lbl = done.textContent; done.disabled = true; done.textContent = "…";
+    const r = await api("/api/task/done", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ source: done.dataset.done, text: done.dataset.text }) });
+    if (r.error) { alert(r.error); done.textContent = lbl; done.disabled = false; }
+    else refresh();
+    return;
+  }
+
   const btn = e.target.closest("[data-act]");
   if (btn && ["start", "stop", "restart", "status", "run"].includes(btn.dataset.act)) {
     e.stopPropagation();
     const { act, id } = btn.dataset;
+    // R#10: konfirmasi 1x sebelum aksi merusak pada agent native-service 24/7
+    if (["stop", "restart", "run"].includes(act) && AGENTS[id] && AGENTS[id].owner === "native-service"
+        && !confirm(`${AGENTS[id].name} = service 24/7. Yakin mau '${act}'? Ini bisa ganggu instance yang lagi jalan.`)) return;
     const label = btn.textContent;
     btn.disabled = true; btn.textContent = "…";
     const r = await api(`/api/proc/${id}/${act}`, { method: "POST" });
@@ -458,9 +508,12 @@ async function refresh() {
   render(state);
 }
 const visible = () => document.visibilityState === "visible";   // F3: jangan polling saat tab hidden
+const cmdActive = () => document.getElementById("view-command").classList.contains("active");
 setInterval(() => { document.getElementById("clock").textContent = new Date().toLocaleString("id-ID"); }, 1000);
 refresh();
+loadOps();   // #8/#9 sekali di awal
 setInterval(() => { if (visible()) refresh(); }, 6000);
+setInterval(() => { if (visible() && cmdActive()) loadOps(); }, 60000);   // OPS lebih jarang (schtasks/git mahal)
 setInterval(() => { if (visible() && openAgent && document.getElementById("view-agents").classList.contains("active")) renderDetail(); }, 5000);
 setInterval(() => { if (visible() && graphLoaded && document.getElementById("view-graph").classList.contains("active")) loadGraph(true); }, 90000);
 document.addEventListener("visibilitychange", () => { if (visible()) refresh(); });   // refresh langsung saat tab balik aktif

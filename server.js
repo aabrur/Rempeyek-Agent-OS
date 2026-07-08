@@ -5,6 +5,7 @@
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
+const net = require("net");
 const { spawn, execFile } = require("child_process");
 const crypto = require("crypto");
 
@@ -32,17 +33,20 @@ const LOG_FILE_MAX = 1_000_000;                     // 1 MB/agent → rotasi nai
 const CLAUDE_PROJECTS = "C:\\Users\\abrur\\.claude\\projects";
 for (const d of [AVATAR_DIR, TELEMETRY_DIR, LOG_DIR]) { try { fs.mkdirSync(d, { recursive: true }); } catch {} }
 
-/* loadConfig: memoize by mtime (B6) + tahan config rusak mid-edit â†’ return last-good (R10) */
+/* loadConfig: memoize by mtime (B6) + tahan config rusak mid-edit â†’ return last-good (R10).
+   R#11: simpan error terakhir supaya dashboard bisa tampilkan banner (bukan diam-diam last-good). */
 let _cfgCache = { mtime: 0, data: null };
+let configError = null;   // { msg, at } saat parse gagal tapi masih ada last-good
 function loadConfig() {
   try {
     const st = fs.statSync(CONFIG_PATH);
     if (_cfgCache.data && st.mtimeMs === _cfgCache.mtime) return _cfgCache.data;
     const data = JSON.parse(fs.readFileSync(CONFIG_PATH, "utf8"));
     _cfgCache = { mtime: st.mtimeMs, data };
+    configError = null;                       // sembuh â†’ bersihkan banner
     return data;
   } catch (e) {
-    if (_cfgCache.data) { console.error("[config] parse gagal, pakai last-good:", e.message); return _cfgCache.data; }
+    if (_cfgCache.data) { console.error("[config] parse gagal, pakai last-good:", e.message); configError = { msg: e.message, at: new Date().toISOString() }; return _cfgCache.data; }
     throw e;
   }
 }
@@ -115,6 +119,8 @@ function buildState() {
     vault: VAULT,
     agency: cfg.agency || "AGENTIC//OS",
     generatedAt: new Date().toISOString(),
+    configError,                              // R#11: null kalau sehat, {msg,at} kalau config rusak
+
     stats: {
       notes: { value: files.length, label: "Total catatan vault" },
       activeWeek: { value: files.filter(f => now - f.mtime < 7 * DAY).length, label: "Catatan diubah 7 hari terakhir" },
@@ -286,7 +292,7 @@ function gwCtl(id, action, cb) {
       const prev = gwCache.get(id);                    // R#1: deteksi transisi running â†’ down
       gwCache.set(id, { running, text, at: Date.now(), exitCode: code });
       logUptime(id, running);
-      if (prev && prev.running && !running) alertDown(id, `gateway turun (terdeteksi saat ${action})`);
+      if (prev && prev.running && !running) { alertDown(id, `gateway turun (terdeteksi saat ${action})`); if (action === "status") maybeWatchdog(id); }
     } else if (action === "stop") { gwCache.set(id, { running: false, text, at: Date.now(), exitCode: code }); logUptime(id, false); }
     finish({ ok: code === 0, code, action, running, output: text });
   });
@@ -368,16 +374,56 @@ function gwStop(id, cb) {
   cb({ ok: true, ownedKilled: killed, note: killed ? "proses run (owned) dihentikan" : `${agent ? agent.name : id} tidak punya native stop & tidak ada proses owned` });
 }
 
+/* R#7: health probe asli â€” cek TCP port beneran listening (lebih jujur dari cocok-cocokan teks status).
+   Config: agent.gateway.probe = { host?, port }. Connect sukses = hidup, else mati. */
+function probePort(host, port, cb) {
+  const sock = new net.Socket();
+  let done = false;
+  const finish = up => { if (done) return; done = true; try { sock.destroy(); } catch {} cb(up); };
+  sock.setTimeout(3000);
+  sock.once("connect", () => finish(true));
+  sock.once("timeout", () => finish(false));
+  sock.once("error", () => finish(false));
+  try { sock.connect(port, host || "127.0.0.1"); } catch { finish(false); }
+}
+function probeAndCache(id, probe) {
+  probePort(probe.host, probe.port, up => {
+    const prev = gwCache.get(id);
+    const host = probe.host || "127.0.0.1";
+    gwCache.set(id, { running: up, text: `probe TCP ${host}:${probe.port} â†’ ${up ? "OPEN (listening)" : "CLOSED"}`, at: Date.now(), exitCode: up ? 0 : 1 });
+    logUptime(id, up);
+    if (prev && prev.running && !up) { alertDown(id, `probe port ${probe.port} tertutup (service turun)`); maybeWatchdog(id); }
+  });
+}
+
+/* R#6: watchdog auto-restart untuk agent 24/7 (opsional per agent: gateway.watchdog=true).
+   Hard anti-loop: maks 3 restart / jam. Tetap kirim alert (dari pemanggil). */
+const restartLog = new Map();   // id -> [timestamps]
+function maybeWatchdog(id) {
+  const a = agentById(id);
+  if (!a || !a.gateway || !a.gateway.watchdog || !gwActions(a).includes("restart")) return;
+  const now = Date.now();
+  const hits = (restartLog.get(id) || []).filter(t => now - t < 3600000);
+  if (hits.length >= 3) { console.error(`[watchdog] ${id}: batas 3x/jam tercapai, stop auto-restart`); return; }
+  hits.push(now); restartLog.set(id, hits);
+  console.error(`[watchdog] ${id}: auto-restart (percobaan ${hits.length}/3 jam ini)`);
+  alertDown(id, `watchdog auto-restart (percobaan ${hits.length}/3 dalam 1 jam)`);
+  gwCtl(id, "restart", () => {});
+}
+
 /* refresh status semua agent yang mendukungnya (dipanggil berkala).
    R4: in-flight guard â€” jangan spawn status baru kalau yang lama belum selesai (cegah overlap/pileup). */
 const polling = new Set();
 function pollAllStatus() {
   let agents; try { agents = loadConfig().agents; } catch { return; }
-  for (const a of agents)
-    if (a.enabled && a.gateway && gwActions(a).includes("status") && !polling.has(a.id)) {
+  for (const a of agents) {
+    if (!a.enabled || !a.gateway) continue;
+    if (a.gateway.probe && a.gateway.probe.port) { probeAndCache(a.id, a.gateway.probe); continue; }  // R#7: probe menang
+    if (gwActions(a).includes("status") && !polling.has(a.id)) {
       polling.add(a.id);
       gwCtl(a.id, "status", () => polling.delete(a.id));
     }
+  }
 }
 
 /* ---------------- avatar ---------------- */
@@ -676,6 +722,55 @@ function createTask(agentId, title, detail) {
   } catch (e) { return { error: `gagal tulis task: ${e.message}` }; }
 }
 
+/* R#8: panel jadwal â€” baca Windows Scheduled Task tiap agent (next run, last run, last result). */
+function querySchtask(name, cb) {
+  execFile("schtasks", ["/query", "/tn", name, "/fo", "LIST", "/v"], { windowsHide: true }, (e, out) => {
+    if (e) return cb({ name, error: String((e.message || "gagal query")).split("\n")[0].slice(0, 120) });
+    const grab = re => { const m = out.match(re); return m ? m[1].trim() : null; };
+    const lr = grab(/Last Result:\s*(.+)/);
+    cb({ name, taskState: grab(/Scheduled Task State:\s*(.+)/) || grab(/Status:\s*(.+)/),
+      nextRun: grab(/Next Run Time:\s*(.+)/), lastRun: grab(/Last Run Time:\s*(.+)/),
+      lastResult: lr, ok: lr === "0" });
+  });
+}
+function buildSchedule(cb) {
+  let agents; try { agents = loadConfig().agents.filter(a => a.gateway && a.gateway.schtask); } catch { return cb([]); }
+  if (!agents.length) return cb([]);
+  const out = []; let pending = agents.length;
+  agents.forEach(a => querySchtask(a.gateway.schtask, r => { out.push({ id: a.id, agent: a.name, icon: a.icon, ...r }); if (--pending === 0) cb(out); }));
+}
+
+/* R#9: kesehatan vault â€” umur commit git terakhir + umur backup terakhir (cegah kehilangan otak).
+   Backup opsional via env BACKUP_PATH (folder/file); kalau tak diset, hanya lapor git. */
+function buildVaultHealth(cb) {
+  const res = { vault: VAULT, gitCommitAt: null, gitAgeH: null, gitOk: false, backupAt: null, backupAgeH: null, backup: null };
+  const backup = process.env.BACKUP_PATH || null;
+  if (backup) { try { const st = fs.statSync(backup); res.backupAt = new Date(st.mtimeMs).toISOString(); res.backupAgeH = Math.round((Date.now() - st.mtimeMs) / 3600000); res.backup = backup; } catch { res.backup = backup + " (tidak ditemukan)"; } }
+  execFile("git", ["-C", VAULT, "log", "-1", "--format=%cI"], { windowsHide: true }, (e, out) => {
+    if (!e && out && out.trim()) { const t = Date.parse(out.trim()); if (!Number.isNaN(t)) { res.gitCommitAt = out.trim(); res.gitAgeH = Math.round((Date.now() - t) / 3600000); res.gitOk = true; } }
+    else res.gitError = e ? String(e.message).split("\n")[0].slice(0, 120) : "tak ada commit";
+    cb(res);
+  });
+}
+
+/* Bonus (dua-arah): tandai task selesai dari dashboard â†’ ubah `- [ ]` jadi `- [x]` di file vault. */
+function markTaskDone(source, text) {
+  if (!source || !text) return { error: "butuh {source, text}" };
+  const rel = String(source).replace(/\\/g, "/");
+  if (!rel.startsWith("Tasks/") || rel.includes("..")) return { error: "source harus di dalam Tasks/" };
+  const file = path.join(VAULT, rel);
+  try {
+    let txt = fs.readFileSync(file, "utf8");
+    const needle = String(text).trim();
+    const lines = txt.split(/\r?\n/);
+    const i = lines.findIndex(l => /^\s*[-*] \[ \]/.test(l) && l.includes(needle));
+    if (i === -1) return { error: "task tidak ketemu (mungkin sudah berubah)" };
+    lines[i] = lines[i].replace("[ ]", "[x]");
+    fs.writeFileSync(file, lines.join("\n"), "utf8");
+    return { ok: true, rel, line: lines[i].trim() };
+  } catch (e) { return { error: `gagal update: ${e.message}` }; }
+}
+
 function readBody(req, res, cb) {
   let body = "", aborted = false;
   req.on("data", d => {
@@ -761,6 +856,14 @@ const server = http.createServer((req, res) => {
           const r = createTask(d.agent, d.title, d.detail);
           json(res, r.error ? 400 : 200, r);
         });
+      if (url === "/api/task/done" && req.method === "POST")
+        return readBody(req, res, body => {
+          let d; try { d = JSON.parse(body); } catch { return json(res, 400, { error: "body harus JSON {source,text}" }); }
+          const r = markTaskDone(d.source, d.text);
+          json(res, r.error ? 400 : 200, r);
+        });
+      if (url === "/api/schedule") return buildSchedule(r => json(res, 200, r));      // R#8
+      if (url === "/api/vault-health") return buildVaultHealth(r => json(res, 200, r)); // R#9
       m = url.match(/^\/api\/agent\/([\w-]+)\/detail$/);
       if (m) { const d = agentDetail(m[1]); return json(res, d.error ? 404 : 200, d); }
       m = url.match(/^\/api\/agent\/([\w-]+)\/avatar$/);

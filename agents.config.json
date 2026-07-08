@@ -35,6 +35,8 @@
         "home": "C:\\Users\\abrur",
         "trigger": "C:\\Users\\abrur\\AppData\\Local\\hermes\\hermes-agent\\venv\\Scripts\\hermes.exe",
         "runCmd": "C:\\Users\\abrur\\AppData\\Local\\hermes\\hermes-agent\\venv\\Scripts\\hermes.exe",
+        "schtask": "Hermes_Gateway",
+        "watchdog": false,
         "actions": ["start", "stop", "restart", "status", "run"]
       }
     },
@@ -54,6 +56,9 @@
         "home": "C:\\Users\\abrur\\.openclaw",
         "trigger": "openclaw",
         "runCmd": "openclaw gateway run --force",
+        "schtask": "OpenClaw Gateway",
+        "probe": { "host": "127.0.0.1", "port": 18789 },
+        "watchdog": false,
         "actions": ["start", "stop", "restart", "status", "run"]
       }
     },

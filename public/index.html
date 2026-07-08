@@ -37,6 +37,7 @@
   </aside>
 
   <main class="main">
+    <div id="configBanner" class="config-banner" hidden></div>
     <!-- COMMAND CENTER -->
     <section id="view-command" class="view active">
       <header class="page-head">
@@ -64,6 +65,17 @@
         <div class="panel">
           <div class="panel-head"><h2>PRIMARY WORKFLOWS</h2><span class="chip chip-plain">routing</span></div>
           <div id="workflowCards" class="workflow-grid"></div>
+        </div>
+      </div>
+
+      <div class="two-col">
+        <div class="panel">
+          <div class="panel-head"><h2>VAULT HEALTH</h2><span class="chip chip-plain">anti data-loss</span></div>
+          <div id="vaultHealth" class="vault-health"><div class="empty">memuat…</div></div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><h2>JADWAL · SCHEDULED TASKS</h2><span class="chip chip-plain">schtasks</span></div>
+          <div id="scheduleList" class="sched-list"><div class="empty">memuat…</div></div>
         </div>
       </div>
     </section>

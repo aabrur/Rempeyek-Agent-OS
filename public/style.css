@@ -235,6 +235,24 @@ body {
 .task-form input:focus, .task-form select:focus { border-color: var(--lime); }
 .task-form .btn { flex: 0 0 auto; padding: 6px 10px; font-size: 11px; }
 
+/* R#11 config banner */
+.config-banner { margin: 0 0 12px; padding: 10px 14px; border-radius: 8px; font-size: 12px; color: #ffd; font-family: var(--mono);
+  background: rgba(255, 176, 31, .1); border: 1px solid rgba(255, 176, 31, .5); }
+.config-banner code { color: var(--red); }
+
+/* Bonus: tombol mini + baris aksi review */
+.review-act { display: flex; align-items: center; gap: 8px; }
+.btn-mini { padding: 4px 8px; font-size: 10px; }
+
+/* R#9 vault health + R#8 schedule */
+.vault-health, .sched-list { display: flex; flex-direction: column; gap: 8px; }
+.vh-row, .sched-row { display: flex; align-items: center; gap: 9px; font-size: 12px; }
+.vh-k { color: var(--muted); min-width: 130px; }
+.vh-v { color: var(--text); font-family: var(--mono); margin-left: auto; }
+.vh-hint { font-size: 10px; color: var(--muted); font-family: var(--mono); opacity: .7; margin-top: 2px; }
+.sched-a { color: var(--text); min-width: 96px; }
+.sched-d { color: var(--muted); font-family: var(--mono); font-size: 10.5px; }
+
 .review-list, .list-panel { display: flex; flex-direction: column; gap: 8px; }
 .review-item, .list-item {
   display: flex; justify-content: space-between; align-items: center; gap: 12px;
