@@ -6,6 +6,7 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 const net = require("net");
+const os = require("os");
 const { spawn, execFile } = require("child_process");
 const crypto = require("crypto");
 
@@ -19,7 +20,7 @@ try {
 } catch {}
 
 const PORT = process.env.PORT || 4321;
-const VAULT = process.env.VAULT_PATH || "C:\\Users\\abrur\\Obsidian Vault";
+const VAULT = process.env.VAULT_PATH || path.join(__dirname, "Obsidian Vault");
 const CONFIG_PATH = process.env.AGENTS_CONFIG || path.join(__dirname, "agents.config.json");
 const TOKEN = process.env.DASH_TOKEN || "";
 const PUBLIC = path.join(__dirname, "public");
@@ -30,7 +31,7 @@ const AVATAR_DIR = path.join(PUBLIC, "avatars");
 const TELEMETRY_DIR = path.join(__dirname, "telemetry");
 const LOG_DIR = path.join(TELEMETRY_DIR, "logs");   // R#4: per-agent run log, survives restarts
 const LOG_FILE_MAX = 1_000_000;                     // 1 MB/agent → naive rotation (keep the tail half)
-const CLAUDE_PROJECTS = "C:\\Users\\abrur\\.claude\\projects";
+const CLAUDE_PROJECTS = process.env.CLAUDE_PROJECTS || path.join(os.homedir(), ".claude", "projects");
 for (const d of [AVATAR_DIR, TELEMETRY_DIR, LOG_DIR]) { try { fs.mkdirSync(d, { recursive: true }); } catch {} }
 
 /* loadConfig: memoize by mtime (B6) + tolerate config broken mid-edit → return last-good (R10).
@@ -488,312 +489,6 @@ function buildGraph() {
   }
 }
 
-/* ------- generateGraphifyHTML: builds vis-network HTML from graph.json ------- */
-const COMMUNITY_COLORS = [
-  "#4E79A7", "#F28E2B", "#E15759", "#76B7B2", "#59A14F",
-  "#EDC948", "#B07AA1", "#FF9DA7", "#9C755F", "#BAB0AC",
-];
-function esc(s) { return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;"); }
-
-function generateGraphifyHTML(g) {
-  const nodes = g.nodes || [];
-  const links = g.links || [];
-  // Degree map
-  const deg = {};
-  nodes.forEach(n => { deg[n.id] = 0; });
-  links.forEach(l => { deg[l.source] = (deg[l.source] || 0) + 1; deg[l.target] = (deg[l.target] || 0) + 1; });
-  const maxDeg = Math.max(1, ...Object.values(deg));
-  // Community labels + counts
-  const communityNodes = {};
-  nodes.forEach(n => {
-    const c = n.community ?? 0;
-    if (!communityNodes[c]) communityNodes[c] = [];
-    communityNodes[c].push(n);
-  });
-  // Build vis nodes
-  const visNodes = nodes.map(n => {
-    const cid = n.community ?? 0;
-    const color = COMMUNITY_COLORS[cid % COMMUNITY_COLORS.length];
-    const d = deg[n.id] || 0;
-    const size = 10 + 30 * (d / maxDeg);
-    const fontSize = d >= maxDeg * 0.15 ? 12 : 0;
-    const label = (n.label || n.id || "").replace(/<\/script>/gi, "");
-    return {
-      id: n.id, label,
-      color: { background: color, border: color, highlight: { background: "#ffffff", border: color } },
-      size: Math.round(size * 10) / 10,
-      font: { size: fontSize, color: "#ffffff" },
-      title: esc(label),
-      community: cid,
-      community_name: n.community_name || `Community ${cid}`,
-      source_file: n.source_file || "",
-      file_type: n.file_type || "",
-      degree: d,
-    };
-  });
-  // Build vis edges
-  const visEdges = links.map((l, i) => {
-    const conf = l.confidence || "EXTRACTED";
-    const rel = l.relation || "";
-    return {
-      from: l.source, to: l.target,
-      label: "",
-      title: esc(`${rel} [${conf}]`),
-      dashes: conf !== "EXTRACTED",
-      width: conf === "EXTRACTED" ? 2 : 1,
-      color: { opacity: conf === "EXTRACTED" ? 0.7 : 0.35 },
-    };
-  });
-  // Build legend data
-  const legendData = Object.keys(communityNodes).sort((a,b) => Number(a)-Number(b)).map(cidStr => {
-    const cid = Number(cidStr);
-    const color = COMMUNITY_COLORS[cid % COMMUNITY_COLORS.length];
-    const members = communityNodes[cid];
-    // Determine label: most common source_file prefix or community id
-    let lbl = `Community ${cid}`;
-    if (members.length > 0 && members[0].community_name) lbl = members[0].community_name;
-    return { cid, color, label: esc(lbl), count: members.length };
-  });
-  const stats = `${nodes.length} nodes &middot; ${links.length} edges &middot; ${Object.keys(communityNodes).length} communities`;
-  const nodesJSON = JSON.stringify(visNodes).replace(/<\//g, "<\\/");
-  const edgesJSON = JSON.stringify(visEdges).replace(/<\//g, "<\\/");
-  const legendJSON = JSON.stringify(legendData).replace(/<\//g, "<\\/");
-
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<title>Neural Vault — Knowledge Graph</title>
-<script src="https://unpkg.com/vis-network@9.1.6/standalone/umd/vis-network.min.js"
-        integrity="sha384-Ux6phic9PEHJ38YtrijhkzyJ8yQlH8i/+buBR8s3mAZOJrP1gwyvAcIYl3GWtpX1"
-        crossorigin="anonymous"><\/script>
-<style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: #0f0f1a; color: #e0e0e0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; display: flex; height: 100vh; overflow: hidden; }
-  #graph { flex: 1; }
-  #sidebar { width: 280px; background: #1a1a2e; border-left: 1px solid #2a2a4e; display: flex; flex-direction: column; overflow: hidden; }
-  #search-wrap { padding: 12px; border-bottom: 1px solid #2a2a4e; }
-  #search { width: 100%; background: #0f0f1a; border: 1px solid #3a3a5e; color: #e0e0e0; padding: 7px 10px; border-radius: 6px; font-size: 13px; outline: none; }
-  #search:focus { border-color: #4E79A7; }
-  #search-results { max-height: 140px; overflow-y: auto; padding: 4px 12px; border-bottom: 1px solid #2a2a4e; display: none; }
-  .search-item { padding: 4px 6px; cursor: pointer; border-radius: 4px; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .search-item:hover { background: #2a2a4e; }
-  #info-panel { padding: 14px; border-bottom: 1px solid #2a2a4e; min-height: 140px; }
-  #info-panel h3 { font-size: 13px; color: #aaa; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em; }
-  #info-content { font-size: 13px; color: #ccc; line-height: 1.6; }
-  #info-content .field { margin-bottom: 5px; }
-  #info-content .field b { color: #e0e0e0; }
-  #info-content .empty { color: #555; font-style: italic; }
-  .neighbor-link { display: block; padding: 2px 6px; margin: 2px 0; border-radius: 3px; cursor: pointer; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-left: 3px solid #333; }
-  .neighbor-link:hover { background: #2a2a4e; }
-  #neighbors-list { max-height: 160px; overflow-y: auto; margin-top: 4px; }
-  #legend-wrap { flex: 1; overflow-y: auto; padding: 12px; }
-  #legend-wrap h3 { font-size: 13px; color: #aaa; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.05em; }
-  .legend-item { display: flex; align-items: center; gap: 8px; padding: 4px 0; cursor: pointer; border-radius: 4px; font-size: 12px; }
-  .legend-item:hover { background: #2a2a4e; padding-left: 4px; }
-  .legend-item.dimmed { opacity: 0.35; }
-  .legend-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
-  .legend-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .legend-count { color: #666; font-size: 11px; }
-  #stats { padding: 10px 14px; border-top: 1px solid #2a2a4e; font-size: 11px; color: #555; }
-  #legend-controls { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; padding: 4px 0; }
-  #legend-controls label { display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 12px; color: #aaa; user-select: none; }
-  #legend-controls label:hover { color: #e0e0e0; }
-  .legend-cb, #select-all-cb { appearance: none; -webkit-appearance: none; width: 14px; height: 14px; border: 1.5px solid #3a3a5e; border-radius: 3px; background: #0f0f1a; cursor: pointer; position: relative; flex-shrink: 0; }
-  .legend-cb:checked, #select-all-cb:checked { background: #4E79A7; border-color: #4E79A7; }
-  .legend-cb:checked::after, #select-all-cb:checked::after { content: ''; position: absolute; left: 3.5px; top: 1px; width: 4px; height: 7px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg); }
-  #select-all-cb:indeterminate { background: #4E79A7; border-color: #4E79A7; }
-  #select-all-cb:indeterminate::after { content: ''; position: absolute; left: 2px; top: 5px; width: 8px; height: 2px; background: #fff; border: none; transform: none; }
-</style>
-</head>
-<body>
-<div id="graph"></div>
-<div id="sidebar">
-  <div id="search-wrap">
-    <input id="search" type="text" placeholder="Search nodes..." autocomplete="off">
-    <div id="search-results"></div>
-  </div>
-  <div id="info-panel">
-    <h3>Node Info</h3>
-    <div id="info-content"><span class="empty">Click a node to inspect it</span></div>
-  </div>
-  <div id="legend-wrap">
-    <h3>Communities</h3>
-    <div id="legend-controls">
-      <label><input type="checkbox" id="select-all-cb" checked onchange="toggleAllCommunities(!this.checked)">Select All</label>
-    </div>
-    <div id="legend"></div>
-  </div>
-  <div id="stats">${stats}</div>
-</div>
-<script>
-const RAW_NODES = ${nodesJSON};
-const RAW_EDGES = ${edgesJSON};
-const LEGEND = ${legendJSON};
-
-function esc(s) {
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
-}
-
-const nodesDS = new vis.DataSet(RAW_NODES.map(n => ({
-  id: n.id, label: n.label, color: n.color, size: n.size,
-  font: n.font, title: n.title,
-  _community: n.community, _community_name: n.community_name,
-  _source_file: n.source_file, _file_type: n.file_type, _degree: n.degree,
-})));
-
-const edgesDS = new vis.DataSet(RAW_EDGES.map((e, i) => ({
-  id: i, from: e.from, to: e.to,
-  label: '',
-  title: e.title,
-  dashes: e.dashes,
-  width: e.width,
-  color: e.color,
-  arrows: { to: { enabled: true, scaleFactor: 0.5 } },
-})));
-
-const container = document.getElementById('graph');
-const network = new vis.Network(container, { nodes: nodesDS, edges: edgesDS }, {
-  physics: {
-    enabled: true,
-    solver: 'forceAtlas2Based',
-    forceAtlas2Based: {
-      gravitationalConstant: -60,
-      centralGravity: 0.005,
-      springLength: 120,
-      springConstant: 0.08,
-      damping: 0.4,
-      avoidOverlap: 0.8,
-    },
-    stabilization: { iterations: 200, fit: true },
-  },
-  interaction: {
-    hover: true,
-    tooltipDelay: 100,
-    hideEdgesOnDrag: true,
-    navigationButtons: false,
-    keyboard: false,
-  },
-  nodes: { shape: 'dot', borderWidth: 1.5 },
-  edges: { smooth: { type: 'continuous', roundness: 0.2 }, selectionWidth: 3 },
-});
-
-network.once('stabilizationIterationsDone', () => {
-  network.setOptions({ physics: { enabled: false } });
-});
-
-function showInfo(nodeId) {
-  const n = nodesDS.get(nodeId);
-  if (!n) return;
-  const neighborIds = network.getConnectedNodes(nodeId);
-  const neighborItems = neighborIds.map(nid => {
-    const nb = nodesDS.get(nid);
-    const color = nb ? nb.color.background : '#555';
-    return '<span class="neighbor-link" style="border-left-color:'+esc(color)+'" onclick="focusNode('+JSON.stringify(nid)+')">'+esc(nb ? nb.label : nid)+'<\\/span>';
-  }).join('');
-  const isMd = n._source_file && n._source_file.endsWith('.md');
-  const obsLink = isMd ? '<div class="field" style="margin-top: 8px;"><a class="neighbor-link" style="color:#00E5FF; border-left-color:#00E5FF; display:inline-block; text-decoration:none; font-weight:bold;" href="obsidian://open?vault=Obsidian%20Vault&file='+encodeURIComponent(n._source_file.replace(/\\.md$/,''))+'">Open in Obsidian<\\/a><\\/div>' : '';
-  document.getElementById('info-content').innerHTML =
-    '<div class="field"><b>'+esc(n.label)+'<\\/b><\\/div>'+
-    '<div class="field">Type: '+esc(n._file_type || 'unknown')+'<\\/div>'+
-    '<div class="field">Community: '+esc(n._community_name)+'<\\/div>'+
-    '<div class="field">Source: '+esc(n._source_file || '-')+'<\\/div>'+
-    '<div class="field">Degree: '+n._degree+'<\\/div>'+
-    obsLink+
-    (neighborIds.length ? '<div class="field" style="margin-top:8px;color:#aaa;font-size:11px">Neighbors ('+neighborIds.length+')<\\/div><div id="neighbors-list">'+neighborItems+'<\\/div>' : '');
-}
-
-function focusNode(nodeId) {
-  network.focus(nodeId, { scale: 1.4, animation: true });
-  network.selectNodes([nodeId]);
-  showInfo(nodeId);
-}
-
-let hoveredNodeId = null;
-network.on('hoverNode', params => { hoveredNodeId = params.node; container.style.cursor = 'pointer'; });
-network.on('blurNode', () => { hoveredNodeId = null; container.style.cursor = 'default'; });
-container.addEventListener('click', () => {
-  if (hoveredNodeId !== null) { showInfo(hoveredNodeId); network.selectNodes([hoveredNodeId]); }
-});
-network.on('click', params => {
-  if (params.nodes.length > 0) { showInfo(params.nodes[0]); }
-  else if (hoveredNodeId === null) { document.getElementById('info-content').innerHTML = '<span class="empty">Click a node to inspect it<\\/span>'; }
-});
-
-const searchInput = document.getElementById('search');
-const searchResults = document.getElementById('search-results');
-searchInput.addEventListener('input', () => {
-  const q = searchInput.value.toLowerCase().trim();
-  searchResults.innerHTML = '';
-  if (!q) { searchResults.style.display = 'none'; return; }
-  const matches = RAW_NODES.filter(n => n.label.toLowerCase().includes(q)).slice(0, 20);
-  if (!matches.length) { searchResults.style.display = 'none'; return; }
-  searchResults.style.display = 'block';
-  matches.forEach(n => {
-    const el = document.createElement('div');
-    el.className = 'search-item';
-    el.textContent = n.label;
-    el.style.borderLeft = '3px solid '+n.color.background;
-    el.style.paddingLeft = '8px';
-    el.onclick = () => {
-      network.focus(n.id, { scale: 1.5, animation: true });
-      network.selectNodes([n.id]);
-      showInfo(n.id);
-      searchResults.style.display = 'none';
-      searchInput.value = '';
-    };
-    searchResults.appendChild(el);
-  });
-});
-document.addEventListener('click', e => {
-  if (!searchResults.contains(e.target) && e.target !== searchInput) searchResults.style.display = 'none';
-});
-
-const hiddenCommunities = new Set();
-const selectAllCb = document.getElementById('select-all-cb');
-
-function updateSelectAllState() {
-  const total = LEGEND.length;
-  const hidden = hiddenCommunities.size;
-  selectAllCb.checked = hidden === 0;
-  selectAllCb.indeterminate = hidden > 0 && hidden < total;
-}
-
-function toggleAllCommunities(hide) {
-  document.querySelectorAll('.legend-item').forEach(item => { hide ? item.classList.add('dimmed') : item.classList.remove('dimmed'); });
-  document.querySelectorAll('.legend-cb').forEach(cb => { cb.checked = !hide; });
-  LEGEND.forEach(c => { if (hide) hiddenCommunities.add(c.cid); else hiddenCommunities.delete(c.cid); });
-  const updates = RAW_NODES.map(n => ({ id: n.id, hidden: hide }));
-  nodesDS.update(updates);
-  updateSelectAllState();
-}
-
-const legendEl = document.getElementById('legend');
-LEGEND.forEach(c => {
-  const item = document.createElement('div');
-  item.className = 'legend-item';
-  const cb = document.createElement('input');
-  cb.type = 'checkbox';
-  cb.className = 'legend-cb';
-  cb.checked = true;
-  cb.addEventListener('change', (e) => {
-    e.stopPropagation();
-    if (cb.checked) { hiddenCommunities.delete(c.cid); item.classList.remove('dimmed'); }
-    else { hiddenCommunities.add(c.cid); item.classList.add('dimmed'); }
-    const updates = RAW_NODES.filter(n => n.community === c.cid).map(n => ({ id: n.id, hidden: !cb.checked }));
-    nodesDS.update(updates);
-    updateSelectAllState();
-  });
-  item.innerHTML = '<div class="legend-dot" style="background:'+c.color+'"><\\/div><span class="legend-label">'+c.label+'<\\/span><span class="legend-count">'+c.count+'<\\/span>';
-  item.prepend(cb);
-  item.onclick = (e) => { if (e.target === cb) return; cb.checked = !cb.checked; cb.dispatchEvent(new Event('change')); };
-  legendEl.appendChild(item);
-});
-<\/script>
-</body>
-</html>`;
-}
-
 /* ------- Claude Code activity: sessions + subagents from the transcript jsonl ------- */
 function tailRead(file, bytes) {
   try {
@@ -806,11 +501,12 @@ function tailRead(file, bytes) {
     return buf.toString("utf8");
   } catch { return ""; }
 }
+const HOME_PREFIX_RE = new RegExp("^" + os.homedir().replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "[\\\\/]", "i");
 function toolTarget(name, input) {
   if (!input) return "";
   const t = input.file_path || input.path || input.pattern || input.description ||
     (input.command ? String(input.command) : "") || input.prompt || "";
-  return String(t).replace(/^C:\\Users\\abrur\\/i, "").slice(0, 90);
+  return String(t).replace(HOME_PREFIX_RE, "").slice(0, 90);
 }
 function claudeActivity() {
   const sessions = [];
@@ -1157,29 +853,6 @@ const server = http.createServer((req, res) => {
         return;
       }
       if (url === "/api/graph") return json(res, 200, buildGraph());
-      if (url === "/api/graphify-html") {
-        // Try graph.html first (from graphify update)
-        const filePath = path.join(VAULT, "graphify-out", "graph.html");
-        if (fs.existsSync(filePath)) {
-          res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-          return res.end(fs.readFileSync(filePath));
-        }
-        // Fallback: generate vis-network HTML from graph.json
-        const jsonPath = path.join(VAULT, "graphify-out", "graph.json");
-        if (!fs.existsSync(jsonPath)) {
-          res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
-          return res.end("graph.json not found. Run 'graphify update' in a terminal.");
-        }
-        try {
-          const g = JSON.parse(fs.readFileSync(jsonPath, "utf8"));
-          const html = generateGraphifyHTML(g);
-          res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-          return res.end(html);
-        } catch (e) {
-          res.writeHead(500, { "Content-Type": "text/plain; charset=utf-8" });
-          return res.end("Error generating graph: " + e.message);
-        }
-      }
       if (url === "/api/report") return json(res, 200, buildReport());
       if (url === "/api/report/save" && req.method === "POST") return json(res, 200, saveReport());
       if (url === "/api/task" && req.method === "POST")
