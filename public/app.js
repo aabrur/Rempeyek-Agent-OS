@@ -11,10 +11,13 @@ const TILE_C = ["#00E5FF", "#FF3DD8", "#A6FF3C", "#FFB01F"];
 const PALETTE = ["#00E5FF", "#FF3DD8", "#A6FF3C", "#FFB01F", "#8C5BFF", "#FF4D6A", "#3CFFC8", "#FF8A3C", "#4C9BFF", "#F2FF3C"];
 
 const WORKFLOWS = [
-  { who: "Hermes", t: "Crypto & Market Ops", d: "Trading bot, market analysis, cron & heartbeat 24/7. Real-money moves only with Boss approval." },
-  { who: "ZCode", t: "Build & Orchestrate", d: "Interactive coding, software engineering, orchestration of 200+ skills." },
-  { who: "OpenClaw", t: "Strategic Memo", d: "Business analysis, SWOT, founder-grade docs, persona-driven writing." },
-  { who: "Claude Code", t: "Dev & Vault Ops", d: "Full dev, file ops, MCP, ecosystem integration, guardian of the vault constitution." },
+  { id: "openclaw", who: "OpenClaw", t: "Strategy & Business", d: "Business analysis, SWOT, founder-grade memos, persona-driven writing, multi-agent orchestration." },
+  { id: "hermes", who: "Hermes", t: "Crypto & Market Ops", d: "Trading bot, market analysis, cron & heartbeat 24/7. Real-money moves only with Boss approval." },
+  { id: "zcode", who: "ZCode", t: "Build & Debug", d: "Interactive coding, software engineering, systematic debugging, orchestration of 200+ skills." },
+  { id: "claude-code", who: "Claude Code", t: "Dev & Vault Ops", d: "Full dev, file ops, MCP, ecosystem integration, guardian of the vault constitution." },
+  { id: "kimi-code", who: "Kimi Code", t: "Backup Coding", d: "Standby coding agent — long-context implementation and code review when extra capacity is needed." },
+  { id: "copilot", who: "Copilot CLI", t: "Inline Assist", d: "Manual CLI coding assistant — quick edits, completions, and MCP/plugin-driven tasks in its own terminal." },
+  { id: "antigravity", who: "Antigravity", t: "Agentic Integration", d: "Gemini-based advanced agentic coding, dashboard building, and knowledge-graph visualization." },
 ];
 
 /* ---------- util ---------- */
@@ -254,8 +257,8 @@ function render(state) {
 
   const wf = document.getElementById("workflowCards");
   wf.innerHTML = "";
-  WORKFLOWS.forEach(w => wf.appendChild(el(`<div class="wf">
-    <span class="who">${esc(w.who)}</span><div class="t">${esc(w.t)}</div><div class="d">${esc(w.d)}</div></div>`)));
+  WORKFLOWS.forEach(w => wf.appendChild(el(`<div class="wf" style="--ac:${ac(w.id)}">
+    <span class="who" style="color:${ac(w.id)}">${esc(w.who)}</span><div class="t">${esc(w.t)}</div><div class="d">${esc(w.d)}</div></div>`)));
 
   const pl = document.getElementById("projectList");
   pl.innerHTML = "";

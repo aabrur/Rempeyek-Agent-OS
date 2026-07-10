@@ -284,7 +284,8 @@ body {
 .kind.task { border: 1px solid var(--violet); color: var(--violet); }
 .empty { color: var(--muted); font-size: 12px; padding: 14px; border: 1px dashed var(--line); border-radius: 9px; }
 .workflow-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.wf { border: 1px solid var(--line); border-radius: 9px; padding: 11px 12px; background: rgba(5, 3, 16, .45); }
+.wf { border: 1px solid var(--line); border-left: 2px solid var(--ac, var(--magenta)); border-radius: 9px; padding: 11px 12px; background: rgba(5, 3, 16, .45); transition: border-color .15s, box-shadow .15s; }
+.wf:hover { box-shadow: 0 0 16px color-mix(in srgb, var(--ac, var(--magenta)) 20%, transparent); }
 .wf .who { font-family: var(--mono); font-size: 9.5px; color: var(--magenta); letter-spacing: .12em; text-transform: uppercase; }
 .wf .t { font-weight: 700; font-size: 12.5px; margin: 3px 0 2px; }
 .wf .d { font-size: 11px; color: var(--muted); }
