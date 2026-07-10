@@ -1,7 +1,7 @@
-/* Agentic OS â€” zero-dependency Node server.
-   Dashboard live dari Obsidian Vault + launcher gateway agent.
-   Jalankan: npm run dev  â†’  http://localhost:4321
-   Remote:   set DASH_TOKEN=rahasia  â†’  akses wajib pakai token. */
+/* Agentic OS — zero-dependency Node server.
+   Live dashboard from the Obsidian Vault + agent gateway launcher.
+   Run: npm run dev  →  http://localhost:4321
+   Remote:   set DASH_TOKEN=secret  →  access requires the token. */
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
@@ -9,7 +9,7 @@ const net = require("net");
 const { spawn, execFile } = require("child_process");
 const crypto = require("crypto");
 
-/* muat .env (KEY=VALUE per baris; env var asli menang atas isi file) */
+/* load .env (KEY=VALUE per line; real env vars win over file contents) */
 try {
   for (const line of fs.readFileSync(path.join(__dirname, ".env"), "utf8").split(/\r?\n/)) {
     const m = line.match(/^\s*([A-Z_][A-Z0-9_]*)\s*=\s*(.*)\s*$/);
@@ -28,37 +28,37 @@ const DAY = 86400000;
 const LOG_MAX = 800;
 const AVATAR_DIR = path.join(PUBLIC, "avatars");
 const TELEMETRY_DIR = path.join(__dirname, "telemetry");
-const LOG_DIR = path.join(TELEMETRY_DIR, "logs");   // R#4: log run per-agent, selamat dari restart
-const LOG_FILE_MAX = 1_000_000;                     // 1 MB/agent → rotasi naif (simpan separuh ekor)
+const LOG_DIR = path.join(TELEMETRY_DIR, "logs");   // R#4: per-agent run log, survives restarts
+const LOG_FILE_MAX = 1_000_000;                     // 1 MB/agent → naive rotation (keep the tail half)
 const CLAUDE_PROJECTS = "C:\\Users\\abrur\\.claude\\projects";
 for (const d of [AVATAR_DIR, TELEMETRY_DIR, LOG_DIR]) { try { fs.mkdirSync(d, { recursive: true }); } catch {} }
 
-/* loadConfig: memoize by mtime (B6) + tahan config rusak mid-edit â†’ return last-good (R10).
-   R#11: simpan error terakhir supaya dashboard bisa tampilkan banner (bukan diam-diam last-good). */
+/* loadConfig: memoize by mtime (B6) + tolerate config broken mid-edit → return last-good (R10).
+   R#11: keep the last error so the dashboard can show a banner (not silently serve last-good). */
 let _cfgCache = { mtime: 0, data: null };
-let configError = null;   // { msg, at } saat parse gagal tapi masih ada last-good
+let configError = null;   // { msg, at } when parsing fails but a last-good copy exists
 function loadConfig() {
   try {
     const st = fs.statSync(CONFIG_PATH);
     if (_cfgCache.data && st.mtimeMs === _cfgCache.mtime) return _cfgCache.data;
     const data = JSON.parse(fs.readFileSync(CONFIG_PATH, "utf8"));
     _cfgCache = { mtime: st.mtimeMs, data };
-    configError = null;                       // sembuh â†’ bersihkan banner
+    configError = null;                       // recovered → clear the banner
     return data;
   } catch (e) {
-    if (_cfgCache.data) { console.error("[config] parse gagal, pakai last-good:", e.message); configError = { msg: e.message, at: new Date().toISOString() }; return _cfgCache.data; }
+    if (_cfgCache.data) { console.error("[config] parse failed, using last-good:", e.message); configError = { msg: e.message, at: new Date().toISOString() }; return _cfgCache.data; }
     throw e;
   }
 }
 
 /* ---------------- vault scan (view: Command Center) ---------------- */
 function walk(dir, out = [], base = dir, depth = 0) {
-  if (depth > 100) return out;               // R14: cegah rekursi tak henti (nest dalam)
+  if (depth > 100) return out;               // R14: prevent runaway recursion (deep nesting)
   let entries;
   try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return out; }
   for (const e of entries) {
     if (IGNORE.has(e.name) || e.name.startsWith(".")) continue;
-    if (e.isSymbolicLink()) continue;        // R14: skip symlink/junction â†’ cegah loop
+    if (e.isSymbolicLink()) continue;        // R14: skip symlinks/junctions → prevent loops
     const full = path.join(dir, e.name);
     if (e.isDirectory()) walk(full, out, base, depth + 1);
     else if (e.name.endsWith(".md")) {
@@ -69,7 +69,7 @@ function walk(dir, out = [], base = dir, depth = 0) {
   return out;
 }
 
-/* snapshot vault ber-TTL pendek: dedupe re-walk saat banyak endpoint/tab minta dalam 1 tick (B1/B3) */
+/* short-TTL vault snapshot: dedupes re-walks when many endpoints/tabs ask within one tick (B1/B3) */
 let _walkCache = { t: 0, data: null };
 function walkVault() {
   if (_walkCache.data && Date.now() - _walkCache.t < 3000) return _walkCache.data;
@@ -110,7 +110,7 @@ function buildState() {
   const files = walkVault();
   const now = Date.now();
   const tasks = openTasks();
-  const um = uptimeMap();                       // R#2: uptime 24 jam per agent (1x baca file)
+  const um = uptimeMap();                       // R#2: 24-hour uptime per agent (single file read)
   const inbox = files.filter(f => f.rel.startsWith("Inbox/"));
   const projects = files.filter(f => f.rel.startsWith("Projects/") && f.rel.split("/").length === 2)
     .sort((a, b) => b.mtime - a.mtime)
@@ -119,13 +119,13 @@ function buildState() {
     vault: VAULT,
     agency: cfg.agency || "AGENTIC//OS",
     generatedAt: new Date().toISOString(),
-    configError,                              // R#11: null kalau sehat, {msg,at} kalau config rusak
+    configError,                              // R#11: null when healthy, {msg,at} when config is broken
 
     stats: {
-      notes: { value: files.length, label: "Total catatan vault" },
-      activeWeek: { value: files.filter(f => now - f.mtime < 7 * DAY).length, label: "Catatan diubah 7 hari terakhir" },
-      openTasks: { value: tasks.length, label: "Checkbox terbuka di Tasks/" },
-      projects: { value: projects.length, label: "Project note aktif" },
+      notes: { value: files.length, label: "Total vault notes" },
+      activeWeek: { value: files.filter(f => now - f.mtime < 7 * DAY).length, label: "Notes changed in the last 7 days" },
+      openTasks: { value: tasks.length, label: "Open checkboxes in Tasks/" },
+      projects: { value: projects.length, label: "Active project notes" },
     },
     agents: cfg.agents.map(a => ({ ...a, gateway: undefined, actions: gwActions(a), canSummon: !!(a.gateway && a.gateway.home && a.gateway.trigger), ...agentVaultStatus(files, a), proc: procInfo(a.id), avatar: avatarUrl(a.id), uptime: um[a.id] || null })),
     review: [
@@ -139,11 +139,11 @@ function buildState() {
 }
 
 /* ---------------- gateway controller ----------------
-   Dashboard memanggil command gateway ASLI tiap agent (start/stop/restart/status/run).
-   - start/stop/restart/status : command pendek (jalan â†’ tampung output â†’ selesai),
-     dikelola OS service manager (schtasks/systemd) â†’ tetap hidup walau dashboard ditutup.
-   - run : foreground, di-own dashboard (log live), berhenti saat dashboard/tombol stop.
-   procs = proses `run` yang di-own dashboard. gwCache = hasil status terakhir per agent. */
+   The dashboard calls each agent's REAL gateway commands (start/stop/restart/status/run).
+   - start/stop/restart/status : short commands (run → capture output → done),
+     managed by the OS service manager (schtasks/systemd) → stays alive even if the dashboard closes.
+   - run : foreground, owned by the dashboard (live log), stops with the dashboard/stop button.
+   procs = `run` processes owned by the dashboard. gwCache = last status result per agent. */
 const procs = new Map();   // id -> {child,pid,log:[],seq,status,startedAt,exitCode}
 const gwCache = new Map();  // id -> {running,text,at,exitCode}
 
@@ -152,6 +152,7 @@ function gwActions(agent) { return (agent && agent.gateway && agent.gateway.acti
 
 function detectRunning(text) {
   const t = (text || "").toLowerCase();
+  // Note: matches Indonesian output emitted by some agent CLIs — do not translate
   if (/not running|tidak (sedang )?jalan|belum jalan|\bstopped\b|\binactive\b|no gateway|not installed|no running/.test(t)) return false;
   if (/\brunning\b|\bactive\b|\bpid[:\s#]*\d|listening on|is up\b/.test(t)) return true;
   return false;
@@ -160,7 +161,7 @@ function detectRunning(text) {
 function procInfo(id) {
   const p = procs.get(id);
   const c = gwCache.get(id);
-  // proses run yang di-own dashboard menang kalau masih hidup
+  // a dashboard-owned run process wins while it's still alive
   if (p && p.status === "running")
     return { status: "running", mode: "owned", pid: p.pid, startedAt: p.startedAt, exitCode: null, logSize: p.seq, reason: null, statusText: c && c.text || null, checkedAt: c && new Date(c.at).toISOString() || null };
   let reason = null;
@@ -195,10 +196,10 @@ function pushLog(p, stream, chunk) {
       disk.push({ t: entry.t, s: entry.s, line: entry.line });
       if (p.log.length > LOG_MAX) p.log.splice(0, p.log.length - LOG_MAX);
     }
-    if (disk.length) appendDiskLog(p.id, disk);       // R#4: persist ke disk
-  } catch (e) { /* R19: jangan biarkan throw di event 'data' escape handler */ }
+    if (disk.length) appendDiskLog(p.id, disk);       // R#4: persist to disk
+  } catch (e) { /* R19: don't let a throw in the 'data' event escape the handler */ }
 }
-/* R#4: append log run ke telemetry/logs/<id>.log (JSONL) + rotasi naif saat > LOG_FILE_MAX */
+/* R#4: append run log to telemetry/logs/<id>.log (JSONL) + naive rotation when > LOG_FILE_MAX */
 function appendDiskLog(id, entries) {
   if (!id || !entries || !entries.length) return;
   try {
@@ -210,7 +211,7 @@ function appendDiskLog(id, entries) {
     }
   } catch {}
 }
-/* R#4: baca ekor log disk (dipakai detail agent setelah restart, saat proc in-memory hilang) */
+/* R#4: read the disk log tail (used by agent detail after a restart, when the in-memory proc is gone) */
 function readDiskLog(id, n) {
   const out = [];
   for (const line of tailRead(path.join(LOG_DIR, `${id}.log`), 80000).split("\n")) {
@@ -220,15 +221,15 @@ function readDiskLog(id, n) {
   return out.slice(-n);
 }
 
-/* R2: tree-kill konsisten (Win: taskkill /T, POSIX: kill process group) â€” dipakai owned-run & timeout gwCtl */
+/* R2: consistent tree-kill (Win: taskkill /T, POSIX: kill process group) — used by owned-run & gwCtl timeout */
 function killTree(pid, child) {
   if (!pid) { try { child && child.kill(); } catch {} return; }
   if (process.platform === "win32") { try { execFile("taskkill", ["/pid", String(pid), "/T", "/F"], () => {}); } catch {} }
   else { try { process.kill(-pid, "SIGKILL"); } catch { try { child && child.kill(); } catch {} } }
 }
 
-/* ROADMAP #1: alert saat agent turun (running â†’ down) atau run exit non-zero.
-   Durable = 1 note ke vault Inbox/ (auto muncul di Needs Review). Toast Windows = best-effort. */
+/* ROADMAP #1: alert when an agent goes down (running → down) or a run exits non-zero.
+   Durable = 1 note in the vault Inbox/ (auto-appears in Needs Review). Windows toast = best-effort. */
 function notifyWindows(title, msg) {
   if (process.platform !== "win32") return;
   const q = s => String(s).replace(/'/g, "''").slice(0, 200);
@@ -248,13 +249,13 @@ function alertDown(id, reason) {
     const fname = `ALERT ${name} ${stamp.slice(0, 10)} ${stamp.slice(11, 19).replace(/:/g, ".")}.md`;
     fs.writeFileSync(path.join(dir, fname),
       `---\ntype: alert\nagent: ${id}\ncreated: ${stamp}\ntags: [alert, agentic-os]\n---\n\n` +
-      `# ⚠ ${name} — gateway down\n\n- Waktu: ${stamp.slice(0, 19).replace("T", " ")}\n- Sebab: ${reason}\n- Sumber: agentic-os dashboard (deteksi otomatis)\n`, "utf8");
-  } catch (e) { console.error("[alert] gagal tulis inbox:", e.message); }
+      `# ⚠ ${name} — gateway down\n\n- Time: ${stamp.slice(0, 19).replace("T", " ")}\n- Cause: ${reason}\n- Source: agentic-os dashboard (automatic detection)\n`, "utf8");
+  } catch (e) { console.error("[alert] failed to write inbox note:", e.message); }
   notifyWindows(`⚠ ${name} down`, reason);
 }
 
-/* ROADMAP #2: catat tiap poll status ke telemetry/uptime.jsonl (ts + up 0/1) â†’ strip uptime 24 jam.
-   ponytail: append-only, dibaca via tailRead (cap byte). File tumbuh ~poll/hariâ€”rotasi nanti kalau perlu. */
+/* ROADMAP #2: log each status poll to telemetry/uptime.jsonl (ts + up 0/1) → 24-hour uptime strip.
+   ponytail: append-only, read via tailRead (byte cap). File grows ~polls/day — rotate later if needed. */
 function logUptime(id, running) {
   try { fs.appendFileSync(path.join(TELEMETRY_DIR, "uptime.jsonl"), JSON.stringify({ ts: Date.now(), id, up: running ? 1 : 0 }) + "\n"); } catch {}
 }
@@ -273,84 +274,84 @@ function uptimeMap() {
   return out;
 }
 
-/* command pendek: start/stop/restart/status â†’ jalankan `<bin> <action>`, tampung output */
+/* short commands: start/stop/restart/status → run `<bin> <action>`, capture the output */
 function gwCtl(id, action, cb) {
   const agent = agentById(id);
-  if (!agent) return cb({ error: `agent '${id}' tidak dikenal` });
+  if (!agent) return cb({ error: `unknown agent '${id}'` });
   const g = agent.gateway;
-  if (!agent.enabled || !g || !g.bin) return cb({ error: agent.note || `gateway '${id}' belum siap (enabled:false)` });
-  if (!gwActions(agent).includes(action)) return cb({ error: `aksi '${action}' tidak didukung ${agent.name}` });
+  if (!agent.enabled || !g || !g.bin) return cb({ error: agent.note || `gateway '${id}' not ready (enabled:false)` });
+  if (!gwActions(agent).includes(action)) return cb({ error: `action '${action}' not supported by ${agent.name}` });
   const cwd = g.cwd || loadConfig().workdir;
-  if (!fs.existsSync(cwd)) return cb({ error: `cwd tidak ada: ${cwd}` });
+  if (!fs.existsSync(cwd)) return cb({ error: `cwd does not exist: ${cwd}` });
 
   const cmd = `${g.bin} ${action}`;
   let out = "", done = false;
   const finish = (obj) => { if (done) return; done = true; clearTimeout(timer); cb(obj); };
   let child;
   try { child = spawn(cmd, [], { cwd, shell: true, windowsHide: true, env: { ...process.env, AGENT_WORKDIR: loadConfig().workdir } }); }
-  catch (e) { return cb({ error: `gagal spawn: ${e.message}` }); }
+  catch (e) { return cb({ error: `spawn failed: ${e.message}` }); }
   const timer = setTimeout(() => { killTree(child.pid, child); finish({ error: `timeout 30s: ${cmd}` }); }, 30000);
   child.stdout.on("data", d => { out += d; });
   child.stderr.on("data", d => { out += d; });
-  child.on("error", err => finish({ error: `gagal jalankan: ${err.message}` }));
+  child.on("error", err => finish({ error: `failed to run: ${err.message}` }));
   child.on("exit", code => {
     const text = out.trim().slice(0, 4000);
     const running = detectRunning(text);
     if (action === "status" || action === "start" || action === "restart") {
-      const prev = gwCache.get(id);                    // R#1: deteksi transisi running â†’ down
+      const prev = gwCache.get(id);                    // R#1: detect running → down transition
       gwCache.set(id, { running, text, at: Date.now(), exitCode: code });
       logUptime(id, running);
-      if (prev && prev.running && !running) { alertDown(id, `gateway turun (terdeteksi saat ${action})`); if (action === "status") maybeWatchdog(id); }
+      if (prev && prev.running && !running) { alertDown(id, `gateway went down (detected during ${action})`); if (action === "status") maybeWatchdog(id); }
     } else if (action === "stop") { gwCache.set(id, { running: false, text, at: Date.now(), exitCode: code }); logUptime(id, false); }
     finish({ ok: code === 0, code, action, running, output: text });
   });
 }
 
-/* run: foreground, di-own dashboard, log live */
+/* run: foreground, owned by the dashboard, live log */
 function gwRun(id) {
   const agent = agentById(id);
-  if (!agent) return { error: `agent '${id}' tidak dikenal` };
+  if (!agent) return { error: `unknown agent '${id}'` };
   const g = agent.gateway;
-  if (!agent.enabled || !g || !g.bin) return { error: agent.note || `gateway '${id}' belum siap (enabled:false)` };
-  if (!gwActions(agent).includes("run")) return { error: `${agent.name} tidak mendukung 'run'` };
+  if (!agent.enabled || !g || !g.bin) return { error: agent.note || `gateway '${id}' not ready (enabled:false)` };
+  if (!gwActions(agent).includes("run")) return { error: `${agent.name} does not support 'run'` };
   const existing = procs.get(id);
-  if (existing && existing.status === "running") return { error: `${id} sudah jalan owned (pid ${existing.pid})` };
+  if (existing && existing.status === "running") return { error: `${id} is already running owned (pid ${existing.pid})` };
   const cwd = g.cwd || loadConfig().workdir;
-  if (!fs.existsSync(cwd)) return { error: `cwd tidak ada: ${cwd}` };
+  if (!fs.existsSync(cwd)) return { error: `cwd does not exist: ${cwd}` };
 
   const cmd = g.runCmd || `${g.bin} run`;
   const p = { id, log: [], seq: 0, status: "running", startedAt: new Date().toISOString(), exitCode: null };
   pushLog(p, "sys", `[agentic-os] run (owned): ${cmd}  (cwd: ${cwd})`);
   let child;
   try { child = spawn(cmd, [], { cwd, shell: true, windowsHide: true, env: { ...process.env, AGENT_WORKDIR: loadConfig().workdir } }); }
-  catch (e) { return { error: `gagal spawn: ${e.message}` }; }
+  catch (e) { return { error: `spawn failed: ${e.message}` }; }
   p.child = child; p.pid = child.pid;
   child.stdout.on("data", d => pushLog(p, "out", d));
   child.stderr.on("data", d => pushLog(p, "err", d));
   child.on("exit", code => { p.status = "exited"; p.exitCode = code; pushLog(p, "sys", `[agentic-os] exit code ${code}`);
-    if (code !== 0) { const last = p.log.filter(l => l.s === "out" || l.s === "err").slice(-1)[0]; alertDown(id, `run (owned) exit code ${code}${last ? " â€” " + last.line : ""}`); } });
+    if (code !== 0) { const last = p.log.filter(l => l.s === "out" || l.s === "err").slice(-1)[0]; alertDown(id, `run (owned) exit code ${code}${last ? " — " + last.line : ""}`); } });
   child.on("error", err => { p.status = "error"; p.exitCode = -1; pushLog(p, "sys", `[agentic-os] spawn error: ${err.message}`); });
   procs.set(id, p);
   return { ok: true, pid: child.pid, mode: "run (owned)" };
 }
 
-/* terminal: buka Windows Terminal (elevated/admin) yang cd ke folder default & auto-run trigger.
-   TIDAK di-own dashboard (detached + unref) â€” makanya Stop/Stop-all tak menutup terminal CLI/TUI ini. */
+/* terminal: open a Windows Terminal (elevated/admin) that cd's to the default folder & auto-runs the trigger.
+   NOT owned by the dashboard (detached + unref) — that's why Stop/Stop-all won't close this CLI/TUI terminal. */
 function gwTerminal(id, mode) {
   const agent = agentById(id);
-  if (!agent) return { error: `agent '${id}' tidak dikenal` };
+  if (!agent) return { error: `unknown agent '${id}'` };
   const g = agent.gateway;
-  if (!agent.enabled || !g) return { error: agent.note || `gateway '${id}' belum siap (enabled:false)` };
+  if (!agent.enabled || !g) return { error: agent.note || `gateway '${id}' not ready (enabled:false)` };
   let dir, cmd;
   if (mode === "summon") {
-    if (!g.trigger) return { error: `${agent.name} belum punya trigger untuk dipanggil` };
+    if (!g.trigger) return { error: `${agent.name} has no trigger to summon it with` };
     dir = g.home || loadConfig().workdir; cmd = g.trigger;
-  } else if (mode === "start") { if (!g.bin) return { error: `${agent.name} tak punya gateway` }; dir = g.cwd || loadConfig().workdir; cmd = `${g.bin} start`; }
-  else if (mode === "run") { if (!g.bin) return { error: `${agent.name} tak punya gateway` }; dir = g.cwd || loadConfig().workdir; cmd = g.runCmd || `${g.bin} run`; }
-  else return { error: `mode terminal '${mode}' tidak dikenal (summon|start|run)` };
-  if (!fs.existsSync(dir)) return { error: `folder tidak ada: ${dir}` };
+  } else if (mode === "start") { if (!g.bin) return { error: `${agent.name} has no gateway` }; dir = g.cwd || loadConfig().workdir; cmd = `${g.bin} start`; }
+  else if (mode === "run") { if (!g.bin) return { error: `${agent.name} has no gateway` }; dir = g.cwd || loadConfig().workdir; cmd = g.runCmd || `${g.bin} run`; }
+  else return { error: `unknown terminal mode '${mode}' (summon|start|run)` };
+  if (!fs.existsSync(dir)) return { error: `folder does not exist: ${dir}` };
 
-  // ponytail: dir & cmd dari config (trusted). Escape single-quote untuk untai PowerShell.
+  // ponytail: dir & cmd come from config (trusted). Escape single quotes for the PowerShell string.
   const q = s => String(s).replace(/'/g, "''");
   const ps =
     `$d='${q(dir)}'; $c='${q(cmd)}'; ` +
@@ -361,29 +362,29 @@ function gwTerminal(id, mode) {
     const child = spawn("powershell", ["-NoProfile", "-Command", ps], { detached: true, windowsHide: true, stdio: "ignore" });
     child.unref();
     return { ok: true, mode, dir, cmd, terminal: true };
-  } catch (e) { return { error: `gagal buka terminal: ${e.message}` }; }
+  } catch (e) { return { error: `failed to open terminal: ${e.message}` }; }
 }
 
-/* matikan proses run yang di-own dashboard (kalau ada) */
+/* kill the dashboard-owned run process (if any) */
 function killOwned(id) {
   const p = procs.get(id);
   if (!p || p.status !== "running" || !p.pid) return false;
-  pushLog(p, "sys", "[agentic-os] stop owned â€” tree-kill");
+  pushLog(p, "sys", "[agentic-os] stop owned — tree-kill");
   killTree(p.pid, p.child);
   return true;
 }
 
-/* stop = matikan owned run (kalau ada) + panggil native `gateway stop` (kalau didukung) */
+/* stop = kill the owned run (if any) + call the native `gateway stop` (if supported) */
 function gwStop(id, cb) {
   const agent = agentById(id);
   const killed = killOwned(id);
   if (agent && gwActions(agent).includes("stop"))
     return gwCtl(id, "stop", r => cb({ ...r, ownedKilled: killed }));
-  cb({ ok: true, ownedKilled: killed, note: killed ? "proses run (owned) dihentikan" : `${agent ? agent.name : id} tidak punya native stop & tidak ada proses owned` });
+  cb({ ok: true, ownedKilled: killed, note: killed ? "owned run process stopped" : `${agent ? agent.name : id} has no native stop & no owned process` });
 }
 
-/* R#7: health probe asli â€” cek TCP port beneran listening (lebih jujur dari cocok-cocokan teks status).
-   Config: agent.gateway.probe = { host?, port }. Connect sukses = hidup, else mati. */
+/* R#7: real health probe — check that the TCP port is actually listening (more honest than matching status text).
+   Config: agent.gateway.probe = { host?, port }. Successful connect = alive, else down. */
 function probePort(host, port, cb) {
   const sock = new net.Socket();
   let done = false;
@@ -398,35 +399,35 @@ function probeAndCache(id, probe) {
   probePort(probe.host, probe.port, up => {
     const prev = gwCache.get(id);
     const host = probe.host || "127.0.0.1";
-    gwCache.set(id, { running: up, text: `probe TCP ${host}:${probe.port} â†’ ${up ? "OPEN (listening)" : "CLOSED"}`, at: Date.now(), exitCode: up ? 0 : 1 });
+    gwCache.set(id, { running: up, text: `probe TCP ${host}:${probe.port} → ${up ? "OPEN (listening)" : "CLOSED"}`, at: Date.now(), exitCode: up ? 0 : 1 });
     logUptime(id, up);
-    if (prev && prev.running && !up) { alertDown(id, `probe port ${probe.port} tertutup (service turun)`); maybeWatchdog(id); }
+    if (prev && prev.running && !up) { alertDown(id, `probe port ${probe.port} closed (service down)`); maybeWatchdog(id); }
   });
 }
 
-/* R#6: watchdog auto-restart untuk agent 24/7 (opsional per agent: gateway.watchdog=true).
-   Hard anti-loop: maks 3 restart / jam. Tetap kirim alert (dari pemanggil). */
+/* R#6: watchdog auto-restart for 24/7 agents (optional per agent: gateway.watchdog=true).
+   Hard anti-loop: max 3 restarts / hour. Alerts are still sent (by the caller). */
 const restartLog = new Map();   // id -> [timestamps]
 function maybeWatchdog(id) {
   const a = agentById(id);
   if (!a || !a.gateway || !a.gateway.watchdog || !gwActions(a).includes("restart")) return;
   const now = Date.now();
   const hits = (restartLog.get(id) || []).filter(t => now - t < 3600000);
-  if (hits.length >= 3) { console.error(`[watchdog] ${id}: batas 3x/jam tercapai, stop auto-restart`); return; }
+  if (hits.length >= 3) { console.error(`[watchdog] ${id}: 3x/hour limit reached, stopping auto-restart`); return; }
   hits.push(now); restartLog.set(id, hits);
-  console.error(`[watchdog] ${id}: auto-restart (percobaan ${hits.length}/3 jam ini)`);
-  alertDown(id, `watchdog auto-restart (percobaan ${hits.length}/3 dalam 1 jam)`);
+  console.error(`[watchdog] ${id}: auto-restart (attempt ${hits.length}/3 this hour)`);
+  alertDown(id, `watchdog auto-restart (attempt ${hits.length}/3 within 1 hour)`);
   gwCtl(id, "restart", () => {});
 }
 
-/* refresh status semua agent yang mendukungnya (dipanggil berkala).
-   R4: in-flight guard â€” jangan spawn status baru kalau yang lama belum selesai (cegah overlap/pileup). */
+/* refresh the status of every agent that supports it (called periodically).
+   R4: in-flight guard — don't spawn a new status check while the old one is still running (prevents overlap/pileup). */
 const polling = new Set();
 function pollAllStatus() {
   let agents; try { agents = loadConfig().agents; } catch { return; }
   for (const a of agents) {
     if (!a.enabled || !a.gateway) continue;
-    if (a.gateway.probe && a.gateway.probe.port) { probeAndCache(a.id, a.gateway.probe); continue; }  // R#7: probe menang
+    if (a.gateway.probe && a.gateway.probe.port) { probeAndCache(a.id, a.gateway.probe); continue; }  // R#7: probe wins
     if (gwActions(a).includes("status") && !polling.has(a.id)) {
       polling.add(a.id);
       gwCtl(a.id, "status", () => polling.delete(a.id));
@@ -436,15 +437,15 @@ function pollAllStatus() {
 
 /* ---------------- avatar ---------------- */
 function avatarUrl(id) {
-  for (const ext of ["png", "jpg", "webp", "svg"])   // svg = placeholder sementara; raster (upload) menang duluan
+  for (const ext of ["png", "jpg", "webp", "svg"])   // svg = temporary placeholder; raster (uploaded) wins first
     if (fs.existsSync(path.join(AVATAR_DIR, `${id}.${ext}`))) return `/avatars/${id}.${ext}`;
   return null;
 }
 function saveAvatar(id, dataUrl) {
   const m = /^data:image\/(png|jpeg|webp);base64,(.+)$/.exec(dataUrl || "");
-  if (!m) return { error: "format harus data:image/png|jpeg|webp;base64" };
+  if (!m) return { error: "format must be data:image/png|jpeg|webp;base64" };
   const buf = Buffer.from(m[2], "base64");
-  if (buf.length > 3e6) return { error: "maks 3 MB" };
+  if (buf.length > 3e6) return { error: "max 3 MB" };
   const ext = m[1] === "jpeg" ? "jpg" : m[1];
   for (const e of ["png", "jpg", "webp", "svg"]) { try { fs.unlinkSync(path.join(AVATAR_DIR, `${id}.${e}`)); } catch {} }
   fs.writeFileSync(path.join(AVATAR_DIR, `${id}.${ext}`), buf);
@@ -482,7 +483,7 @@ function buildGraph() {
   graphCache = { t: Date.now(), data: { nodes: [...nodes.values()], edges, generatedAt: new Date().toISOString() } };
   return graphCache.data;
   } catch (e) {
-    if (graphCache.data) return graphCache.data;   // R18: jangan poison cache ke null
+    if (graphCache.data) return graphCache.data;   // R18: don't poison the cache to null
     return { nodes: [], edges: [], generatedAt: new Date().toISOString(), error: e.message };
   }
 }
@@ -793,7 +794,7 @@ LEGEND.forEach(c => {
 </html>`;
 }
 
-/* ------- aktivitas Claude Code: sesi + subagent dari transcript jsonl ------- */
+/* ------- Claude Code activity: sessions + subagents from the transcript jsonl ------- */
 function tailRead(file, bytes) {
   try {
     const size = fs.statSync(file).size;
@@ -852,7 +853,7 @@ function claudeActivity() {
         if (b.name === "Agent" || b.name === "Task")
           spawns.set(b.id, {
             session: c.id.slice(0, 8), ts: o.timestamp || null,
-            desc: (b.input && (b.input.description || "")) || "(tanpa deskripsi)",
+            desc: (b.input && (b.input.description || "")) || "(no description)",
             type: (b.input && (b.input.subagent_type || "general-purpose")) || "general-purpose",
             status: "running",
           });
@@ -871,7 +872,7 @@ function claudeActivity() {
   return { sessions, subagents: allAgents.reverse().slice(0, 20) };
 }
 
-/* ------- telemetry lintas-agent: agentic-os/telemetry/<id>.jsonl ------- */
+/* ------- cross-agent telemetry: agentic-os/telemetry/<id>.jsonl ------- */
 function readTelemetry(id) {
   const file = path.join(TELEMETRY_DIR, `${id}.jsonl`);
   if (!fs.existsSync(file)) return [];
@@ -883,8 +884,8 @@ function readTelemetry(id) {
   return out.slice(-30).reverse();
 }
 
-/* Aktivitas seragam untuk agent non-Claude: turunkan sesi + subagent dari telemetry mereka
-   sendiri (bukan data palsu), shape sama dengan claudeActivity() supaya UI render identik. */
+/* Uniform activity for non-Claude agents: derive sessions + subagents from their own
+   telemetry (not fake data), same shape as claudeActivity() so the UI renders identically. */
 function telemetryActivity(events) {
   const subagents = [], subSeen = new Set();
   const sessions = [], taskSeen = new Set();
@@ -896,7 +897,7 @@ function telemetryActivity(events) {
         status: e.type === "subagent_done" ? "done" : "running", ts: e.ts || null });
     } else if (e.type === "task_start" || e.type === "task_progress" || e.type === "task_done") {
       const key = e.name || "";
-      if (taskSeen.has(key)) continue; taskSeen.add(key);   // status terbaru per task (newest-first)
+      if (taskSeen.has(key)) continue; taskSeen.add(key);   // latest status per task (newest-first)
       const ageMin = e.ts ? (Date.now() - Date.parse(e.ts)) / 60000 : 1e9;
       sessions.push({ id: (e.name || "task").slice(0, 8), project: e.detail || "",
         lastActivity: e.ts || null,
@@ -910,7 +911,7 @@ function telemetryActivity(events) {
 
 function agentDetail(id) {
   const agent = loadConfig().agents.find(a => a.id === id);
-  if (!agent) return { error: `agent '${id}' tidak dikenal` };
+  if (!agent) return { error: `unknown agent '${id}'` };
   const p = procs.get(id);
   const files = walkVault();
   const tele = readTelemetry(id);
@@ -924,9 +925,9 @@ function agentDetail(id) {
     cwd: agent.gateway && agent.gateway.cwd, bin: agent.gateway && agent.gateway.bin, actions: gwActions(agent),
     canSummon: !!(agent.gateway && agent.gateway.home && agent.gateway.trigger),
     proc: procInfo(id), ...agentVaultStatus(files, agent),
-    log: p && p.log.length ? p.log.slice(-40) : readDiskLog(id, 40),   // R#4: fallback ke disk pasca-restart
+    log: p && p.log.length ? p.log.slice(-40) : readDiskLog(id, 40),   // R#4: fall back to disk after a restart
     laneFiles, telemetry: tele,
-    // activity seragam semua agent: Claude dari transcript, lainnya dari telemetry mereka
+    // uniform activity for all agents: Claude from transcripts, the rest from their own telemetry
     activity: id === "claude-code" ? claudeActivity() : telemetryActivity(tele),
     source: id === "claude-code" ? "transcript" : "telemetry",
   };
@@ -971,32 +972,32 @@ function buildReport() {
   };
 }
 function reportMarkdown(r) {
-  const bar = n => "â–ˆ".repeat(Math.min(n, 30)) || "Â·";
+  const bar = n => "█".repeat(Math.min(n, 30)) || "·";
   const lines = [
     "---",
-    `title: "Laporan Agentic OS ${r.generatedAt.slice(0, 10)}"`,
+    `title: "Agentic OS Report ${r.generatedAt.slice(0, 10)}"`,
     `date: ${r.generatedAt.slice(0, 10)}`,
     "type: report",
     "created_by: agentic-os-dashboard",
     "tags: [report, agentic-os]",
     "---", "",
-    `# Laporan Agentic OS â€” ${r.generatedAt.slice(0, 16).replace("T", " ")}`, "",
-    `| Metrik | Nilai |`, `|---|---|`,
-    `| Total catatan vault | ${r.totals.notes} |`,
-    `| Koneksi antar catatan (wikilink) | ${r.totals.edges} |`,
-    `| Catatan aktif 7 hari | ${r.totals.active7d} |`,
-    `| Task terbuka | ${r.totals.openTasks} |`,
-    `| Gateway sedang jalan | ${r.totals.gwRunning} |`, "",
-    "## Aktivitas 14 hari (catatan diubah/hari)", "", "```",
+    `# Agentic OS Report — ${r.generatedAt.slice(0, 16).replace("T", " ")}`, "",
+    `| Metric | Value |`, `|---|---|`,
+    `| Total vault notes | ${r.totals.notes} |`,
+    `| Note-to-note links (wikilinks) | ${r.totals.edges} |`,
+    `| Notes active in 7 days | ${r.totals.active7d} |`,
+    `| Open tasks | ${r.totals.openTasks} |`,
+    `| Gateways running | ${r.totals.gwRunning} |`, "",
+    "## 14-day activity (notes changed/day)", "", "```",
     ...r.days.map(d => `${d.date}  ${String(d.count).padStart(3)}  ${bar(d.count)}`),
     "```", "",
-    "## Distribusi folder", "", `| Folder | Catatan |`, `|---|---|`,
+    "## Folder distribution", "", `| Folder | Notes |`, `|---|---|`,
     ...r.folders.map(f => `| ${f.name} | ${f.count} |`), "",
-    "## Status agent", "", `| Agent | Node | Catatan lane | Aktif 7d | Terakhir | Gateway |`, `|---|---|---|---|---|---|`,
+    "## Agent status", "", `| Agent | Node | Lane notes | Active 7d | Last seen | Gateway |`, `|---|---|---|---|---|---|`,
     ...r.agents.map(a => `| ${a.icon} ${a.name} | ${a.node} | ${a.laneNotes} | ${a.touched7d} | ${a.lastSeen || "-"} | ${a.gw} |`), "",
   ];
-  if (r.tasks.length) lines.push("## Task terbuka (maks 10)", "", ...r.tasks.map(t => `- [ ] ${t.text} _(${t.source})_`), "");
-  lines.push("---", "_Digenerate otomatis dari dashboard Agentic OS._");
+  if (r.tasks.length) lines.push("## Open tasks (max 10)", "", ...r.tasks.map(t => `- [ ] ${t.text} _(${t.source})_`), "");
+  lines.push("---", "_Generated automatically by the Agentic OS dashboard._");
   return lines.join("\n");
 }
 function localISO(d = new Date()) {
@@ -1008,38 +1009,38 @@ function saveReport() {
     const dir = path.join(VAULT, "Reports");
     fs.mkdirSync(dir, { recursive: true });
     const l = localISO();
-    const name = `Laporan ${l.slice(0, 10)} ${l.slice(11, 19).replace(/:/g, ".")}.md`;  // detik â†’ tak saling timpa
+    const name = `Report ${l.slice(0, 10)} ${l.slice(11, 19).replace(/:/g, ".")}.md`;  // seconds → no overwrites
     fs.writeFileSync(path.join(dir, name), reportMarkdown(r), "utf8");
     return { ok: true, rel: `Reports/${name}` };
-  } catch (e) { return { error: `gagal simpan laporan: ${e.message}` }; }
+  } catch (e) { return { error: `failed to save report: ${e.message}` }; }
 }
 
-/* R#5: kirim task ke agent dari dashboard â†’ tulis checkbox ke vault Tasks/Inbox Tasks.md.
-   openTasks() scan semua Tasks/*.md â†’ otomatis muncul di Needs Review (kind task), agent ambil sendiri. */
+/* R#5: send a task to an agent from the dashboard → write a checkbox to vault Tasks/Inbox Tasks.md.
+   openTasks() scans all Tasks/*.md → it auto-appears in Needs Review (kind task), agents pick it up themselves. */
 function createTask(agentId, title, detail) {
   title = String(title || "").trim().replace(/[\r\n]+/g, " ").slice(0, 200);
-  if (!title) return { error: "judul task kosong" };
+  if (!title) return { error: "task title is empty" };
   const agent = loadConfig().agents.find(a => a.id === agentId);
-  const who = agent ? agent.name : (agentId ? agentId : "Umum");
+  const who = agent ? agent.name : (agentId ? agentId : "General");
   const date = localISO().slice(0, 10);
   const extra = detail ? `  ·  ${String(detail).trim().replace(/[\r\n]+/g, " ").slice(0, 300)}` : "";
   try {
     const dir = path.join(VAULT, "Tasks");
     fs.mkdirSync(dir, { recursive: true });
     const file = path.join(dir, "Inbox Tasks.md");
-    const line = `- [ ] ${title} — ${who} — ${date}${extra}\n`;   // — = em-dash bersih (hindari mojibake)
+    const line = `- [ ] ${title} — ${who} — ${date}${extra}\n`;   // — = clean em-dash (avoids mojibake)
     if (!fs.existsSync(file))
-      fs.writeFileSync(file, `# 📥 Inbox Tasks\n\n> Task dari dashboard. Agent ambil → tandai \`[x]\` saat selesai.\n\n${line}`, "utf8");
+      fs.writeFileSync(file, `# 📥 Inbox Tasks\n\n> Tasks from the dashboard. Agents pick them up → mark \`[x]\` when done.\n\n${line}`, "utf8");
     else
       fs.appendFileSync(file, line, "utf8");
     return { ok: true, rel: "Tasks/Inbox Tasks.md", line: line.trim() };
-  } catch (e) { return { error: `gagal tulis task: ${e.message}` }; }
+  } catch (e) { return { error: `failed to write task: ${e.message}` }; }
 }
 
-/* R#8: panel jadwal â€” baca Windows Scheduled Task tiap agent (next run, last run, last result). */
+/* R#8: schedule panel — read each agent's Windows Scheduled Task (next run, last run, last result). */
 function querySchtask(name, cb) {
   execFile("schtasks", ["/query", "/tn", name, "/fo", "LIST", "/v"], { windowsHide: true }, (e, out) => {
-    if (e) return cb({ name, error: String((e.message || "gagal query")).split("\n")[0].slice(0, 120) });
+    if (e) return cb({ name, error: String((e.message || "query failed")).split("\n")[0].slice(0, 120) });
     const grab = re => { const m = out.match(re); return m ? m[1].trim() : null; };
     const lr = grab(/Last Result:\s*(.+)/);
     cb({ name, taskState: grab(/Scheduled Task State:\s*(.+)/) || grab(/Status:\s*(.+)/),
@@ -1054,45 +1055,45 @@ function buildSchedule(cb) {
   agents.forEach(a => querySchtask(a.gateway.schtask, r => { out.push({ id: a.id, agent: a.name, icon: a.icon, ...r }); if (--pending === 0) cb(out); }));
 }
 
-/* R#9: kesehatan vault â€” umur commit git terakhir + umur backup terakhir (cegah kehilangan otak).
-   Backup opsional via env BACKUP_PATH (folder/file); kalau tak diset, hanya lapor git. */
+/* R#9: vault health — age of the last git commit + age of the last backup (prevent losing the brain).
+   Backup optional via env BACKUP_PATH (folder/file); if unset, only git is reported. */
 function buildVaultHealth(cb) {
   const res = { vault: VAULT, gitCommitAt: null, gitAgeH: null, gitOk: false, backupAt: null, backupAgeH: null, backup: null };
   const backup = process.env.BACKUP_PATH || null;
-  if (backup) { try { const st = fs.statSync(backup); res.backupAt = new Date(st.mtimeMs).toISOString(); res.backupAgeH = Math.round((Date.now() - st.mtimeMs) / 3600000); res.backup = backup; } catch { res.backup = backup + " (tidak ditemukan)"; } }
+  if (backup) { try { const st = fs.statSync(backup); res.backupAt = new Date(st.mtimeMs).toISOString(); res.backupAgeH = Math.round((Date.now() - st.mtimeMs) / 3600000); res.backup = backup; } catch { res.backup = backup + " (not found)"; } }
   execFile("git", ["-C", VAULT, "log", "-1", "--format=%cI"], { windowsHide: true }, (e, out) => {
     if (!e && out && out.trim()) { const t = Date.parse(out.trim()); if (!Number.isNaN(t)) { res.gitCommitAt = out.trim(); res.gitAgeH = Math.round((Date.now() - t) / 3600000); res.gitOk = true; } }
-    else res.gitError = e ? String(e.message).split("\n")[0].slice(0, 120) : "tak ada commit";
+    else res.gitError = e ? String(e.message).split("\n")[0].slice(0, 120) : "no commits";
     cb(res);
   });
 }
 
-/* Bonus (dua-arah): tandai task selesai dari dashboard â†’ ubah `- [ ]` jadi `- [x]` di file vault. */
+/* Bonus (two-way): mark a task done from the dashboard → change `- [ ]` to `- [x]` in the vault file. */
 function markTaskDone(source, text) {
-  if (!source || !text) return { error: "butuh {source, text}" };
+  if (!source || !text) return { error: "requires {source, text}" };
   const rel = String(source).replace(/\\/g, "/");
-  if (!rel.startsWith("Tasks/") || rel.includes("..")) return { error: "source harus di dalam Tasks/" };
+  if (!rel.startsWith("Tasks/") || rel.includes("..")) return { error: "source must be inside Tasks/" };
   const file = path.join(VAULT, rel);
   try {
     let txt = fs.readFileSync(file, "utf8");
     const needle = String(text).trim();
     const lines = txt.split(/\r?\n/);
     const i = lines.findIndex(l => /^\s*[-*] \[ \]/.test(l) && l.includes(needle));
-    if (i === -1) return { error: "task tidak ketemu (mungkin sudah berubah)" };
+    if (i === -1) return { error: "task not found (it may have changed)" };
     lines[i] = lines[i].replace("[ ]", "[x]");
     fs.writeFileSync(file, lines.join("\n"), "utf8");
     return { ok: true, rel, line: lines[i].trim() };
-  } catch (e) { return { error: `gagal update: ${e.message}` }; }
+  } catch (e) { return { error: `update failed: ${e.message}` }; }
 }
 
 function readBody(req, res, cb) {
   let body = "", aborted = false;
   req.on("data", d => {
     body += d;
-    if (body.length > 5e6 && !aborted) {           // R5: balas 413, jangan biarkan client hang
+    if (body.length > 5e6 && !aborted) {           // R5: reply 413, don't leave the client hanging
       aborted = true;
       res.writeHead(413, { "Content-Type": "application/json; charset=utf-8" });
-      res.end(JSON.stringify({ error: "body melebihi 5MB" }));
+      res.end(JSON.stringify({ error: "body exceeds 5MB" }));
       req.destroy();
     }
   });
@@ -1123,7 +1124,7 @@ const server = http.createServer((req, res) => {
   const url = (req.url || "/").split("?")[0];
 
   if (url.startsWith("/api/")) {
-    if (!authorized(req)) return json(res, 401, { error: "token salah/kosong â€” set header x-dash-token" });
+    if (!authorized(req)) return json(res, 401, { error: "invalid/missing token — set the x-dash-token header" });
     try {
       if (url === "/api/state") return json(res, 200, buildState());
       if (url === "/api/procs") {
@@ -1157,17 +1158,17 @@ const server = http.createServer((req, res) => {
       }
       if (url === "/api/graph") return json(res, 200, buildGraph());
       if (url === "/api/graphify-html") {
-        // Coba graph.html dulu (dari graphify update)
+        // Try graph.html first (from graphify update)
         const filePath = path.join(VAULT, "graphify-out", "graph.html");
         if (fs.existsSync(filePath)) {
           res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
           return res.end(fs.readFileSync(filePath));
         }
-        // Fallback: generate vis-network HTML dari graph.json
+        // Fallback: generate vis-network HTML from graph.json
         const jsonPath = path.join(VAULT, "graphify-out", "graph.json");
         if (!fs.existsSync(jsonPath)) {
           res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
-          return res.end("graph.json not found. Silakan jalankan 'graphify update' di terminal.");
+          return res.end("graph.json not found. Run 'graphify update' in a terminal.");
         }
         try {
           const g = JSON.parse(fs.readFileSync(jsonPath, "utf8"));
@@ -1183,13 +1184,13 @@ const server = http.createServer((req, res) => {
       if (url === "/api/report/save" && req.method === "POST") return json(res, 200, saveReport());
       if (url === "/api/task" && req.method === "POST")
         return readBody(req, res, body => {
-          let d; try { d = JSON.parse(body); } catch { return json(res, 400, { error: "body harus JSON {agent,title,detail?}" }); }
+          let d; try { d = JSON.parse(body); } catch { return json(res, 400, { error: "body must be JSON {agent,title,detail?}" }); }
           const r = createTask(d.agent, d.title, d.detail);
           json(res, r.error ? 400 : 200, r);
         });
       if (url === "/api/task/done" && req.method === "POST")
         return readBody(req, res, body => {
-          let d; try { d = JSON.parse(body); } catch { return json(res, 400, { error: "body harus JSON {source,text}" }); }
+          let d; try { d = JSON.parse(body); } catch { return json(res, 400, { error: "body must be JSON {source,text}" }); }
           const r = markTaskDone(d.source, d.text);
           json(res, r.error ? 400 : 200, r);
         });
@@ -1200,18 +1201,18 @@ const server = http.createServer((req, res) => {
       m = url.match(/^\/api\/agent\/([\w-]+)\/avatar$/);
       if (m && req.method === "POST") {
         const id = m[1];
-        if (!loadConfig().agents.some(a => a.id === id)) return json(res, 404, { error: "agent tidak dikenal" });
+        if (!loadConfig().agents.some(a => a.id === id)) return json(res, 404, { error: "unknown agent" });
         return readBody(req, res, body => {
-          let data; try { data = JSON.parse(body).data; } catch { return json(res, 400, { error: "body harus JSON {data}" }); }
+          let data; try { data = JSON.parse(body).data; } catch { return json(res, 400, { error: "body must be JSON {data}" }); }
           const r = saveAvatar(id, data);
           json(res, r.error ? 400 : 200, r);
         });
       }
       return json(res, 404, { error: "unknown api" });
-    } catch (err) { console.error("[api]", (err && err.stack) || err); return json(res, 500, { error: "internal error" }); }  // S12: jangan echo detail internal
+    } catch (err) { console.error("[api]", (err && err.stack) || err); return json(res, 500, { error: "internal error" }); }  // S12: don't echo internal details
   }
 
-  // S5: path-traversal guard pakai path.relative (bukan startsWith), + decode URL
+  // S5: path-traversal guard using path.relative (not startsWith), + URL decode
   let rel; try { rel = url === "/" ? "index.html" : decodeURIComponent(url.slice(1)); } catch { res.writeHead(400); return res.end("bad request"); }
   const file = path.normalize(path.join(PUBLIC, rel));
   const relToPublic = path.relative(PUBLIC, file);
@@ -1227,15 +1228,15 @@ const server = http.createServer((req, res) => {
   } catch { res.writeHead(500, { "Content-Type": "text/plain" }); res.end("error"); }
 });
 
-/* R1+R3: shutdown & crash handler â€” SIGINT/SIGTERM/SIGHUP + uncaughtException tidak dijangkau
-   process.on("exit") (event loop mati di 'exit', taskkill async tak sempat). Di sini masih ada loop. */
+/* R1+R3: shutdown & crash handlers — SIGINT/SIGTERM/SIGHUP + uncaughtException are not covered by
+   process.on("exit") (the event loop is dead at 'exit', so async taskkill never runs). Here the loop is still alive. */
 let shuttingDown = false;
 function shutdown(sig) {
   if (shuttingDown) return; shuttingDown = true;
-  console.error(`[agentic-os] shutdown (${sig}) â€” hentikan proses owned`);
+  console.error(`[agentic-os] shutdown (${sig}) — stopping owned processes`);
   for (const id of procs.keys()) killOwned(id);
   try { server.close(); } catch {}
-  setTimeout(() => process.exit(0), 500);   // beri waktu taskkill async
+  setTimeout(() => process.exit(0), 500);   // give async taskkill time to finish
 }
 for (const sig of ["SIGINT", "SIGTERM", "SIGHUP"]) process.on(sig, () => shutdown(sig));
 process.on("uncaughtException", e => { console.error("[uncaughtException]", (e && e.stack) || e); shutdown("uncaughtException"); });
@@ -1243,23 +1244,23 @@ process.on("unhandledRejection", e => { console.error("[unhandledRejection]", (e
 process.on("exit", () => { for (const id of procs.keys()) killOwned(id); });
 
 server.on("error", e => {
-  if (e.code === "EADDRINUSE") { console.error(`\n  Port ${PORT} sudah dipakai. Jalankan di port lain: set PORT=4322 lalu npm run dev\n`); }
+  if (e.code === "EADDRINUSE") { console.error(`\n  Port ${PORT} is already in use. Run on another port: set PORT=4322 then npm run dev\n`); }
   else console.error("[server]", (e && e.stack) || e);
   process.exit(1);
 });
 
 server.listen(PORT, () => {
-  console.log(`\n  Agentic OS jalan di  http://localhost:${PORT}`);
-  console.log(`  Vault sumber data:   ${VAULT}`);
-  console.log(`  Config agent:        ${CONFIG_PATH}`);
-  console.log(TOKEN ? "  Auth: token AKTIF (x-dash-token)" : "  Auth: tanpa token (lokal). Untuk remote: set DASH_TOKEN.\n");
-  setTimeout(pollAllStatus, 3000);       // status awal
-  setInterval(pollAllStatus, 45000);     // R4: interval (45s) > timeout gwCtl (30s) + in-flight guard
-  setTimeout(runDailyBridge, 10000);     // R#2: jalankan daily-bridge sekali di awal
-  setInterval(runDailyBridge, 3600000);  // R#2: lalu tiap jam (dulu ada tapi tak pernah dipanggil)
+  console.log(`\n  Agentic OS running at  http://localhost:${PORT}`);
+  console.log(`  Vault data source:     ${VAULT}`);
+  console.log(`  Agent config:          ${CONFIG_PATH}`);
+  console.log(TOKEN ? "  Auth: token ACTIVE (x-dash-token)" : "  Auth: no token (local only). For remote access: set DASH_TOKEN.\n");
+  setTimeout(pollAllStatus, 3000);       // initial status
+  setInterval(pollAllStatus, 45000);     // R4: interval (45s) > gwCtl timeout (30s) + in-flight guard
+  setTimeout(runDailyBridge, 10000);     // R#2: run the daily bridge once at startup
+  setInterval(runDailyBridge, 3600000);  // R#2: then hourly (it existed before but was never invoked)
 });
 
-/* R#2: jalankan scripts/hermes-daily-bridge.cjs (sync telemetry + vault daily note) */
+/* R#2: run scripts/hermes-daily-bridge.cjs (sync telemetry + vault daily note) */
 function runDailyBridge() {
   const f = path.join(__dirname, "scripts", "hermes-daily-bridge.cjs");
   if (!fs.existsSync(f)) return;

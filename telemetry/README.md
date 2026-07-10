@@ -1,48 +1,48 @@
-# Telemetry Agentic OS — protokol lapor progres
+# Agentic OS Telemetry — progress reporting protocol
 
-Setiap agent bisa melaporkan progres kerjanya ke dashboard dengan **append** satu baris JSON
-ke file `agentic-os\telemetry\<agent-id>.jsonl` (id: `claude-code`, `hermes`, `openclaw`, `zcode`, `copilot`).
+Any agent can report its work progress to the dashboard by **appending** one JSON line
+to `agentic-os\telemetry\<agent-id>.jsonl` (ids: `claude-code`, `hermes`, `openclaw`,
+`zcode`, `kimi-code`, `copilot`, `antigravity`).
 
-Format per baris:
+Format, one event per line:
 
 ```json
-{"ts":"2026-07-05T22:10:00+07:00","type":"task_start","name":"Analisis market BTC","detail":"scan 4 exchange","progress":0}
-{"ts":"2026-07-05T22:14:00+07:00","type":"task_progress","name":"Analisis market BTC","detail":"2/4 exchange selesai","progress":50}
-{"ts":"2026-07-05T22:20:00+07:00","type":"task_done","name":"Analisis market BTC","detail":"laporan di vault","progress":100}
-{"ts":"...","type":"subagent_start","name":"researcher-1","detail":"riset kompetitor"}
-{"ts":"...","type":"subagent_done","name":"researcher-1","detail":"selesai"}
+{"ts":"2026-07-05T22:10:00+07:00","type":"task_start","name":"BTC market analysis","detail":"scanning 4 exchanges","progress":0}
+{"ts":"2026-07-05T22:14:00+07:00","type":"task_progress","name":"BTC market analysis","detail":"2/4 exchanges done","progress":50}
+{"ts":"2026-07-05T22:20:00+07:00","type":"task_done","name":"BTC market analysis","detail":"report in the vault","progress":100}
+{"ts":"...","type":"subagent_start","name":"researcher-1","detail":"competitor research"}
+{"ts":"...","type":"subagent_done","name":"researcher-1","detail":"finished"}
 ```
 
 - `type`: `task_start` | `task_progress` | `task_done` | `subagent_start` | `subagent_done` | `info`
-- `progress`: opsional, 0–100.
-- Dashboard membaca 30 event terakhir per agent (tab detail agent → TELEMETRY).
-- Khusus **Claude Code**, dashboard juga membaca langsung transcript sesi di
-  `.claude\projects\` (sesi aktif, tool terakhir, spawn subagent) tanpa perlu file ini.
+- `progress`: optional, 0–100.
+- The dashboard reads the last 30 events per agent (agent detail → TELEMETRY).
+- **Claude Code** is special: the dashboard also reads its session transcripts directly
+  from `.claude\projects\` (active sessions, last tool, subagent spawns) without this file.
 
-## Cara gampang — helper `report` (disarankan)
+## The easy way — the `report` helper (recommended)
 
-Ketimbang nulis JSONL manual, pakai wrapper 1-baris di root repo:
-
-```
-report <id> "<nama task>" [progress 0-100] [detail...]
-```
-
-- `progress` **0** → `task_start`, **100** → `task_done`, lainnya/kosong → `task_progress`
-- id: `claude-code` | `hermes` | `openclaw` | `zcode` | `copilot`
-
-Contoh:
+Instead of writing JSONL by hand, use the one-liner wrapper in the repo root:
 
 ```
-report hermes "Scan market BTC" 0  "mulai 4 exchange"
-report hermes "Scan market BTC" 50 "2/4 exchange selesai"
-report hermes "Scan market BTC" 100 "laporan di vault"
+report <id> "<task name>" [progress 0-100] [detail...]
 ```
 
-Dari mana saja: `report.cmd` (root) atau `node scripts/report.cjs ...`.
+- `progress` **0** → `task_start`, **100** → `task_done`, anything else/empty → `task_progress`
 
-## Append manual dari PowerShell (kalau perlu)
+Examples:
+
+```
+report hermes "Scan BTC market" 0   "starting on 4 exchanges"
+report hermes "Scan BTC market" 50  "2/4 exchanges done"
+report hermes "Scan BTC market" 100 "report in the vault"
+```
+
+From anywhere: `report.cmd` (repo root) or `node scripts/report.cjs ...`.
+
+## Manual append from PowerShell (if needed)
 
 ```powershell
 '{"ts":"' + (Get-Date -Format o) + '","type":"task_start","name":"Deploy X"}' |
-  Add-Content "C:\Users\abrur\Rempeyek-agent-os\telemetry\hermes.jsonl"
+  Add-Content "<repo>\telemetry\hermes.jsonl"
 ```

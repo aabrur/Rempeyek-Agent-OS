@@ -1,22 +1,27 @@
-# Copilot CLI — catatan status (sementara)
+# Copilot CLI — status notes
 
-Copilot CLI = **Node-12** di [[Our Family]] (ikon ⬜, path `C:\Users\abrur\.copilot`).
-Per konstitusi ekosistem: Copilot **tidak punya subcommand `gateway`** (cuma
-`login/mcp/plugin/skill/update/--acp`) — dipakai **manual di CLI-nya**, bukan
-dikontrol dashboard. Jadi di dashboard Copilot **tidak** punya Start/Stop/Status gateway.
+Copilot CLI = **Node-12** (icon ⬜, home `C:\Users\abrur\.copilot`).
+Per the ecosystem constitution: Copilot **has no `gateway` subcommand** (only
+`login/mcp/plugin/skill/update/--acp`) — it is used **manually in its own CLI**,
+not controlled by the dashboard. So on the dashboard Copilot has **no** gateway
+Start/Stop/Status.
 
-## Yang sudah dipasang (sementara)
-- **Kartu Copilot** muncul untuk observability + tombol **⧉ Panggil** → buka Windows
-  Terminal admin di `.copilot` lalu auto-run `copilot`.
-- **Avatar sementara**: `public/avatars/copilot.svg` (mark `>_`). Ganti dengan foto
-  asli lewat tombol ✎ di kartu detail (upload PNG/JPG akan menimpa placeholder ini).
-- **Status dot** sekarang jujur: hijau hanya kalau gateway benar-benar running.
-  Copilot (tanpa gateway) tampil idle sampai ada telemetry.
+## What is in place
 
-## Yang bisa diisi Copilot sendiri nanti
-1. Lapor aktivitas via telemetry → `telemetry\copilot.jsonl` (lihat `telemetry\README.md`,
-   type `task_start/progress/done`, `subagent_start/done`) supaya Sesi/Subagent/Telemetry keisi.
-2. Buat lane `Brains/Copilot/` di vault saat orchestration diaktifkan (sekarang manual CLI).
-3. Ganti avatar sementara dengan yang asli.
+- **Copilot card** appears for observability + a **⧉ Summon** button → opens an
+  admin Windows Terminal at `.copilot` and auto-runs `copilot`.
+- **Placeholder avatar**: `public/avatars/copilot.svg` (`>_` mark). Replace it with
+  a real photo via the ✎ button on the detail card (a PNG/JPG upload overrides it).
+- **Honest status dot**: green only when a gateway is actually running.
+  Copilot (no gateway) shows idle until telemetry arrives.
 
-Jangan tambahkan aksi gateway palsu (start/stop/status) — Copilot memang tidak punya.
+## What Copilot can fill in later
+
+1. Report activity via telemetry → `telemetry\copilot.jsonl` (see `telemetry\README.md`,
+   types `task_start/progress/done`, `subagent_start/done`) so the Sessions/Subagents/Telemetry
+   panels fill up.
+2. Create a `Brains/Copilot/` lane in the vault when orchestration is activated
+   (currently manual CLI only).
+3. Replace the placeholder avatar with a real one.
+
+Do not add fake gateway actions (start/stop/status) — Copilot genuinely has none.

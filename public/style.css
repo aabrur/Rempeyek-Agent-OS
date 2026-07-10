@@ -26,7 +26,7 @@ body {
   overflow: hidden;
 }
 
-/* latar: grid + glow, statis, tidak menangkap pointer */
+/* background: grid + glow, static, does not capture the pointer */
 .bg-grid, .bg-glow { position: fixed; inset: 0; pointer-events: none; z-index: 0; }
 .bg-grid {
   background:
@@ -238,7 +238,7 @@ body {
 .panel-head h2 { font-family: var(--disp); font-size: 12.5px; letter-spacing: .16em; color: var(--text); }
 .chip { font-family: var(--mono); font-size: 10px; padding: 3px 9px; border-radius: 999px; border: 1px solid var(--magenta); color: var(--magenta); }
 .chip-plain { border-color: var(--line); color: var(--muted); }
-/* R#5: form kirim task ke agent */
+/* R#5: send-task-to-agent form */
 .task-form { display: flex; gap: 6px; margin-bottom: 10px; }
 .task-form select, .task-form input {
   font-family: var(--mono); font-size: 11px; color: var(--text);
@@ -255,7 +255,7 @@ body {
   background: rgba(255, 176, 31, .1); border: 1px solid rgba(255, 176, 31, .5); }
 .config-banner code { color: var(--red); }
 
-/* Bonus: tombol mini + baris aksi review */
+/* Bonus: mini button + review action row */
 .review-act { display: flex; align-items: center; gap: 8px; }
 .btn-mini { padding: 4px 8px; font-size: 10px; }
 
