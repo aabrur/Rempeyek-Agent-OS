@@ -30,11 +30,11 @@
       "owner": "native-service",
       "note": "Single-owner = native service (schtask Hermes_Gateway, 24/7). Dashboard dipakai untuk observability + remote command (start/stop/restart/status). `run` (owned foreground) hanya untuk debug — Hermes singleton, sudah pakai --replace agar tak bentrok instance service. Path & cwd terverifikasi benar 2026-07-05 (Claude Code).",
       "gateway": {
-        "bin": "C:\\Users\\abrur\\AppData\\Local\\hermes\\hermes-agent\\venv\\Scripts\\hermes.exe",
-        "cwd": "C:\\Users\\abrur\\agentic-os",
+        "bin": "C:\\Users\\abrur\\AppData\\Local\\hermes\\hermes-agent\\venv\\Scripts\\hermes.exe gateway",
+        "cwd": "C:\\Users\\abrur\\Rempeyek-Agent-Os",
         "home": "C:\\Users\\abrur",
         "trigger": "C:\\Users\\abrur\\AppData\\Local\\hermes\\hermes-agent\\venv\\Scripts\\hermes.exe",
-        "runCmd": "C:\\Users\\abrur\\AppData\\Local\\hermes\\hermes-agent\\venv\\Scripts\\hermes.exe",
+        "runCmd": "C:\\Users\\abrur\\AppData\\Local\\hermes\\hermes-agent\\venv\\Scripts\\hermes.exe gateway run",
         "schtask": "Hermes_Gateway",
         "watchdog": false,
         "actions": ["start", "stop", "restart", "status", "run"]
@@ -49,7 +49,7 @@
       "lane": "OpenClaw",
       "enabled": true,
       "owner": "native-service",
-      "note": "Single-owner = native service (Scheduled Task \"OpenClaw Gateway\", 24/7 di port 18789, launcher .openclaw\\gateway.cmd). Dashboard dipakai untuk observability + remote command (start/stop/restart/status → kelola service schtask). `run` (owned foreground) hanya untuk debug — bentrok dengan service yang sudah jalan, jadi runCmd pakai --force (kill listener lama di port dulu). 2026-07-05 (Claude Code): cwd diperbaiki ke home baru + service di-reinstall (gateway.cmd hilang saat migrasi home → start gagal result=1; `openclaw gateway install --force` regenerate launcher, start kini Running/probe ok).",
+      "note": "Single-owner = native service (Scheduled Task \"OpenClaw Gateway\", 24/7 di port 18789, launcher .openclaw\\gateway.cmd). Dashboard dipakai untuk observability + remote command (start/stop/restart/status → kelola service schtask). `run` (owned foreground) hanya untuk debug — bentrok dengan service yang sudah jalan, jadi runCmd pakai --force (kill listener lama di port dulu). 2026-07-05 (Claude Code): cwd diperbaiki ke home baru + service di-reinstall (gateway.cmd hilang saat migrasi home → start gagal result=1; `openclaw gateway install --force` regenerate launcher, start kini Running/probe ok). 2026-07-10 (OpenClaw/Node-7): gateway.cmd hilang lagi → schtask result=1, port 18789 tak listen. Re-fix: `openclaw gateway install --force` regenerate launcher → start via dashboard → port 18789 listening ~4s, probe running. Frontend juga diperbaiki: tombol ▶ Start utama dulu cuma 'summon' (buka terminal), kini langsung `start` gateway (spawn); dropdown persist saat auto-refresh; login token inline (bukan prompt yg bisa keblokir).",
       "gateway": {
         "bin": "openclaw gateway",
         "cwd": "C:\\Users\\abrur\\.openclaw",
@@ -74,6 +74,51 @@
       "gateway": {
         "home": "C:\\Users\\abrur\\.copilot",
         "trigger": "copilot",
+        "actions": []
+      }
+    },
+    {
+      "id": "zcode",
+      "name": "ZCode",
+      "icon": "🟣",
+      "role": "Development agent (coding/debugging)",
+      "node": "Node-9",
+      "lane": "ZCode",
+      "enabled": true,
+      "note": "ZCode (Node-9). Development & debugging specialist. Tidak punya CLI gateway binary di PATH — tidak bisa start/stop/status via dashboard. Status dari telemetry & vault lane.",
+      "gateway": {
+        "home": "C:\\Users\\abrur\\.zcode",
+        "trigger": "zcode",
+        "actions": []
+      }
+    },
+    {
+      "id": "kimi-code",
+      "name": "Kimi Code",
+      "icon": "🟡",
+      "role": "Coding agent (cadangan)",
+      "node": "Node-11",
+      "lane": "KimiCode",
+      "enabled": true,
+      "note": "Kimi Code (Node-11, Our Family). Coding agent cadangan. Akses via telemetry. Gateway belum dikonfigurasi — status dari telemetry & vault lane.",
+      "gateway": {
+        "home": "C:\\Users\\abrur\\.kimi-code",
+        "trigger": "kimi-code",
+        "actions": []
+      }
+    },
+    {
+      "id": "antigravity",
+      "name": "Antigravity",
+      "icon": "🟠",
+      "role": "Advanced agentic coding & integration",
+      "node": "Node-13",
+      "lane": "Antigravity",
+      "enabled": true,
+      "note": "Antigravity CLI (Node-13, Our Family). Asisten coding internal berbasis Gemini. Dipanggil lewat terminal/IDE. Status keaktifan dipantau via file log/telemetry.",
+      "gateway": {
+        "home": "C:\\Users\\abrur\\Rempeyek-Agent-Os",
+        "trigger": "agy",
         "actions": []
       }
     }
