@@ -91,16 +91,8 @@
     </section>
 
     <!-- NEURAL VAULT (GRAPH) -->
-    <section id="view-graph" class="view view-flush">
-      <div class="graph-bar">
-        <div class="graph-title">NEURAL VAULT <span id="graphStats" class="graph-stats"></span></div>
-        <input id="graphSearch" class="graph-search" type="search" placeholder="cari catatan…" autocomplete="off">
-        <a class="graph-open" href="obsidian://open?vault=Obsidian%20Vault" title="Buka vault di Obsidian">⧉ OPEN VAULT</a>
-        <div id="graphLegend" class="graph-legend"></div>
-      </div>
-      <div class="graph-wrap"><canvas id="graphCanvas"></canvas>
-        <div class="graph-hint">drag = geser · scroll = zoom · klik node = buka di Obsidian</div>
-      </div>
+    <section id="view-graph" class="view view-flush" style="padding: 0; margin: 0; overflow: hidden; height: calc(100vh - 52px);">
+      <iframe id="graphIframe" src="about:blank" style="width: 100%; height: 100%; border: none; background: #0f0f1a;"></iframe>
     </section>
 
     <!-- REPORTS -->
@@ -129,6 +121,17 @@
 </div>
 
 <input type="file" id="avatarFile" accept="image/png,image/jpeg,image/webp" hidden>
+
+<!-- login token inline (muncul kalau /api balik 401 dari akses non-lokal) -->
+<div id="tokenLogin" class="token-ov" hidden>
+  <div class="token-box">
+    <div class="token-title">◈ AGENTIC//OS terkunci</div>
+    <div class="token-sub">Dashboard butuh token (DASH_TOKEN) untuk akses remote.</div>
+    <input id="tokenInput" type="password" placeholder="Masukkan token…" autocomplete="current-password">
+    <button id="tokenSubmit" class="btn btn-primary">Masuk</button>
+    <div id="tokenHint" class="token-hint"></div>
+  </div>
+</div>
 <script src="graph.js"></script>
 <script src="app.js"></script>
 </body>

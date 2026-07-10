@@ -216,6 +216,21 @@ body {
 .gw-menu button:hover { background: rgba(0,229,255,.1); color: var(--cyan); }
 .gw-menu-sep { height: 1px; background: var(--line); margin: 5px 4px; }
 
+/* overlay login token */
+.token-ov { position: fixed; inset: 0; z-index: 200; display: grid; place-items: center;
+  background: rgba(5,3,16,.82); backdrop-filter: blur(4px); }
+.token-ov[hidden] { display: none; }
+.token-box { width: min(360px, 90vw); display: flex; flex-direction: column; gap: 12px;
+  padding: 26px 24px; border: 1px solid var(--cyan); border-radius: 14px;
+  background: linear-gradient(170deg, var(--card), var(--panel));
+  box-shadow: 0 0 40px rgba(0,229,255,.25); }
+.token-title { font-family: var(--disp); font-size: 17px; letter-spacing: .1em; color: var(--cyan); }
+.token-sub { font-size: 12px; color: var(--muted); }
+.token-box input { padding: 10px 12px; border-radius: 8px; border: 1px solid var(--line);
+  background: var(--bg); color: var(--text); font: 13px var(--mono); }
+.token-box input:focus { outline: none; border-color: var(--cyan); }
+.token-hint { font-size: 11px; color: var(--red); min-height: 14px; }
+
 /* panels, lists */
 .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .panel { background: linear-gradient(170deg, var(--card), var(--panel)); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
