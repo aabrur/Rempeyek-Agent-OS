@@ -368,7 +368,63 @@ body {
 .rep-stat .v { font-family: var(--disp); font-size: 26px; font-weight: 700; color: var(--cyan); text-shadow: 0 0 14px rgba(0,229,255,.5); }
 .rep-stat .l { font-family: var(--mono); font-size: 9.5px; color: var(--muted); letter-spacing: .1em; text-transform: uppercase; }
 
-/* responsif */
+/* ---------------- agent topology map ---------------- */
+.topology-panel {
+  border: 1px solid var(--line); border-radius: 14px; margin-bottom: 18px;
+  background:
+    radial-gradient(ellipse 60% 90% at 50% 50%, rgba(0, 229, 255, .05), transparent 70%),
+    linear-gradient(170deg, var(--card), var(--panel));
+  overflow: hidden; position: relative;
+}
+.topology-panel::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background:
+    linear-gradient(rgba(140, 91, 255, .04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(140, 91, 255, .04) 1px, transparent 1px);
+  background-size: 34px 34px;
+}
+.topology { width: 100%; height: auto; display: block; position: relative; }
+.top-node { transition: opacity .2s; }
+.top-node:hover circle:first-of-type { filter: drop-shadow(0 0 8px currentColor); }
+.top-node.top-off { opacity: .4; }
+.top-pulse { transform-box: fill-box; transform-origin: center; }
+@media (prefers-reduced-motion: no-preference) {
+  .top-pulse { animation: topPulse 2.6s ease-out infinite; }
+  @keyframes topPulse {
+    0%   { transform: scale(.75); opacity: .9; }
+    70%  { transform: scale(1.35); opacity: 0; }
+    100% { transform: scale(1.35); opacity: 0; }
+  }
+}
+
+/* ---------------- skeleton loaders ---------------- */
+.skeleton-block {
+  height: 58px; border-radius: 9px;
+  background: linear-gradient(100deg, var(--card) 40%, var(--card-hi) 50%, var(--card) 60%);
+  background-size: 200% 100%;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .skeleton-block { animation: shimmer 1.4s linear infinite; }
+  @keyframes shimmer { to { background-position: -200% 0; } }
+}
+
+/* ---------------- micro-interactions & focus ---------------- */
+.btn:active:not(:disabled) { transform: translateY(1px); }
+.btn:focus-visible, .nav-item:focus-visible, input:focus-visible, select:focus-visible {
+  outline: 2px solid var(--cyan); outline-offset: 2px;
+}
+.view.active { animation: viewIn .18s ease-out; }
+@media (prefers-reduced-motion: reduce) { .view.active { animation: none; } }
+@keyframes viewIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+/* custom scrollbars (WebKit + Firefox) */
+* { scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+*::-webkit-scrollbar { width: 9px; height: 9px; }
+*::-webkit-scrollbar-thumb { background: var(--line); border-radius: 999px; border: 2px solid var(--bg); }
+*::-webkit-scrollbar-thumb:hover { background: var(--violet); }
+*::-webkit-scrollbar-track { background: transparent; }
+
+/* responsive */
 @media (max-width: 1000px) {
   body { overflow: auto; }
   .shell { flex-direction: column; height: auto; }

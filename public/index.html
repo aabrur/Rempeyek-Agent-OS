@@ -93,11 +93,16 @@
 
     <!-- NEURAL VAULT (GRAPH) -->
     <section id="view-graph" class="view view-flush">
-      <div id="graphToolbar" class="graph-toolbar">
-        <input id="graphSearch" type="search" placeholder="Search nodes…" autocomplete="off">
+      <div class="graph-bar">
+        <span class="graph-title">NEURAL VAULT</span>
+        <input id="graphSearch" class="graph-search" type="search" placeholder="Search nodes…" autocomplete="off">
         <span id="graphStats" class="graph-stats"></span>
+        <a class="graph-open" href="obsidian://open?vault=Obsidian%20Vault" title="Open the vault in Obsidian">⧉ OPEN VAULT</a>
       </div>
-      <canvas id="graphCanvas"></canvas>
+      <div class="graph-wrap">
+        <canvas id="graphCanvas"></canvas>
+        <div class="graph-hint">drag to pan · scroll to zoom · click a node to open it in Obsidian</div>
+      </div>
     </section>
 
     <!-- REPORTS -->
