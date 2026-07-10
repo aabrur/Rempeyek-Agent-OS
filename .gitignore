@@ -1,12 +1,20 @@
-# Rahasia — JANGAN pernah di-commit
+# Secrets — NEVER commit
 .env
 
-# Runtime / data lokal
+# Runtime / local data
 node_modules/
 telemetry/*.jsonl
 telemetry/logs/
 public/avatars/*
 !public/avatars/.gitkeep
+
+# Personal memory layer (lives on disk, not in this repo)
+Obsidian Vault/
+.obsidian/
+
+# Generated artifacts
+graphify-out/
+*.log
 
 # OS / editor
 Thumbs.db

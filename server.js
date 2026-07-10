@@ -1100,31 +1100,17 @@ function readBody(req, res, cb) {
 }
 
 /* ---------------- http ---------------- */
-/* S1: bandingkan token konstan-waktu (anti timing attack). S2: header saja, tak lagi terima ?token= */
+/* S1: constant-time token compare (anti timing attack). S2: header-only auth — ?token= query is not accepted */
 function safeEq(a, b) {
   const ba = Buffer.from(String(a || "")), bb = Buffer.from(String(b || ""));
-  if (ba.length !== bb.length) return false;
+  if (ba.length !== bb.length) { crypto.timingSafeEqual(bb, bb); return false; }
   return crypto.timingSafeEqual(ba, bb);
 }
 function authorized(req) {
   if (!TOKEN) return true;
   const remote = req.socket && (req.socket.remoteAddress || req.connection && req.connection.remoteAddress || "");
-  console.log(`[auth] remote=${remote}, TOKEN=${TOKEN ? "SET" : "UNSET"}, url=${req.url}`);
-  if (/^(127\.0\.0\.1|::1|::ffff:127\.0\.0\.1)$/.test(remote)) { console.log(`[auth] ✓ localhost bypass`); return true; }
-  let tokenVal = req.headers["x-dash-token"] || "";
-  if (!tokenVal && req.url.includes("?")) {
-    try {
-      const q = new URL(req.url, "http://x").searchParams.get("token");
-      if (q) tokenVal = q;
-    } catch {}
-  }
-  const a = Buffer.from(String(tokenVal));
-  if (a.length !== TOKEN.length) return safeEq(Buffer.alloc(TOKEN.length, 0), TOKEN);
-  return timingSafeCompare(a, TOKEN);
-}
-function timingSafeCompare(a, b) {
-  if (a.length !== b.length) return crypto.timingSafeEqual(Buffer.alloc(a.length, 0), b);
-  return crypto.timingSafeEqual(a, b);
+  if (/^(127\.0\.0\.1|::1|::ffff:127\.0\.0\.1)$/.test(remote)) return true;
+  return safeEq(req.headers["x-dash-token"] || "", TOKEN);
 }
 function json(res, code, obj) {
   res.writeHead(code, { "Content-Type": "application/json; charset=utf-8" });

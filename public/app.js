@@ -22,27 +22,19 @@ function headers() { return TOKEN ? { "x-dash-token": TOKEN } : {}; }
 /* api() selalu balik objek (tak pernah throw): R7/R8 fetch dibungkus try/catch + AbortSignal timeout,
    R6/F12 retry 401 pakai counter maksimal 2 (bukan rekursi tak terbatas). */
 async function api(path, opts = {}, attempt = 0) {
-  console.log(`[DEBUG-api] CALLED path=${path} attempt=${attempt}`);
   try {
-    console.log(`[DEBUG-api] calling fetch(${path})`);
     const res = await fetch(path, { ...opts, headers: { ...headers(), ...(opts.headers || {}) }, signal: AbortSignal.timeout(8000) });
-    console.log(`[DEBUG-api] fetch returned status=${res.status}`);
     if (res.status === 401) {
-      console.log(`[DEBUG-api] got 401, checking TOKEN and attempt`);
       if (TOKEN && attempt < 1) {
-        console.log(`[DEBUG-api] retrying with token`);
         return api(path, opts, attempt + 1);
       }
-      console.log(`[DEBUG-api] showing token login modal`);
       showTokenLogin();
       return { error: "unauthorized" };
     }
     const json = await res.json();
-    console.log(`[DEBUG-api] ✓ SUCCESS returned ${Object.keys(json).length} keys`);
     return json;
   } catch (e) {
     const errMsg = e && e.name === "TimeoutError" ? "timeout" : (e && e.message) || "network error";
-    console.error(`[DEBUG-api] CAUGHT ERROR:`, errMsg, e);
     return { error: errMsg };
   }
 }
@@ -132,22 +124,16 @@ function render(state) {
     if (testEl) {
       testEl.textContent = "🔄 " + new Date(state.generatedAt).toLocaleTimeString("id-ID");
       testEl.style.color = "#A6FF3C";  // lime green - visible proof render() ran
-      console.log(`[DEBUG-render] ✓ RENDER CALLED - updated stamp element`);
     }
   } catch (e) {
-    console.error(`[DEBUG-render] Error updating stamp:`, e.message);
   }
   
-  console.log(`[DEBUG-render] START - state has ${state?.agents?.length || 0} agents`);
   try {
     // F2: dirty-check — kalau data (selain timestamp) tak berubah, skip rebuild DOM berat (cegah layout thrash + scroll jump)
     const key = JSON.stringify({ ...state, generatedAt: 0 });
-    console.log(`[DEBUG-render] key length: ${key.length}, lastStateKey length: ${_lastStateKey.length}, match: ${key === _lastStateKey}`);
-    if (key === _lastStateKey) { console.log(`[DEBUG-render] SKIPPING - dirty check matched`); return; }
+    if (key === _lastStateKey) { return; }
     _lastStateKey = key;
-    console.log(`[DEBUG-render] continuing - updating DOM`);
   } catch (e) {
-    console.error(`[DEBUG-render] Error in dirty check:`, e.message);
   }
   // pertahankan dropdown yang sedang terbuka supaya tak ketutup tiap refresh (6/45 dtk)
   const openMenus = new Set();
@@ -199,25 +185,18 @@ function render(state) {
     if (sel) {
       const cur = sel.value;
       const opts = state.agents.map(a => `<option value="${a.id}">${esc(a.icon || "")} ${esc(a.name)}</option>`).join("");
-      console.log(`[DEBUG-dropdown] sel found: true, opts.length: ${opts.length}, agents: ${state.agents.length}, cur: ${cur}`);
       // FORCE UPDATE: Always update dropdown if it's currently empty, even if state hasn't changed (dirty-check)
       const isCurrentlyEmpty = !sel.innerHTML || sel.innerHTML.trim() === "";
       const needsUpdate = sel.dataset.sig !== opts || isCurrentlyEmpty;
-      console.log(`[DEBUG-dropdown] isCurrentlyEmpty: ${isCurrentlyEmpty}, needsUpdate: ${needsUpdate}`);
       if (needsUpdate) { 
-        console.log(`[DEBUG-dropdown] innerHTML mismatch or empty, updating dropdown`);
         sel.innerHTML = opts; 
         sel.dataset.sig = opts; 
         if (cur) sel.value = cur; 
-        console.log(`[DEBUG-dropdown] ✓ Updated! New innerHTML length: ${sel.innerHTML.length}`);
       } else {
-        console.log(`[DEBUG-dropdown] no change in options, skipping update`);
       }
     } else {
-      console.log(`[DEBUG-dropdown] sel not found!`);
     }
   } catch (e) {
-    console.error(`[DEBUG-dropdown] ERROR:`, e.message);
   }
 
   document.getElementById("reviewCount").textContent = `${state.review.length} open`;
@@ -348,7 +327,6 @@ function loadGraph(force) {
   if (!iframe) return;
   const targetSrc = `/api/graphify-html${TOKEN ? "?token=" + encodeURIComponent(TOKEN) : ""}`;
   if (iframe.src === "about:blank" || force || !iframe.src.includes("/api/graphify-html")) {
-    console.log(`[DEBUG-graph] loading iframe src: ${targetSrc}`);
     iframe.src = targetSrc;
   }
 }
@@ -559,7 +537,6 @@ document.getElementById("nav").addEventListener("click", e => {
 
 /* ---------- loop ---------- */
 async function refresh() {
-  console.log(`[DEBUG-refresh] CALLED`);
   try {
     // VISIBLE TEST: If refresh() is called, set title background color
     document.title = "🔄 " + document.title;
@@ -567,14 +544,11 @@ async function refresh() {
   
   const state = await api("/api/state");
   const cb = document.getElementById("configBanner");
-  console.log(`[DEBUG-refresh] got response, agents: ${state?.agents?.length || 0}`);
   if (!state || state.error) {
     if (cb) { cb.hidden = false; cb.innerHTML = `⚠ <b>Gagal memuat state</b> — ${(state && state.error) || "server tidak merespons"}. Coba refresh halaman; kalau pakai token pastikan benar.`; }
     document.getElementById("stamp").textContent = `gagal memuat (${(state && state.error) || "server mati?"})`;
-    console.log(`[DEBUG-refresh] API ERROR`);
     return;
   }
-  console.log(`[DEBUG-refresh] ✓ calling render()`);
   render(state);
 }
 const visible = () => document.visibilityState === "visible";   // F3: jangan polling saat tab hidden
