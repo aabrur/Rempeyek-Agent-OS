@@ -1,55 +1,47 @@
 /* AGENTIC//OS — app logic */
 const VAULT_NAME = "Obsidian Vault";
 let TOKEN = localStorage.getItem("dashToken") || "";
-let openAgent = null;   // id agent yang detailnya terbuka
+let openAgent = null;   // id of the agent whose detail panel is open
 let graph = null, graphLoaded = false;
 let lastReport = null;
-let AGENTS = {};   // R#10: id -> agent (buat cek owner: native-service di guard konfirmasi)
+let AGENTS = {};   // R#10: id -> agent (owner: native-service check for the confirm guard)
 
-const ACCENT = { "claude-code": "#00E5FF", hermes: "#A6FF3C", openclaw: "#4C9BFF", zcode: "#8C5BFF", copilot: "#FFB01F" };
+const ACCENT = { "claude-code": "#00E5FF", hermes: "#A6FF3C", openclaw: "#4C9BFF", zcode: "#8C5BFF", copilot: "#FFB01F", "kimi-code": "#F2FF3C", antigravity: "#FF8A3C" };
 const TILE_C = ["#00E5FF", "#FF3DD8", "#A6FF3C", "#FFB01F"];
 const PALETTE = ["#00E5FF", "#FF3DD8", "#A6FF3C", "#FFB01F", "#8C5BFF", "#FF4D6A", "#3CFFC8", "#FF8A3C", "#4C9BFF", "#F2FF3C"];
 
 const WORKFLOWS = [
-  { who: "Hermes", t: "Crypto & Market Ops", d: "Trading bot, market analysis, cron & heartbeat 24/7. Real-money hanya dengan approval Boss." },
-  { who: "ZCode", t: "Build & Orchestrate", d: "Interactive coding, software engineering, orkestrasi 200+ skills." },
-  { who: "OpenClaw", t: "Strategic Memo", d: "Analisis bisnis, SWOT, founder-grade docs, persona-driven writing." },
-  { who: "Claude Code", t: "Dev & Vault Ops", d: "Full dev, file ops, MCP, integrasi ekosistem, penjaga konstitusi vault." },
+  { who: "Hermes", t: "Crypto & Market Ops", d: "Trading bot, market analysis, cron & heartbeat 24/7. Real-money moves only with Boss approval." },
+  { who: "ZCode", t: "Build & Orchestrate", d: "Interactive coding, software engineering, orchestration of 200+ skills." },
+  { who: "OpenClaw", t: "Strategic Memo", d: "Business analysis, SWOT, founder-grade docs, persona-driven writing." },
+  { who: "Claude Code", t: "Dev & Vault Ops", d: "Full dev, file ops, MCP, ecosystem integration, guardian of the vault constitution." },
 ];
 
 /* ---------- util ---------- */
 function headers() { return TOKEN ? { "x-dash-token": TOKEN } : {}; }
-/* api() selalu balik objek (tak pernah throw): R7/R8 fetch dibungkus try/catch + AbortSignal timeout,
-   R6/F12 retry 401 pakai counter maksimal 2 (bukan rekursi tak terbatas). */
+/* api() always returns an object (never throws): R7/R8 fetch wrapped in try/catch + AbortSignal timeout,
+   R6/F12 401 retry uses a counter capped at 2 (not unbounded recursion). */
 async function api(path, opts = {}, attempt = 0) {
-  console.log(`[DEBUG-api] CALLED path=${path} attempt=${attempt}`);
   try {
-    console.log(`[DEBUG-api] calling fetch(${path})`);
     const res = await fetch(path, { ...opts, headers: { ...headers(), ...(opts.headers || {}) }, signal: AbortSignal.timeout(8000) });
-    console.log(`[DEBUG-api] fetch returned status=${res.status}`);
     if (res.status === 401) {
-      console.log(`[DEBUG-api] got 401, checking TOKEN and attempt`);
       if (TOKEN && attempt < 1) {
-        console.log(`[DEBUG-api] retrying with token`);
         return api(path, opts, attempt + 1);
       }
-      console.log(`[DEBUG-api] showing token login modal`);
       showTokenLogin();
       return { error: "unauthorized" };
     }
     const json = await res.json();
-    console.log(`[DEBUG-api] ✓ SUCCESS returned ${Object.keys(json).length} keys`);
     return json;
   } catch (e) {
     const errMsg = e && e.name === "TimeoutError" ? "timeout" : (e && e.message) || "network error";
-    console.error(`[DEBUG-api] CAUGHT ERROR:`, errMsg, e);
     return { error: errMsg };
   }
 }
-/* login token inline (pengganti prompt() yang bisa keblokir di iframe/context tertentu) */
+/* Inline token login (replaces prompt(), which can be blocked in iframes/certain contexts) */
 function showTokenLogin() {
   const ov = document.getElementById("tokenLogin");
-  if (!ov) { const t = prompt("Dashboard dikunci token (DASH_TOKEN). Masukkan token:") || ""; if (t) { TOKEN = t; localStorage.setItem("dashToken", TOKEN); refresh(); } return; }
+  if (!ov) { const t = prompt("Dashboard is token-locked (DASH_TOKEN). Enter token:") || ""; if (t) { TOKEN = t; localStorage.setItem("dashToken", TOKEN); refresh(); } return; }
   ov.hidden = false;
   const input = document.getElementById("tokenInput");
   const submit = document.getElementById("tokenSubmit");
@@ -66,7 +58,7 @@ function esc(s) { return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;
 function pill(status) { return `<span class="pill"><span class="dot ${status}"></span><span class="lbl-${status}">${status}</span></span>`; }
 function ac(id) { return ACCENT[id] || "#8C5BFF"; }
 function gwState(p) {
-  if (!p || p.status === "off") return { cls: "idle", label: "belum dicek", tip: "" };
+  if (!p || p.status === "off") return { cls: "idle", label: "not checked yet", tip: "" };
   if (p.status === "running") return { cls: "running", label: p.mode === "owned" ? `running · owned pid ${p.pid}` : "running · service", tip: p.statusText || "" };
   if (p.status === "stopped") return { cls: "idle", label: "stopped", tip: p.statusText || "" };
   if (p.status === "exited") return { cls: "exited", label: `exited (${p.exitCode})`, tip: p.reason || "" };
@@ -76,28 +68,28 @@ function gwPill(gw) {
   return `<span class="pill" title="${esc(gw.tip)}"><span class="dot ${gw.cls}"></span>` +
     `<span class="lbl-${gw.cls}">${esc(gw.label)}</span></span>`;
 }
-/* ROADMAP #2: chip uptime 24 jam (reuse pill/dot — tanpa CSS baru) */
+/* ROADMAP #2: 24h uptime chip (reuses pill/dot — no new CSS) */
 function uptimeChip(u) {
   if (!u || !u.samples) return "";
   const cls = u.pct >= 90 ? "running" : u.pct >= 50 ? "exited" : "error";
-  return `<span class="pill" title="uptime 24 jam · ${u.samples} sampel poll"><span class="dot ${cls}"></span>` +
+  return `<span class="pill" title="24h uptime · ${u.samples} poll samples"><span class="dot ${cls}"></span>` +
     `<span class="lbl-${cls}">${u.pct}% up 24h</span></span>`;
 }
 function avatarHtml(a, lg) {
   const inner = a.avatar ? `<img src="${a.avatar}" alt="${esc(a.name)}">` : (a.icon || "◈");
   return `<div class="avatar ${lg ? "avatar-lg" : ""}" style="--ac:${ac(a.id)}">${inner}
-    ${lg ? `<button class="avatar-edit" data-act="avatar" data-id="${a.id}" title="Ganti foto profil">✎</button>` : ""}</div>`;
+    ${lg ? `<button class="avatar-edit" data-act="avatar" data-id="${a.id}" title="Change profile photo">✎</button>` : ""}</div>`;
 }
 const ACT_LABEL = { start: "▶ Start", stop: "■ Stop", restart: "↻ Restart", status: "◇ Status", run: "⚡ Run" };
 const ACT_CLS = { start: "btn-run", stop: "btn-stop", restart: "btn-dim", status: "btn-dim", run: "btn-dim" };
 function gwBtn(act, id) { return `<button class="btn ${ACT_CLS[act] || "btn-dim"}" data-act="${act}" data-id="${id}">${ACT_LABEL[act] || act}</button>`; }
-/* Start = split button: klik utama buka terminal admin + panggil agent; caret = pilihan terminal lain + start headless */
+/* Start = split button: main click starts the gateway; caret = other terminal options + headless start */
 function startSplit(a) {
   return `<div class="gw-split">
-    <button class="btn btn-run gw-main" data-act="start" data-id="${a.id}" title="Nyalakan gateway ${esc(a.name)} (background service) — agent langsung jalan & bisa di-monitor">▶ Start</button>
-    <button class="btn btn-run gw-caret" data-menu="${a.id}" title="Opsi lain">▾</button>
+    <button class="btn btn-run gw-main" data-act="start" data-id="${a.id}" title="Start the ${esc(a.name)} gateway (background service) — the agent comes up and can be monitored">▶ Start</button>
+    <button class="btn btn-run gw-caret" data-menu="${a.id}" title="More options">▾</button>
     <div class="gw-menu" data-menufor="${a.id}">
-      <button data-term="summon" data-id="${a.id}">⧉ Open terminal · panggil agent</button>
+      <button data-term="summon" data-id="${a.id}">⧉ Open terminal · summon agent</button>
       <button data-term="run" data-id="${a.id}">⧉ Gateway run · terminal (foreground)</button>
       <div class="gw-menu-sep"></div>
       <button data-act="status" data-id="${a.id}">◇ Status</button>
@@ -106,10 +98,10 @@ function startSplit(a) {
   </div>`;
 }
 function summonBtn(a) {
-  return `<button class="btn btn-run" data-term="summon" data-id="${a.id}" title="Buka terminal admin + panggil ${esc(a.name)}">⧉ Panggil</button>`;
+  return `<button class="btn btn-run" data-term="summon" data-id="${a.id}" title="Open an admin terminal + summon ${esc(a.name)}">⧉ Summon</button>`;
 }
 function gwButtons(a, compact) {
-  if (!a.enabled) return `<button class="btn btn-dim" disabled title="${esc(a.note || "nonaktif")}">setup dulu</button>`;
+  if (!a.enabled) return `<button class="btn btn-dim" disabled title="${esc(a.note || "disabled")}">setup required</button>`;
   const acts = a.actions || [];
   const running = a.proc && a.proc.status === "running";
   const hasStart = acts.includes("start");
@@ -118,45 +110,82 @@ function gwButtons(a, compact) {
     if (hasStart) return startSplit(a);
     return a.canSummon ? summonBtn(a) : (acts[0] ? gwBtn(acts[0], a.id) : "");
   }
-  // detail: split Start (gateway) atau tombol Panggil (non-gateway spt Copilot) + sisa aksi headless
+  // detail: split Start (gateway) or Summon button (non-gateway agents like Copilot) + remaining headless actions
   const rest = acts.filter(x => x !== "start").map(x => gwBtn(x, a.id)).join("");
   return (hasStart ? startSplit(a) : (a.canSummon ? summonBtn(a) : "")) + rest;
 }
 
-/* ---------- render utama ---------- */
+/* ---------- agent topology map ---------- */
+/* Radial SVG map: hub in the center, agents on an ellipse. No physics, no library.
+   Rebuilt only when render()'s dirty-check passes, so no poll thrash. */
+function nodeStatus(a) {
+  const running = a.proc && a.proc.status === "running";
+  const dead = a.proc && (a.proc.status === "exited" || a.proc.status === "error");
+  const observeOnly = !(a.actions || []).length;
+  if (!a.enabled) return { cls: "top-off", ring: "#3A3654", label: "disabled" };
+  if (running) return { cls: "top-run", ring: "#A6FF3C", label: "running" };
+  if (dead) return { cls: "top-err", ring: "#FF4D6A", label: a.proc.status };
+  if (observeOnly) return { cls: "top-obs", ring: ac(a.id), label: "observe" };
+  return { cls: "top-idle", ring: "#8E88BE", label: "idle" };
+}
+function renderTopology(state) {
+  const box = document.getElementById("topologyMap");
+  if (!box) return;
+  const agents = state.agents;
+  const W = 960, H = 320, cx = W / 2, cy = H / 2, rx = 380, ry = 108;
+  const n = agents.length;
+  let defs = "", links = "", nodes = "";
+  agents.forEach((a, i) => {
+    const ang = -Math.PI / 2 + (i * 2 * Math.PI) / n;
+    const x = cx + rx * Math.cos(ang), y = cy + ry * Math.sin(ang);
+    const st = nodeStatus(a);
+    const col = ac(a.id);
+    const dash = st.cls === "top-obs" ? `stroke-dasharray="4 4"` : "";
+    const pulse = st.cls === "top-run" ? `<circle class="top-pulse" cx="${x}" cy="${y}" r="24" fill="none" stroke="${st.ring}" stroke-width="1.5" opacity=".8"/>` : "";
+    links += `<line x1="${cx}" y1="${cy}" x2="${x}" y2="${y}" stroke="${st.cls === "top-run" ? col : "#2A2744"}" stroke-width="${st.cls === "top-run" ? 1.6 : 1}" opacity="${st.cls === "top-run" ? .75 : .5}" ${dash}/>`;
+    nodes += `<g class="top-node ${st.cls}" data-open="${a.id}" transform="translate(${x},${y})" style="cursor:pointer">
+      ${pulse ? pulse.replace(`cx="${x}" cy="${y}"`, `cx="0" cy="0"`) : ""}
+      <circle r="21" fill="#100E1F" stroke="${st.ring}" stroke-width="2" ${dash}/>
+      <text y="6" text-anchor="middle" font-size="17">${a.icon || "◈"}</text>
+      <text y="38" text-anchor="middle" font-size="10.5" fill="#EEEBFF" font-family="Bahnschrift,sans-serif" font-weight="600">${esc(a.name)}</text>
+      <text y="51" text-anchor="middle" font-size="8.5" fill="${st.ring}" font-family="Cascadia Mono,monospace">${st.label}</text>
+      <text y="-30" text-anchor="middle" font-size="8" fill="#8E88BE" font-family="Cascadia Mono,monospace">${esc(a.node || "")}</text>
+    </g>`;
+  });
+  const runningCount = agents.filter(a => a.proc && a.proc.status === "running").length;
+  box.innerHTML = `<svg class="topology" viewBox="0 0 ${W} ${H}" role="img" aria-label="Agent topology map">
+    ${defs}${links}
+    <g class="top-hub">
+      <circle cx="${cx}" cy="${cy}" r="34" fill="#14112A" stroke="#00E5FF" stroke-width="1.6"/>
+      <circle class="top-pulse" cx="${cx}" cy="${cy}" r="40" fill="none" stroke="#00E5FF" stroke-width="1" opacity=".5"/>
+      <text x="${cx}" y="${cy - 2}" text-anchor="middle" font-size="15" fill="#00E5FF" font-family="Bahnschrift,sans-serif" font-weight="700">◈</text>
+      <text x="${cx}" y="${cy + 13}" text-anchor="middle" font-size="7.5" fill="#8E88BE" font-family="Cascadia Mono,monospace">${runningCount}/${n} LIVE</text>
+    </g>
+    ${nodes}
+  </svg>`;
+}
+
+/* ---------- main render ---------- */
 let _lastStateKey = "";   // R2: force first render
 function render(state) {
-  // FIRST: Test if render is even being called by modifying a visible element
+  const stamp = document.getElementById("stamp");
+  if (stamp) stamp.textContent = new Date(state.generatedAt).toLocaleTimeString("en-GB");
+
   try {
-    const testEl = document.getElementById("stamp");
-    if (testEl) {
-      testEl.textContent = "🔄 " + new Date(state.generatedAt).toLocaleTimeString("id-ID");
-      testEl.style.color = "#A6FF3C";  // lime green - visible proof render() ran
-      console.log(`[DEBUG-render] ✓ RENDER CALLED - updated stamp element`);
-    }
-  } catch (e) {
-    console.error(`[DEBUG-render] Error updating stamp:`, e.message);
-  }
-  
-  console.log(`[DEBUG-render] START - state has ${state?.agents?.length || 0} agents`);
-  try {
-    // F2: dirty-check — kalau data (selain timestamp) tak berubah, skip rebuild DOM berat (cegah layout thrash + scroll jump)
+    // F2: dirty-check — if data (other than the timestamp) is unchanged, skip the heavy DOM rebuild (prevents layout thrash + scroll jumps)
     const key = JSON.stringify({ ...state, generatedAt: 0 });
-    console.log(`[DEBUG-render] key length: ${key.length}, lastStateKey length: ${_lastStateKey.length}, match: ${key === _lastStateKey}`);
-    if (key === _lastStateKey) { console.log(`[DEBUG-render] SKIPPING - dirty check matched`); return; }
+    if (key === _lastStateKey) { return; }
     _lastStateKey = key;
-    console.log(`[DEBUG-render] continuing - updating DOM`);
   } catch (e) {
-    console.error(`[DEBUG-render] Error in dirty check:`, e.message);
   }
-  // pertahankan dropdown yang sedang terbuka supaya tak ketutup tiap refresh (6/45 dtk)
+  // keep any open dropdown open across refreshes (6/45 s)
   const openMenus = new Set();
   document.querySelectorAll(".gw-menu.open").forEach(m => { if (m.dataset.menufor) openMenus.add(m.dataset.menufor); });
   AGENTS = {}; state.agents.forEach(a => AGENTS[a.id] = a);   // R#10
-  // R#11: banner kalau config rusak (server pakai last-good diam-diam kalau tak ada ini)
+  // R#11: banner when the config is broken (server silently falls back to last-good without this)
   const cb = document.getElementById("configBanner");
   if (cb) {
-    if (state.configError) { cb.hidden = false; cb.innerHTML = `⚠ <b>agents.config.json rusak</b> — pakai config terakhir yang valid. <code>${esc(state.configError.msg)}</code> · perbaiki file lalu dashboard auto-reload.`; }
+    if (state.configError) { cb.hidden = false; cb.innerHTML = `⚠ <b>agents.config.json is broken</b> — using the last valid config. <code>${esc(state.configError.msg)}</code> · fix the file and the dashboard auto-reloads.`; }
     else cb.hidden = true;
   }
   const vp = document.getElementById("vaultPath");
@@ -171,7 +200,9 @@ function render(state) {
   tiles.innerHTML = "";
   Object.values(state.stats).forEach((s, i) => tiles.appendChild(el(`<div class="tile" style="--tile-c:${TILE_C[i % 4]}">
     <div class="tile-top"><span>${esc(s.label)}</span></div>
-    <div class="tile-val">${s.value}</div><div class="tile-sub">live dari vault</div></div>`)));
+    <div class="tile-val">${s.value}</div><div class="tile-sub">live from vault</div></div>`)));
+
+  renderTopology(state);
 
   const cardHtml = a => {
     const gw = gwState(a.proc);
@@ -193,43 +224,33 @@ function render(state) {
       <span><b>${esc(a.name)}</b><br>${esc(a.node)}</span></div>`));
   });
 
-  // R#5: isi dropdown agent di form "kasih task" (jaga pilihan user saat refresh)
+  // R#5: fill the agent dropdown in the "send task" form (preserve the user's selection across refreshes)
   try {
     const sel = document.getElementById("taskAgent");
     if (sel) {
       const cur = sel.value;
       const opts = state.agents.map(a => `<option value="${a.id}">${esc(a.icon || "")} ${esc(a.name)}</option>`).join("");
-      console.log(`[DEBUG-dropdown] sel found: true, opts.length: ${opts.length}, agents: ${state.agents.length}, cur: ${cur}`);
-      // FORCE UPDATE: Always update dropdown if it's currently empty, even if state hasn't changed (dirty-check)
       const isCurrentlyEmpty = !sel.innerHTML || sel.innerHTML.trim() === "";
       const needsUpdate = sel.dataset.sig !== opts || isCurrentlyEmpty;
-      console.log(`[DEBUG-dropdown] isCurrentlyEmpty: ${isCurrentlyEmpty}, needsUpdate: ${needsUpdate}`);
-      if (needsUpdate) { 
-        console.log(`[DEBUG-dropdown] innerHTML mismatch or empty, updating dropdown`);
-        sel.innerHTML = opts; 
-        sel.dataset.sig = opts; 
-        if (cur) sel.value = cur; 
-        console.log(`[DEBUG-dropdown] ✓ Updated! New innerHTML length: ${sel.innerHTML.length}`);
-      } else {
-        console.log(`[DEBUG-dropdown] no change in options, skipping update`);
+      if (needsUpdate) {
+        sel.innerHTML = opts;
+        sel.dataset.sig = opts;
+        if (cur) sel.value = cur;
       }
-    } else {
-      console.log(`[DEBUG-dropdown] sel not found!`);
     }
   } catch (e) {
-    console.error(`[DEBUG-dropdown] ERROR:`, e.message);
   }
 
   document.getElementById("reviewCount").textContent = `${state.review.length} open`;
   const rl = document.getElementById("reviewList");
   rl.innerHTML = "";
-  if (!state.review.length) rl.appendChild(el(`<div class="empty">Kosong — tambah catatan ke <b>Inbox/</b> atau checkbox di <b>Tasks/</b> dan item muncul di sini.</div>`));
+  if (!state.review.length) rl.appendChild(el(`<div class="empty">Empty — add a note to <b>Inbox/</b> or a checkbox in <b>Tasks/</b> and it shows up here.</div>`));
   state.review.slice(0, 8).forEach(r => rl.appendChild(el(`<div class="review-item">
     <div><span class="t">${esc(r.title)}</span><span class="kind ${r.kind}">${r.kind}</span>
     <div class="m">${esc(r.meta)}</div></div>
     <div class="review-act">
-      ${r.kind === "task" ? `<button class="btn btn-run btn-mini" data-done="${esc(r.meta)}" data-text="${esc(r.title)}" title="Tandai selesai (tulis [x] ke vault)">✓ selesai</button>` : ""}
-      <a href="${obsUri(r.meta)}">Buka di Obsidian</a></div></div>`)));
+      ${r.kind === "task" ? `<button class="btn btn-run btn-mini" data-done="${esc(r.meta)}" data-text="${esc(r.title)}" title="Mark done (writes [x] to the vault)">✓ done</button>` : ""}
+      <a href="${obsUri(r.meta)}">Open in Obsidian</a></div></div>`)));
 
   const wf = document.getElementById("workflowCards");
   wf.innerHTML = "";
@@ -241,12 +262,12 @@ function render(state) {
   state.projects.forEach(p => pl.appendChild(el(`<div class="list-item">
     <div><b>${esc(p.name)}</b><div class="p">${esc(p.rel)}</div></div>
     <div style="display:flex;gap:12px;align-items:center"><span class="d">${p.updated}</span>
-    <a class="chip" style="text-decoration:none" href="${obsUri(p.rel)}">buka</a></div></div>`)));
-  // buka kembali dropdown yang tadi terbuka
+    <a class="chip" style="text-decoration:none" href="${obsUri(p.rel)}">open</a></div></div>`)));
+  // reopen dropdowns that were open before the rebuild
   openMenus.forEach(id => document.querySelectorAll(`.gw-menu[data-menufor="${id}"]`).forEach(m => m.classList.add("open")));
 }
 
-/* ---------- detail agent ---------- */
+/* ---------- agent detail ---------- */
 async function renderDetail() {
   const box = document.getElementById("agentDetail");
   if (!openAgent) { box.innerHTML = ""; return; }
@@ -254,39 +275,39 @@ async function renderDetail() {
   if (d.error) { box.innerHTML = `<div class="empty">${esc(d.error)}</div>`; return; }
   const gw = gwState(d.proc);
   const act = d.activity || { sessions: [], subagents: [] };
-  const isTele = d.source === "telemetry";   // Claude = transcript, lainnya = telemetry
+  const isTele = d.source === "telemetry";   // Claude = transcript, others = telemetry
 
   const sessions = act.sessions.length ? act.sessions.map(s => `<div class="sess">
       <div class="top"><span>${esc(s.id)}${s.project ? " · " + esc(s.project) : ""}</span>${pill(s.status)}</div>
       ${s.lastPrompt ? `<div class="prm">❯ ${esc(s.lastPrompt)}</div>` : ""}
-      ${s.lastTool ? `<div class="act">⚙ ${esc(s.lastTool.name)} ${esc(s.lastTool.target)} · ${s.toolCount} tool call</div>` : ""}
+      ${s.lastTool ? `<div class="act">⚙ ${esc(s.lastTool.name)} ${esc(s.lastTool.target)} · ${s.toolCount} tool calls</div>` : ""}
     </div>`).join("")
     : `<div class="empty">${isTele
-        ? `Belum ada aktivitas. Agent lapor task via telemetry <code>agentic-os\\telemetry\\${esc(d.id)}.jsonl</code> (type <code>task_start/progress/done</code>).`
-        : "Belum ada sesi 48 jam terakhir."}</div>`;
+        ? `No activity yet. The agent reports tasks via telemetry <code>agentic-os\\telemetry\\${esc(d.id)}.jsonl</code> (type <code>task_start/progress/done</code>).`
+        : "No sessions in the last 48 hours."}</div>`;
 
   const subs = act.subagents.length ? act.subagents.map(s => `<div class="subrow">
       <span class="ty">${esc(s.type)}</span><span class="nm">${esc(s.desc)}${s.detail ? " — " + esc(s.detail) : ""}</span>
       <span class="st st-${s.status}">${s.status === "done" ? "✔ done" : "⟳ running"}</span></div>`).join("")
     : `<div class="empty">${isTele
-        ? `Belum ada subagent/task. Lapor via telemetry (type <code>subagent_start/done</code>) → muncul di sini otomatis.`
-        : "Belum ada subagent yang di-spawn di sesi 48 jam terakhir. Begitu ada Agent/Task spawn, muncul otomatis."}</div>`;
+        ? `No subagents/tasks yet. Report via telemetry (type <code>subagent_start/done</code>) → they appear here automatically.`
+        : "No subagents spawned in the last 48 hours. As soon as an Agent/Task spawn happens, it shows up automatically."}</div>`;
 
   const tele = d.telemetry.length ? d.telemetry.map(t => `<div class="subrow">
       <span class="ty">${esc(t.type)}</span>
       <span class="nm">${esc(t.name || "")}${t.detail ? " — " + esc(t.detail) : ""}
         ${t.progress != null ? `<span class="tele-bar"><i style="width:${Math.min(100, t.progress)}%"></i></span>` : ""}</span>
       <span class="st">${esc((t.ts || "").slice(11, 16))}</span></div>`).join("")
-    : `<div class="empty">Belum ada telemetry. Agent bisa lapor progres via <code>agentic-os\\telemetry\\${esc(d.id)}.jsonl</code> (lihat README di folder itu).</div>`;
+    : `<div class="empty">No telemetry yet. The agent can report progress via <code>agentic-os\\telemetry\\${esc(d.id)}.jsonl</code> (see the README in that folder).</div>`;
 
   const lane = d.laneFiles.length ? `<div class="mini-list">${d.laneFiles.map(f =>
     `<a href="${obsUri(f.rel)}"><span>${esc(f.rel.split("/").pop().replace(".md", ""))}</span><span class="d">${f.updated}</span></a>`).join("")}</div>`
-    : `<div class="empty">Belum ada catatan di lane Brains.</div>`;
+    : `<div class="empty">No notes in the Brains lane yet.</div>`;
 
-  const checked = d.proc && d.proc.checkedAt ? new Date(d.proc.checkedAt).toLocaleTimeString("id-ID") : null;
+  const checked = d.proc && d.proc.checkedAt ? new Date(d.proc.checkedAt).toLocaleTimeString("en-GB") : null;
   const statusOut = d.proc && d.proc.statusText
     ? `<pre class="logpane" style="height:130px" id="statusout">${esc(d.proc.statusText)}</pre>`
-    : `<div class="empty">Klik <b>Status</b> untuk cek kondisi gateway lewat command aslinya.</div>`;
+    : `<div class="empty">Click <b>Status</b> to check the gateway through its own command.</div>`;
 
   box.innerHTML = `<div class="detail" style="--ac:${ac(d.id)}">
     <div class="detail-head">
@@ -296,19 +317,19 @@ async function renderDetail() {
         <div class="detail-meta">${esc(d.role)} · ${esc(d.node)} · <code>${esc(d.bin || "gateway N/A")}</code></div>
         <div class="pill-row" style="margin-top:7px">${pill(d.vaultStatus)}${gwPill(gw)}</div>
       </div>
-      <div class="detail-actions"><button class="btn btn-dim" data-act="close-detail">✕ tutup</button></div>
+      <div class="detail-actions"><button class="btn btn-dim" data-act="close-detail">✕ close</button></div>
     </div>
     <div class="detail-grid">
-      <div class="dsec" style="grid-column:1/-1"><h3>Kontrol gateway ${checked ? `<span class="cnt" style="text-transform:none;letter-spacing:0">· dicek ${checked}</span>` : ""}</h3>
-        <div class="gw-ctl">${gwButtons(d, false) || `<span class="muted">${esc(d.note || "tidak ada aksi")}</span>`}</div>
+      <div class="dsec" style="grid-column:1/-1"><h3>Gateway control ${checked ? `<span class="cnt" style="text-transform:none;letter-spacing:0">· checked ${checked}</span>` : ""}</h3>
+        <div class="gw-ctl">${gwButtons(d, false) || `<span class="muted">${esc(d.note || "no actions")}</span>`}</div>
         ${d.note ? `<div class="gw-note">ℹ ${esc(d.note)}</div>` : ""}
         ${statusOut}</div>
-      <div class="dsec"><h3>Sesi / Aktivitas <span class="cnt">${act.sessions.length}</span></h3>${sessions}</div>
-      <div class="dsec"><h3>Subagent / Task <span class="cnt">${act.subagents.length}</span></h3>${subs}</div>
+      <div class="dsec"><h3>Sessions / Activity <span class="cnt">${act.sessions.length}</span></h3>${sessions}</div>
+      <div class="dsec"><h3>Subagents / Tasks <span class="cnt">${act.subagents.length}</span></h3>${subs}</div>
       <div class="dsec"><h3>Telemetry <span class="cnt">${d.telemetry.length}</span></h3>${tele}</div>
-      <div class="dsec"><h3>Lane vault — Brains/</h3>${lane}</div>
-      <div class="dsec" style="grid-column:1/-1"><h3>Log gateway run (owned, live)</h3>
-        <pre class="logpane" id="logpane">${d.log.length ? d.log.map(l => `[${l.t}] ${l.s === "err" ? "⚠ " : ""}${esc(l.line)}`).join("\n") : "(belum ada — muncul kalau kamu klik Run / foreground)"}</pre></div>
+      <div class="dsec"><h3>Vault lane — Brains/</h3>${lane}</div>
+      <div class="dsec" style="grid-column:1/-1"><h3>Gateway run log (owned, live)</h3>
+        <pre class="logpane" id="logpane">${d.log.length ? d.log.map(l => `[${l.t}] ${l.s === "err" ? "⚠ " : ""}${esc(l.line)}`).join("\n") : "(nothing yet — appears when you click Run / foreground)"}</pre></div>
     </div>
   </div>`;
   const pane = document.getElementById("logpane");
@@ -325,7 +346,7 @@ avatarInput.addEventListener("change", () => {
   const img = new Image();
   const url = URL.createObjectURL(file);
   img.onload = async () => {
-    URL.revokeObjectURL(url);              // F13/R15: lepas blob URL, cegah memory leak
+    URL.revokeObjectURL(url);              // F13/R15: release the blob URL, prevent a memory leak
     const c = document.createElement("canvas");
     const S = 256; c.width = S; c.height = S;
     const x = c.getContext("2d");
@@ -338,19 +359,26 @@ avatarInput.addEventListener("change", () => {
     if (r.error) alert(r.error);
     refresh(); renderDetail();
   };
-  img.onerror = () => { URL.revokeObjectURL(url); alert("gagal baca gambar"); };
+  img.onerror = () => { URL.revokeObjectURL(url); alert("failed to read the image"); };
   img.src = url;
 });
 
-/* ---------- graph ---------- */
-function loadGraph(force) {
-  const iframe = document.getElementById("graphIframe");
-  if (!iframe) return;
-  const targetSrc = `/api/graphify-html${TOKEN ? "?token=" + encodeURIComponent(TOKEN) : ""}`;
-  if (iframe.src === "about:blank" || force || !iframe.src.includes("/api/graphify-html")) {
-    console.log(`[DEBUG-graph] loading iframe src: ${targetSrc}`);
-    iframe.src = targetSrc;
+/* ---------- vault graph (in-page NeuralGraph on /api/graph) ---------- */
+async function loadGraph(force) {
+  const canvas = document.getElementById("graphCanvas");
+  if (!canvas) return;
+  if (!graph) {
+    graph = NeuralGraph(canvas, { onOpen: n => { location.href = obsUri(n.id); } });
+    const search = document.getElementById("graphSearch");
+    if (search) search.addEventListener("input", () => graph.setQuery(search.value));
   }
+  if (graphLoaded && !force) { graph.reheat(); return; }
+  const data = await api("/api/graph");
+  if (data.error || !Array.isArray(data.nodes)) return;
+  graph.setData(data);
+  graphLoaded = true;
+  const stats = document.getElementById("graphStats");
+  if (stats) stats.textContent = `${data.nodes.length} notes · ${data.edges.length} links`;
 }
 
 /* ---------- reports ---------- */
@@ -386,7 +414,7 @@ function svgDonut(folders) {
   return `<div style="display:flex;gap:18px;align-items:center;flex-wrap:wrap">
     <svg width="180" height="180" viewBox="0 0 180 180">${segs}
       <text x="90" y="86" fill="#EEEBFF" font-size="24" font-weight="700" text-anchor="middle" font-family="Bahnschrift">${total}</text>
-      <text x="90" y="104" fill="#8E88BE" font-size="9" text-anchor="middle" font-family="Cascadia Mono">CATATAN</text></svg>
+      <text x="90" y="104" fill="#8E88BE" font-size="9" text-anchor="middle" font-family="Cascadia Mono">NOTES</text></svg>
     <div class="graph-legend" style="margin:0;flex-direction:column;align-items:flex-start;gap:6px">${leg}</div></div>`;
 }
 function renderReport(r) {
@@ -394,31 +422,31 @@ function renderReport(r) {
   document.getElementById("reportArea").innerHTML = `
   <div class="panel rep-wide" style="margin-top:14px">
     <div class="rep-head-stats">
-      <div class="rep-stat"><div class="v">${r.totals.notes}</div><div class="l">catatan</div></div>
-      <div class="rep-stat"><div class="v">${r.totals.edges}</div><div class="l">koneksi</div></div>
-      <div class="rep-stat"><div class="v">${r.totals.active7d}</div><div class="l">aktif 7 hari</div></div>
-      <div class="rep-stat"><div class="v">${r.totals.openTasks}</div><div class="l">task terbuka</div></div>
-      <div class="rep-stat"><div class="v">${r.totals.gwRunning}</div><div class="l">gateway jalan</div></div>
-      <div class="rep-stat" style="margin-left:auto"><div class="l">digenerate</div><div class="l" style="color:#EEEBFF">${r.generatedAt.slice(0, 16).replace("T", " ")}</div></div>
+      <div class="rep-stat"><div class="v">${r.totals.notes}</div><div class="l">notes</div></div>
+      <div class="rep-stat"><div class="v">${r.totals.edges}</div><div class="l">links</div></div>
+      <div class="rep-stat"><div class="v">${r.totals.active7d}</div><div class="l">active 7 days</div></div>
+      <div class="rep-stat"><div class="v">${r.totals.openTasks}</div><div class="l">open tasks</div></div>
+      <div class="rep-stat"><div class="v">${r.totals.gwRunning}</div><div class="l">gateways up</div></div>
+      <div class="rep-stat" style="margin-left:auto"><div class="l">generated</div><div class="l" style="color:#EEEBFF">${r.generatedAt.slice(0, 16).replace("T", " ")}</div></div>
     </div></div>
   <div class="report-grid">
-    <div class="panel"><div class="panel-head"><h2>AKTIVITAS 14 HARI</h2><span class="chip chip-plain">catatan diubah/hari</span></div>${svgBar(r.days)}</div>
-    <div class="panel"><div class="panel-head"><h2>DISTRIBUSI FOLDER</h2></div>${svgDonut(r.folders)}</div>
-    <div class="panel rep-wide"><div class="panel-head"><h2>STATUS AGENT</h2></div>
-      <table class="rep-table"><tr><th>Agent</th><th>Node</th><th>Catatan lane</th><th>Aktif 7d</th><th></th><th>Terakhir</th><th>Gateway</th></tr>
+    <div class="panel"><div class="panel-head"><h2>14-DAY ACTIVITY</h2><span class="chip chip-plain">notes changed/day</span></div>${svgBar(r.days)}</div>
+    <div class="panel"><div class="panel-head"><h2>FOLDER DISTRIBUTION</h2></div>${svgDonut(r.folders)}</div>
+    <div class="panel rep-wide"><div class="panel-head"><h2>AGENT STATUS</h2></div>
+      <table class="rep-table"><tr><th>Agent</th><th>Node</th><th>Lane notes</th><th>Active 7d</th><th></th><th>Last seen</th><th>Gateway</th></tr>
       ${r.agents.map(a => `<tr><td>${a.icon} <b>${esc(a.name)}</b></td><td style="font-family:var(--mono);font-size:10px">${esc(a.node)}</td>
         <td>${a.laneNotes}</td><td>${a.touched7d}</td>
         <td><div class="rep-bar"><i style="width:${Math.round(a.touched7d / maxT * 100)}%"></i></div></td>
         <td style="font-family:var(--mono);font-size:10px">${a.lastSeen || "—"}</td>
         <td><span class="lbl-${a.gw === "running" ? "running" : "idle"}" style="font-family:var(--mono);font-size:10px">${a.gw}</span></td></tr>`).join("")}
       </table></div>
-    ${r.tasks.length ? `<div class="panel rep-wide"><div class="panel-head"><h2>TASK TERBUKA</h2><span class="chip">${r.totals.openTasks}</span></div>
+    ${r.tasks.length ? `<div class="panel rep-wide"><div class="panel-head"><h2>OPEN TASKS</h2><span class="chip">${r.totals.openTasks}</span></div>
       <div class="mini-list">${r.tasks.map(t => `<a href="${obsUri(t.source)}"><span>☐ ${esc(t.text)}</span><span class="d">${esc(t.source)}</span></a>`).join("")}</div></div>` : ""}
   </div>`;
 }
 
 /* ---------- OPS: vault health (#9) + schedule (#8) ---------- */
-function ageLabel(h) { return h == null ? "—" : h < 1 ? "<1 jam" : h < 48 ? `${h} jam` : `${Math.round(h / 24)} hari`; }
+function ageLabel(h) { return h == null ? "—" : h < 1 ? "<1 hour" : h < 48 ? `${h} hours` : `${Math.round(h / 24)} days`; }
 async function loadOps() {
   const vh = document.getElementById("vaultHealth"), sl = document.getElementById("scheduleList");
   if (!vh || !sl) return;
@@ -427,12 +455,12 @@ async function loadOps() {
     const gitCls = !h.gitOk ? "error" : h.gitAgeH > 48 ? "exited" : "running";
     const bkCls = h.backupAgeH == null ? "idle" : h.backupAgeH > 48 ? "error" : "running";
     vh.innerHTML = `
-      <div class="vh-row"><span class="dot ${gitCls}"></span><span class="vh-k">Commit git terakhir</span>
-        <span class="vh-v">${h.gitOk ? ageLabel(h.gitAgeH) + " lalu" : "belum git init"}</span></div>
-      <div class="vh-row"><span class="dot ${bkCls}"></span><span class="vh-k">Backup terakhir</span>
-        <span class="vh-v">${h.backup == null ? "set BACKUP_PATH" : (h.backupAgeH == null ? "tak ketemu" : ageLabel(h.backupAgeH) + " lalu")}</span></div>
+      <div class="vh-row"><span class="dot ${gitCls}"></span><span class="vh-k">Last git commit</span>
+        <span class="vh-v">${h.gitOk ? ageLabel(h.gitAgeH) + " ago" : "no git init yet"}</span></div>
+      <div class="vh-row"><span class="dot ${bkCls}"></span><span class="vh-k">Last backup</span>
+        <span class="vh-v">${h.backup == null ? "set BACKUP_PATH" : (h.backupAgeH == null ? "not found" : ageLabel(h.backupAgeH) + " ago")}</span></div>
       <div class="vh-hint">${esc(h.vault)}</div>`;
-  } else vh.innerHTML = `<div class="empty">gagal muat vault health</div>`;
+  } else vh.innerHTML = `<div class="empty">failed to load vault health</div>`;
   if (Array.isArray(s) && s.length) {
     sl.innerHTML = s.map(t => {
       const cls = t.error ? "error" : t.ok ? "running" : "exited";
@@ -440,7 +468,7 @@ async function loadOps() {
         <span class="sched-a">${t.icon || ""} ${esc(t.agent)}</span>
         <span class="sched-d">${t.error ? esc(t.error) : `last: ${esc(t.lastRun || "—")} · result ${esc(t.lastResult ?? "—")} · next ${esc(t.nextRun || "—")}`}</span></div>`;
     }).join("");
-  } else sl.innerHTML = `<div class="empty">Tak ada agent dengan <code>schtask</code> di config.</div>`;
+  } else sl.innerHTML = `<div class="empty">No agents with a <code>schtask</code> in the config.</div>`;
 }
 
 /* ---------- events ---------- */
@@ -472,7 +500,7 @@ document.body.addEventListener("click", async e => {
     return;
   }
 
-  // Bonus: tandai task selesai dari dashboard → tulis [x] ke vault
+  // Bonus: mark a task done from the dashboard → writes [x] to the vault
   const done = e.target.closest("[data-done]");
   if (done) {
     e.stopPropagation();
@@ -487,9 +515,9 @@ document.body.addEventListener("click", async e => {
   if (btn && ["start", "stop", "restart", "status", "run"].includes(btn.dataset.act)) {
     e.stopPropagation();
     const { act, id } = btn.dataset;
-    // R#10: konfirmasi 1x sebelum aksi merusak pada agent native-service 24/7
+    // R#10: one confirm before destructive actions on 24/7 native-service agents
     if (["stop", "restart", "run"].includes(act) && AGENTS[id] && AGENTS[id].owner === "native-service"
-        && !confirm(`${AGENTS[id].name} = service 24/7. Yakin mau '${act}'? Ini bisa ganggu instance yang lagi jalan.`)) return;
+        && !confirm(`${AGENTS[id].name} is a 24/7 service. Really '${act}'? This can disrupt the running instance.`)) return;
     const label = btn.textContent;
     btn.disabled = true; btn.textContent = "…";
     const r = await api(`/api/proc/${id}/${act}`, { method: "POST" });
@@ -513,7 +541,7 @@ document.body.addEventListener("click", async e => {
 function closeMenus() { document.querySelectorAll(".gw-menu.open").forEach(m => m.classList.remove("open")); }
 document.addEventListener("click", e => { if (!e.target.closest(".gw-split")) closeMenus(); });
 
-/* R#5: kirim task ke agent → tulis ke vault Tasks/, muncul di Needs Review */
+/* R#5: send a task to an agent → written to the vault's Tasks/, appears in Needs Review */
 document.getElementById("taskForm").addEventListener("submit", async e => {
   e.preventDefault();
   const title = document.getElementById("taskTitle").value.trim();
@@ -525,18 +553,18 @@ document.getElementById("taskForm").addEventListener("submit", async e => {
   btn.textContent = lbl; btn.disabled = false;
   if (r.error) return alert(r.error);
   document.getElementById("taskTitle").value = "";
-  refresh();   // task baru langsung nongol di Needs Review
+  refresh();   // the new task appears in Needs Review immediately
 });
 
 document.getElementById("runAll").addEventListener("click", async () => {
   const r = await api("/api/proc/start-all", { method: "POST" });
   const errs = Object.entries(r).filter(([, v]) => v.error).map(([k, v]) => `${k}: ${v.error}`);
-  if (errs.length) alert("Sebagian gagal:\n" + errs.join("\n"));
+  if (errs.length) alert("Some failed:\n" + errs.join("\n"));
   setTimeout(refresh, 800);
 });
 
 document.getElementById("genReport").addEventListener("click", async () => {
-  document.getElementById("reportArea").innerHTML = `<div class="empty">Membangun laporan…</div>`;
+  document.getElementById("reportArea").innerHTML = `<div class="empty">Building report…</div>`;
   lastReport = await api("/api/report");
   renderReport(lastReport);
   document.getElementById("saveReport").disabled = false;
@@ -544,7 +572,7 @@ document.getElementById("genReport").addEventListener("click", async () => {
 document.getElementById("saveReport").addEventListener("click", async () => {
   const r = await api("/api/report/save", { method: "POST" });
   if (r.error) return alert(r.error);
-  alert(`Laporan tersimpan di vault:\n${r.rel}`);
+  alert(`Report saved to the vault:\n${r.rel}`);
 });
 
 function switchView(view) {
@@ -559,31 +587,23 @@ document.getElementById("nav").addEventListener("click", e => {
 
 /* ---------- loop ---------- */
 async function refresh() {
-  console.log(`[DEBUG-refresh] CALLED`);
-  try {
-    // VISIBLE TEST: If refresh() is called, set title background color
-    document.title = "🔄 " + document.title;
-  } catch (e) {}
-  
   const state = await api("/api/state");
   const cb = document.getElementById("configBanner");
-  console.log(`[DEBUG-refresh] got response, agents: ${state?.agents?.length || 0}`);
   if (!state || state.error) {
-    if (cb) { cb.hidden = false; cb.innerHTML = `⚠ <b>Gagal memuat state</b> — ${(state && state.error) || "server tidak merespons"}. Coba refresh halaman; kalau pakai token pastikan benar.`; }
-    document.getElementById("stamp").textContent = `gagal memuat (${(state && state.error) || "server mati?"})`;
-    console.log(`[DEBUG-refresh] API ERROR`);
+    if (cb) { cb.hidden = false; cb.innerHTML = `⚠ <b>Failed to load state</b> — ${(state && state.error) || "server not responding"}. Try reloading the page; if you use a token, make sure it is correct.`; }
+    document.getElementById("stamp").textContent = `failed to load (${(state && state.error) || "server down?"})`;
     return;
   }
-  console.log(`[DEBUG-refresh] ✓ calling render()`);
+  if (cb && !state.configError) cb.hidden = true;
   render(state);
 }
-const visible = () => document.visibilityState === "visible";   // F3: jangan polling saat tab hidden
+const visible = () => document.visibilityState === "visible";   // F3: don't poll while the tab is hidden
 const cmdActive = () => document.getElementById("view-command").classList.contains("active");
-setInterval(() => { document.getElementById("clock").textContent = new Date().toLocaleString("id-ID"); }, 1000);
+setInterval(() => { document.getElementById("clock").textContent = new Date().toLocaleString("en-GB"); }, 1000);
 refresh();
-loadOps();   // #8/#9 sekali di awal
+loadOps();   // #8/#9 once at startup
 setInterval(() => { if (visible()) refresh(); }, 6000);
-setInterval(() => { if (visible() && cmdActive()) loadOps(); }, 60000);   // OPS lebih jarang (schtasks/git mahal)
+setInterval(() => { if (visible() && cmdActive()) loadOps(); }, 60000);   // OPS less often (schtasks/git are expensive)
 setInterval(() => { if (visible() && openAgent && document.getElementById("view-agents").classList.contains("active")) renderDetail(); }, 5000);
 setInterval(() => { if (visible() && graphLoaded && document.getElementById("view-graph").classList.contains("active")) loadGraph(true); }, 90000);
-document.addEventListener("visibilitychange", () => { if (visible()) refresh(); });   // refresh langsung saat tab balik aktif
+document.addEventListener("visibilitychange", () => { if (visible()) refresh(); });   // refresh immediately when the tab becomes active again

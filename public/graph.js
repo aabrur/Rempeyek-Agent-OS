@@ -1,4 +1,4 @@
-/* NeuralGraph — force-directed graph ala Obsidian, canvas 2D murni.
+/* NeuralGraph — Obsidian-style force-directed graph, pure 2D canvas.
    API: const g = NeuralGraph(canvas, {onOpen}); g.setData({nodes,edges}); g.setQuery(q); g.destroy() */
 function NeuralGraph(canvas, opts = {}) {
   const ctx = canvas.getContext("2d");
@@ -7,7 +7,7 @@ function NeuralGraph(canvas, opts = {}) {
 
   let nodes = [], edges = [], folderColor = new Map();
   let cam = { x: 0, y: 0, z: 1 };          // pan/zoom
-  let alpha = 0;                            // "panas" simulasi; 0 = diam
+  let alpha = 0;                            // simulation heat; 0 = at rest
   let hover = null, dragNode = null, panning = false, query = "";
   let raf = null, last = { x: 0, y: 0 }, moved = 0, dpr = 1;
 
@@ -43,10 +43,10 @@ function NeuralGraph(canvas, opts = {}) {
     return [...folderColor.entries()].map(([name, color]) => ({ name, color }));
   }
 
-  /* ------- simulasi ------- */
+  /* ------- simulation ------- */
   function tick() {
     const N = nodes.length;
-    // tolak-menolak O(n²) — vault ratusan node masih ringan
+    // O(n²) repulsion — still cheap for a vault with hundreds of nodes
     for (let i = 0; i < N; i++) {
       const a = nodes[i];
       for (let j = i + 1; j < N; j++) {
@@ -61,7 +61,7 @@ function NeuralGraph(canvas, opts = {}) {
         a.vx += dx; a.vy += dy; b.vx -= dx; b.vy -= dy;
       }
     }
-    // pegas edge
+    // edge springs
     for (const e of edges) {
       const dx = e.b.x - e.a.x, dy = e.b.y - e.a.y;
       const d = Math.sqrt(dx * dx + dy * dy) || 1;
@@ -69,7 +69,7 @@ function NeuralGraph(canvas, opts = {}) {
       e.a.vx += dx / d * f * 2; e.a.vy += dy / d * f * 2;
       e.b.vx -= dx / d * f * 2; e.b.vy -= dy / d * f * 2;
     }
-    // gravitasi pusat + integrasi
+    // center gravity + integration
     for (const n of nodes) {
       n.vx -= n.x * 0.0015; n.vy -= n.y * 0.0015;
       if (n !== dragNode) {
@@ -85,7 +85,7 @@ function NeuralGraph(canvas, opts = {}) {
     dpr = window.devicePixelRatio || 1;
     const w = canvas.clientWidth, h = canvas.clientHeight;
     if (!w || !h) return;
-    // cek width DAN height: kalau height berubah tanpa width, buffer lama tak ke-clear → sisa piksel "berantakan" di bawah
+    // check width AND height: if only height changes the old buffer is not cleared → stray pixels at the bottom
     if (canvas.width !== w * dpr || canvas.height !== h * dpr) { canvas.width = w * dpr; canvas.height = h * dpr; }
   }
   function toScreen(n) {
@@ -138,13 +138,13 @@ function NeuralGraph(canvas, opts = {}) {
   }
   function loop() {
     if (alpha > 0.005 && !reduce) tick();
-    else if (alpha > 0.005) { for (let i = 0; i < 24; i++) tick(); } // reduced-motion: selesaikan cepat lalu diam
+    else if (alpha > 0.005) { for (let i = 0; i < 24; i++) tick(); } // reduced-motion: settle fast, then stay still
     draw();
     raf = (alpha > 0.005 || hover || dragNode) ? requestAnimationFrame(loop) : null;
   }
   function kick() { if (!raf) raf = requestAnimationFrame(loop); }
 
-  /* ------- interaksi ------- */
+  /* ------- interaction ------- */
   function pick(mx, my) {
     for (let i = nodes.length - 1; i >= 0; i--) {
       const s = toScreen(nodes[i]);
@@ -190,7 +190,7 @@ function NeuralGraph(canvas, opts = {}) {
     const p = pos(e);
     const f = e.deltaY < 0 ? 1.12 : 0.89;
     const nz = Math.min(4, Math.max(0.25, cam.z * f));
-    // zoom ke arah kursor
+    // zoom toward the cursor
     cam.x += (p.x - canvas.clientWidth / 2) * (1 / nz - 1 / cam.z);
     cam.y += (p.y - canvas.clientHeight / 2) * (1 / nz - 1 / cam.z);
     cam.z = nz; kick();

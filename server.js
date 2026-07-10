@@ -1,15 +1,16 @@
-/* Agentic OS â€” zero-dependency Node server.
-   Dashboard live dari Obsidian Vault + launcher gateway agent.
-   Jalankan: npm run dev  â†’  http://localhost:4321
-   Remote:   set DASH_TOKEN=rahasia  â†’  akses wajib pakai token. */
+/* Agentic OS — zero-dependency Node server.
+   Live dashboard from the Obsidian Vault + agent gateway launcher.
+   Run: npm run dev  →  http://localhost:4321
+   Remote:   set DASH_TOKEN=secret  →  access requires the token. */
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
 const net = require("net");
+const os = require("os");
 const { spawn, execFile } = require("child_process");
 const crypto = require("crypto");
 
-/* muat .env (KEY=VALUE per baris; env var asli menang atas isi file) */
+/* load .env (KEY=VALUE per line; real env vars win over file contents) */
 try {
   for (const line of fs.readFileSync(path.join(__dirname, ".env"), "utf8").split(/\r?\n/)) {
     const m = line.match(/^\s*([A-Z_][A-Z0-9_]*)\s*=\s*(.*)\s*$/);
@@ -19,7 +20,7 @@ try {
 } catch {}
 
 const PORT = process.env.PORT || 4321;
-const VAULT = process.env.VAULT_PATH || "C:\\Users\\abrur\\Obsidian Vault";
+const VAULT = process.env.VAULT_PATH || path.join(__dirname, "Obsidian Vault");
 const CONFIG_PATH = process.env.AGENTS_CONFIG || path.join(__dirname, "agents.config.json");
 const TOKEN = process.env.DASH_TOKEN || "";
 const PUBLIC = path.join(__dirname, "public");
@@ -28,37 +29,37 @@ const DAY = 86400000;
 const LOG_MAX = 800;
 const AVATAR_DIR = path.join(PUBLIC, "avatars");
 const TELEMETRY_DIR = path.join(__dirname, "telemetry");
-const LOG_DIR = path.join(TELEMETRY_DIR, "logs");   // R#4: log run per-agent, selamat dari restart
-const LOG_FILE_MAX = 1_000_000;                     // 1 MB/agent → rotasi naif (simpan separuh ekor)
-const CLAUDE_PROJECTS = "C:\\Users\\abrur\\.claude\\projects";
+const LOG_DIR = path.join(TELEMETRY_DIR, "logs");   // R#4: per-agent run log, survives restarts
+const LOG_FILE_MAX = 1_000_000;                     // 1 MB/agent → naive rotation (keep the tail half)
+const CLAUDE_PROJECTS = process.env.CLAUDE_PROJECTS || path.join(os.homedir(), ".claude", "projects");
 for (const d of [AVATAR_DIR, TELEMETRY_DIR, LOG_DIR]) { try { fs.mkdirSync(d, { recursive: true }); } catch {} }
 
-/* loadConfig: memoize by mtime (B6) + tahan config rusak mid-edit â†’ return last-good (R10).
-   R#11: simpan error terakhir supaya dashboard bisa tampilkan banner (bukan diam-diam last-good). */
+/* loadConfig: memoize by mtime (B6) + tolerate config broken mid-edit → return last-good (R10).
+   R#11: keep the last error so the dashboard can show a banner (not silently serve last-good). */
 let _cfgCache = { mtime: 0, data: null };
-let configError = null;   // { msg, at } saat parse gagal tapi masih ada last-good
+let configError = null;   // { msg, at } when parsing fails but a last-good copy exists
 function loadConfig() {
   try {
     const st = fs.statSync(CONFIG_PATH);
     if (_cfgCache.data && st.mtimeMs === _cfgCache.mtime) return _cfgCache.data;
     const data = JSON.parse(fs.readFileSync(CONFIG_PATH, "utf8"));
     _cfgCache = { mtime: st.mtimeMs, data };
-    configError = null;                       // sembuh â†’ bersihkan banner
+    configError = null;                       // recovered → clear the banner
     return data;
   } catch (e) {
-    if (_cfgCache.data) { console.error("[config] parse gagal, pakai last-good:", e.message); configError = { msg: e.message, at: new Date().toISOString() }; return _cfgCache.data; }
+    if (_cfgCache.data) { console.error("[config] parse failed, using last-good:", e.message); configError = { msg: e.message, at: new Date().toISOString() }; return _cfgCache.data; }
     throw e;
   }
 }
 
 /* ---------------- vault scan (view: Command Center) ---------------- */
 function walk(dir, out = [], base = dir, depth = 0) {
-  if (depth > 100) return out;               // R14: cegah rekursi tak henti (nest dalam)
+  if (depth > 100) return out;               // R14: prevent runaway recursion (deep nesting)
   let entries;
   try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return out; }
   for (const e of entries) {
     if (IGNORE.has(e.name) || e.name.startsWith(".")) continue;
-    if (e.isSymbolicLink()) continue;        // R14: skip symlink/junction â†’ cegah loop
+    if (e.isSymbolicLink()) continue;        // R14: skip symlinks/junctions → prevent loops
     const full = path.join(dir, e.name);
     if (e.isDirectory()) walk(full, out, base, depth + 1);
     else if (e.name.endsWith(".md")) {
@@ -69,7 +70,7 @@ function walk(dir, out = [], base = dir, depth = 0) {
   return out;
 }
 
-/* snapshot vault ber-TTL pendek: dedupe re-walk saat banyak endpoint/tab minta dalam 1 tick (B1/B3) */
+/* short-TTL vault snapshot: dedupes re-walks when many endpoints/tabs ask within one tick (B1/B3) */
 let _walkCache = { t: 0, data: null };
 function walkVault() {
   if (_walkCache.data && Date.now() - _walkCache.t < 3000) return _walkCache.data;
@@ -110,7 +111,7 @@ function buildState() {
   const files = walkVault();
   const now = Date.now();
   const tasks = openTasks();
-  const um = uptimeMap();                       // R#2: uptime 24 jam per agent (1x baca file)
+  const um = uptimeMap();                       // R#2: 24-hour uptime per agent (single file read)
   const inbox = files.filter(f => f.rel.startsWith("Inbox/"));
   const projects = files.filter(f => f.rel.startsWith("Projects/") && f.rel.split("/").length === 2)
     .sort((a, b) => b.mtime - a.mtime)
@@ -119,13 +120,13 @@ function buildState() {
     vault: VAULT,
     agency: cfg.agency || "AGENTIC//OS",
     generatedAt: new Date().toISOString(),
-    configError,                              // R#11: null kalau sehat, {msg,at} kalau config rusak
+    configError,                              // R#11: null when healthy, {msg,at} when config is broken
 
     stats: {
-      notes: { value: files.length, label: "Total catatan vault" },
-      activeWeek: { value: files.filter(f => now - f.mtime < 7 * DAY).length, label: "Catatan diubah 7 hari terakhir" },
-      openTasks: { value: tasks.length, label: "Checkbox terbuka di Tasks/" },
-      projects: { value: projects.length, label: "Project note aktif" },
+      notes: { value: files.length, label: "Total vault notes" },
+      activeWeek: { value: files.filter(f => now - f.mtime < 7 * DAY).length, label: "Notes changed in the last 7 days" },
+      openTasks: { value: tasks.length, label: "Open checkboxes in Tasks/" },
+      projects: { value: projects.length, label: "Active project notes" },
     },
     agents: cfg.agents.map(a => ({ ...a, gateway: undefined, actions: gwActions(a), canSummon: !!(a.gateway && a.gateway.home && a.gateway.trigger), ...agentVaultStatus(files, a), proc: procInfo(a.id), avatar: avatarUrl(a.id), uptime: um[a.id] || null })),
     review: [
@@ -139,11 +140,11 @@ function buildState() {
 }
 
 /* ---------------- gateway controller ----------------
-   Dashboard memanggil command gateway ASLI tiap agent (start/stop/restart/status/run).
-   - start/stop/restart/status : command pendek (jalan â†’ tampung output â†’ selesai),
-     dikelola OS service manager (schtasks/systemd) â†’ tetap hidup walau dashboard ditutup.
-   - run : foreground, di-own dashboard (log live), berhenti saat dashboard/tombol stop.
-   procs = proses `run` yang di-own dashboard. gwCache = hasil status terakhir per agent. */
+   The dashboard calls each agent's REAL gateway commands (start/stop/restart/status/run).
+   - start/stop/restart/status : short commands (run → capture output → done),
+     managed by the OS service manager (schtasks/systemd) → stays alive even if the dashboard closes.
+   - run : foreground, owned by the dashboard (live log), stops with the dashboard/stop button.
+   procs = `run` processes owned by the dashboard. gwCache = last status result per agent. */
 const procs = new Map();   // id -> {child,pid,log:[],seq,status,startedAt,exitCode}
 const gwCache = new Map();  // id -> {running,text,at,exitCode}
 
@@ -152,6 +153,7 @@ function gwActions(agent) { return (agent && agent.gateway && agent.gateway.acti
 
 function detectRunning(text) {
   const t = (text || "").toLowerCase();
+  // Note: matches Indonesian output emitted by some agent CLIs — do not translate
   if (/not running|tidak (sedang )?jalan|belum jalan|\bstopped\b|\binactive\b|no gateway|not installed|no running/.test(t)) return false;
   if (/\brunning\b|\bactive\b|\bpid[:\s#]*\d|listening on|is up\b/.test(t)) return true;
   return false;
@@ -160,7 +162,7 @@ function detectRunning(text) {
 function procInfo(id) {
   const p = procs.get(id);
   const c = gwCache.get(id);
-  // proses run yang di-own dashboard menang kalau masih hidup
+  // a dashboard-owned run process wins while it's still alive
   if (p && p.status === "running")
     return { status: "running", mode: "owned", pid: p.pid, startedAt: p.startedAt, exitCode: null, logSize: p.seq, reason: null, statusText: c && c.text || null, checkedAt: c && new Date(c.at).toISOString() || null };
   let reason = null;
@@ -195,10 +197,10 @@ function pushLog(p, stream, chunk) {
       disk.push({ t: entry.t, s: entry.s, line: entry.line });
       if (p.log.length > LOG_MAX) p.log.splice(0, p.log.length - LOG_MAX);
     }
-    if (disk.length) appendDiskLog(p.id, disk);       // R#4: persist ke disk
-  } catch (e) { /* R19: jangan biarkan throw di event 'data' escape handler */ }
+    if (disk.length) appendDiskLog(p.id, disk);       // R#4: persist to disk
+  } catch (e) { /* R19: don't let a throw in the 'data' event escape the handler */ }
 }
-/* R#4: append log run ke telemetry/logs/<id>.log (JSONL) + rotasi naif saat > LOG_FILE_MAX */
+/* R#4: append run log to telemetry/logs/<id>.log (JSONL) + naive rotation when > LOG_FILE_MAX */
 function appendDiskLog(id, entries) {
   if (!id || !entries || !entries.length) return;
   try {
@@ -210,7 +212,7 @@ function appendDiskLog(id, entries) {
     }
   } catch {}
 }
-/* R#4: baca ekor log disk (dipakai detail agent setelah restart, saat proc in-memory hilang) */
+/* R#4: read the disk log tail (used by agent detail after a restart, when the in-memory proc is gone) */
 function readDiskLog(id, n) {
   const out = [];
   for (const line of tailRead(path.join(LOG_DIR, `${id}.log`), 80000).split("\n")) {
@@ -220,15 +222,15 @@ function readDiskLog(id, n) {
   return out.slice(-n);
 }
 
-/* R2: tree-kill konsisten (Win: taskkill /T, POSIX: kill process group) â€” dipakai owned-run & timeout gwCtl */
+/* R2: consistent tree-kill (Win: taskkill /T, POSIX: kill process group) — used by owned-run & gwCtl timeout */
 function killTree(pid, child) {
   if (!pid) { try { child && child.kill(); } catch {} return; }
   if (process.platform === "win32") { try { execFile("taskkill", ["/pid", String(pid), "/T", "/F"], () => {}); } catch {} }
   else { try { process.kill(-pid, "SIGKILL"); } catch { try { child && child.kill(); } catch {} } }
 }
 
-/* ROADMAP #1: alert saat agent turun (running â†’ down) atau run exit non-zero.
-   Durable = 1 note ke vault Inbox/ (auto muncul di Needs Review). Toast Windows = best-effort. */
+/* ROADMAP #1: alert when an agent goes down (running → down) or a run exits non-zero.
+   Durable = 1 note in the vault Inbox/ (auto-appears in Needs Review). Windows toast = best-effort. */
 function notifyWindows(title, msg) {
   if (process.platform !== "win32") return;
   const q = s => String(s).replace(/'/g, "''").slice(0, 200);
@@ -248,13 +250,13 @@ function alertDown(id, reason) {
     const fname = `ALERT ${name} ${stamp.slice(0, 10)} ${stamp.slice(11, 19).replace(/:/g, ".")}.md`;
     fs.writeFileSync(path.join(dir, fname),
       `---\ntype: alert\nagent: ${id}\ncreated: ${stamp}\ntags: [alert, agentic-os]\n---\n\n` +
-      `# ⚠ ${name} — gateway down\n\n- Waktu: ${stamp.slice(0, 19).replace("T", " ")}\n- Sebab: ${reason}\n- Sumber: agentic-os dashboard (deteksi otomatis)\n`, "utf8");
-  } catch (e) { console.error("[alert] gagal tulis inbox:", e.message); }
+      `# ⚠ ${name} — gateway down\n\n- Time: ${stamp.slice(0, 19).replace("T", " ")}\n- Cause: ${reason}\n- Source: agentic-os dashboard (automatic detection)\n`, "utf8");
+  } catch (e) { console.error("[alert] failed to write inbox note:", e.message); }
   notifyWindows(`⚠ ${name} down`, reason);
 }
 
-/* ROADMAP #2: catat tiap poll status ke telemetry/uptime.jsonl (ts + up 0/1) â†’ strip uptime 24 jam.
-   ponytail: append-only, dibaca via tailRead (cap byte). File tumbuh ~poll/hariâ€”rotasi nanti kalau perlu. */
+/* ROADMAP #2: log each status poll to telemetry/uptime.jsonl (ts + up 0/1) → 24-hour uptime strip.
+   ponytail: append-only, read via tailRead (byte cap). File grows ~polls/day — rotate later if needed. */
 function logUptime(id, running) {
   try { fs.appendFileSync(path.join(TELEMETRY_DIR, "uptime.jsonl"), JSON.stringify({ ts: Date.now(), id, up: running ? 1 : 0 }) + "\n"); } catch {}
 }
@@ -273,84 +275,84 @@ function uptimeMap() {
   return out;
 }
 
-/* command pendek: start/stop/restart/status â†’ jalankan `<bin> <action>`, tampung output */
+/* short commands: start/stop/restart/status → run `<bin> <action>`, capture the output */
 function gwCtl(id, action, cb) {
   const agent = agentById(id);
-  if (!agent) return cb({ error: `agent '${id}' tidak dikenal` });
+  if (!agent) return cb({ error: `unknown agent '${id}'` });
   const g = agent.gateway;
-  if (!agent.enabled || !g || !g.bin) return cb({ error: agent.note || `gateway '${id}' belum siap (enabled:false)` });
-  if (!gwActions(agent).includes(action)) return cb({ error: `aksi '${action}' tidak didukung ${agent.name}` });
+  if (!agent.enabled || !g || !g.bin) return cb({ error: agent.note || `gateway '${id}' not ready (enabled:false)` });
+  if (!gwActions(agent).includes(action)) return cb({ error: `action '${action}' not supported by ${agent.name}` });
   const cwd = g.cwd || loadConfig().workdir;
-  if (!fs.existsSync(cwd)) return cb({ error: `cwd tidak ada: ${cwd}` });
+  if (!fs.existsSync(cwd)) return cb({ error: `cwd does not exist: ${cwd}` });
 
   const cmd = `${g.bin} ${action}`;
   let out = "", done = false;
   const finish = (obj) => { if (done) return; done = true; clearTimeout(timer); cb(obj); };
   let child;
   try { child = spawn(cmd, [], { cwd, shell: true, windowsHide: true, env: { ...process.env, AGENT_WORKDIR: loadConfig().workdir } }); }
-  catch (e) { return cb({ error: `gagal spawn: ${e.message}` }); }
+  catch (e) { return cb({ error: `spawn failed: ${e.message}` }); }
   const timer = setTimeout(() => { killTree(child.pid, child); finish({ error: `timeout 30s: ${cmd}` }); }, 30000);
   child.stdout.on("data", d => { out += d; });
   child.stderr.on("data", d => { out += d; });
-  child.on("error", err => finish({ error: `gagal jalankan: ${err.message}` }));
+  child.on("error", err => finish({ error: `failed to run: ${err.message}` }));
   child.on("exit", code => {
     const text = out.trim().slice(0, 4000);
     const running = detectRunning(text);
     if (action === "status" || action === "start" || action === "restart") {
-      const prev = gwCache.get(id);                    // R#1: deteksi transisi running â†’ down
+      const prev = gwCache.get(id);                    // R#1: detect running → down transition
       gwCache.set(id, { running, text, at: Date.now(), exitCode: code });
       logUptime(id, running);
-      if (prev && prev.running && !running) { alertDown(id, `gateway turun (terdeteksi saat ${action})`); if (action === "status") maybeWatchdog(id); }
+      if (prev && prev.running && !running) { alertDown(id, `gateway went down (detected during ${action})`); if (action === "status") maybeWatchdog(id); }
     } else if (action === "stop") { gwCache.set(id, { running: false, text, at: Date.now(), exitCode: code }); logUptime(id, false); }
     finish({ ok: code === 0, code, action, running, output: text });
   });
 }
 
-/* run: foreground, di-own dashboard, log live */
+/* run: foreground, owned by the dashboard, live log */
 function gwRun(id) {
   const agent = agentById(id);
-  if (!agent) return { error: `agent '${id}' tidak dikenal` };
+  if (!agent) return { error: `unknown agent '${id}'` };
   const g = agent.gateway;
-  if (!agent.enabled || !g || !g.bin) return { error: agent.note || `gateway '${id}' belum siap (enabled:false)` };
-  if (!gwActions(agent).includes("run")) return { error: `${agent.name} tidak mendukung 'run'` };
+  if (!agent.enabled || !g || !g.bin) return { error: agent.note || `gateway '${id}' not ready (enabled:false)` };
+  if (!gwActions(agent).includes("run")) return { error: `${agent.name} does not support 'run'` };
   const existing = procs.get(id);
-  if (existing && existing.status === "running") return { error: `${id} sudah jalan owned (pid ${existing.pid})` };
+  if (existing && existing.status === "running") return { error: `${id} is already running owned (pid ${existing.pid})` };
   const cwd = g.cwd || loadConfig().workdir;
-  if (!fs.existsSync(cwd)) return { error: `cwd tidak ada: ${cwd}` };
+  if (!fs.existsSync(cwd)) return { error: `cwd does not exist: ${cwd}` };
 
   const cmd = g.runCmd || `${g.bin} run`;
   const p = { id, log: [], seq: 0, status: "running", startedAt: new Date().toISOString(), exitCode: null };
   pushLog(p, "sys", `[agentic-os] run (owned): ${cmd}  (cwd: ${cwd})`);
   let child;
   try { child = spawn(cmd, [], { cwd, shell: true, windowsHide: true, env: { ...process.env, AGENT_WORKDIR: loadConfig().workdir } }); }
-  catch (e) { return { error: `gagal spawn: ${e.message}` }; }
+  catch (e) { return { error: `spawn failed: ${e.message}` }; }
   p.child = child; p.pid = child.pid;
   child.stdout.on("data", d => pushLog(p, "out", d));
   child.stderr.on("data", d => pushLog(p, "err", d));
   child.on("exit", code => { p.status = "exited"; p.exitCode = code; pushLog(p, "sys", `[agentic-os] exit code ${code}`);
-    if (code !== 0) { const last = p.log.filter(l => l.s === "out" || l.s === "err").slice(-1)[0]; alertDown(id, `run (owned) exit code ${code}${last ? " â€” " + last.line : ""}`); } });
+    if (code !== 0) { const last = p.log.filter(l => l.s === "out" || l.s === "err").slice(-1)[0]; alertDown(id, `run (owned) exit code ${code}${last ? " — " + last.line : ""}`); } });
   child.on("error", err => { p.status = "error"; p.exitCode = -1; pushLog(p, "sys", `[agentic-os] spawn error: ${err.message}`); });
   procs.set(id, p);
   return { ok: true, pid: child.pid, mode: "run (owned)" };
 }
 
-/* terminal: buka Windows Terminal (elevated/admin) yang cd ke folder default & auto-run trigger.
-   TIDAK di-own dashboard (detached + unref) â€” makanya Stop/Stop-all tak menutup terminal CLI/TUI ini. */
+/* terminal: open a Windows Terminal (elevated/admin) that cd's to the default folder & auto-runs the trigger.
+   NOT owned by the dashboard (detached + unref) — that's why Stop/Stop-all won't close this CLI/TUI terminal. */
 function gwTerminal(id, mode) {
   const agent = agentById(id);
-  if (!agent) return { error: `agent '${id}' tidak dikenal` };
+  if (!agent) return { error: `unknown agent '${id}'` };
   const g = agent.gateway;
-  if (!agent.enabled || !g) return { error: agent.note || `gateway '${id}' belum siap (enabled:false)` };
+  if (!agent.enabled || !g) return { error: agent.note || `gateway '${id}' not ready (enabled:false)` };
   let dir, cmd;
   if (mode === "summon") {
-    if (!g.trigger) return { error: `${agent.name} belum punya trigger untuk dipanggil` };
+    if (!g.trigger) return { error: `${agent.name} has no trigger to summon it with` };
     dir = g.home || loadConfig().workdir; cmd = g.trigger;
-  } else if (mode === "start") { if (!g.bin) return { error: `${agent.name} tak punya gateway` }; dir = g.cwd || loadConfig().workdir; cmd = `${g.bin} start`; }
-  else if (mode === "run") { if (!g.bin) return { error: `${agent.name} tak punya gateway` }; dir = g.cwd || loadConfig().workdir; cmd = g.runCmd || `${g.bin} run`; }
-  else return { error: `mode terminal '${mode}' tidak dikenal (summon|start|run)` };
-  if (!fs.existsSync(dir)) return { error: `folder tidak ada: ${dir}` };
+  } else if (mode === "start") { if (!g.bin) return { error: `${agent.name} has no gateway` }; dir = g.cwd || loadConfig().workdir; cmd = `${g.bin} start`; }
+  else if (mode === "run") { if (!g.bin) return { error: `${agent.name} has no gateway` }; dir = g.cwd || loadConfig().workdir; cmd = g.runCmd || `${g.bin} run`; }
+  else return { error: `unknown terminal mode '${mode}' (summon|start|run)` };
+  if (!fs.existsSync(dir)) return { error: `folder does not exist: ${dir}` };
 
-  // ponytail: dir & cmd dari config (trusted). Escape single-quote untuk untai PowerShell.
+  // ponytail: dir & cmd come from config (trusted). Escape single quotes for the PowerShell string.
   const q = s => String(s).replace(/'/g, "''");
   const ps =
     `$d='${q(dir)}'; $c='${q(cmd)}'; ` +
@@ -361,29 +363,29 @@ function gwTerminal(id, mode) {
     const child = spawn("powershell", ["-NoProfile", "-Command", ps], { detached: true, windowsHide: true, stdio: "ignore" });
     child.unref();
     return { ok: true, mode, dir, cmd, terminal: true };
-  } catch (e) { return { error: `gagal buka terminal: ${e.message}` }; }
+  } catch (e) { return { error: `failed to open terminal: ${e.message}` }; }
 }
 
-/* matikan proses run yang di-own dashboard (kalau ada) */
+/* kill the dashboard-owned run process (if any) */
 function killOwned(id) {
   const p = procs.get(id);
   if (!p || p.status !== "running" || !p.pid) return false;
-  pushLog(p, "sys", "[agentic-os] stop owned â€” tree-kill");
+  pushLog(p, "sys", "[agentic-os] stop owned — tree-kill");
   killTree(p.pid, p.child);
   return true;
 }
 
-/* stop = matikan owned run (kalau ada) + panggil native `gateway stop` (kalau didukung) */
+/* stop = kill the owned run (if any) + call the native `gateway stop` (if supported) */
 function gwStop(id, cb) {
   const agent = agentById(id);
   const killed = killOwned(id);
   if (agent && gwActions(agent).includes("stop"))
     return gwCtl(id, "stop", r => cb({ ...r, ownedKilled: killed }));
-  cb({ ok: true, ownedKilled: killed, note: killed ? "proses run (owned) dihentikan" : `${agent ? agent.name : id} tidak punya native stop & tidak ada proses owned` });
+  cb({ ok: true, ownedKilled: killed, note: killed ? "owned run process stopped" : `${agent ? agent.name : id} has no native stop & no owned process` });
 }
 
-/* R#7: health probe asli â€” cek TCP port beneran listening (lebih jujur dari cocok-cocokan teks status).
-   Config: agent.gateway.probe = { host?, port }. Connect sukses = hidup, else mati. */
+/* R#7: real health probe — check that the TCP port is actually listening (more honest than matching status text).
+   Config: agent.gateway.probe = { host?, port }. Successful connect = alive, else down. */
 function probePort(host, port, cb) {
   const sock = new net.Socket();
   let done = false;
@@ -398,35 +400,35 @@ function probeAndCache(id, probe) {
   probePort(probe.host, probe.port, up => {
     const prev = gwCache.get(id);
     const host = probe.host || "127.0.0.1";
-    gwCache.set(id, { running: up, text: `probe TCP ${host}:${probe.port} â†’ ${up ? "OPEN (listening)" : "CLOSED"}`, at: Date.now(), exitCode: up ? 0 : 1 });
+    gwCache.set(id, { running: up, text: `probe TCP ${host}:${probe.port} → ${up ? "OPEN (listening)" : "CLOSED"}`, at: Date.now(), exitCode: up ? 0 : 1 });
     logUptime(id, up);
-    if (prev && prev.running && !up) { alertDown(id, `probe port ${probe.port} tertutup (service turun)`); maybeWatchdog(id); }
+    if (prev && prev.running && !up) { alertDown(id, `probe port ${probe.port} closed (service down)`); maybeWatchdog(id); }
   });
 }
 
-/* R#6: watchdog auto-restart untuk agent 24/7 (opsional per agent: gateway.watchdog=true).
-   Hard anti-loop: maks 3 restart / jam. Tetap kirim alert (dari pemanggil). */
+/* R#6: watchdog auto-restart for 24/7 agents (optional per agent: gateway.watchdog=true).
+   Hard anti-loop: max 3 restarts / hour. Alerts are still sent (by the caller). */
 const restartLog = new Map();   // id -> [timestamps]
 function maybeWatchdog(id) {
   const a = agentById(id);
   if (!a || !a.gateway || !a.gateway.watchdog || !gwActions(a).includes("restart")) return;
   const now = Date.now();
   const hits = (restartLog.get(id) || []).filter(t => now - t < 3600000);
-  if (hits.length >= 3) { console.error(`[watchdog] ${id}: batas 3x/jam tercapai, stop auto-restart`); return; }
+  if (hits.length >= 3) { console.error(`[watchdog] ${id}: 3x/hour limit reached, stopping auto-restart`); return; }
   hits.push(now); restartLog.set(id, hits);
-  console.error(`[watchdog] ${id}: auto-restart (percobaan ${hits.length}/3 jam ini)`);
-  alertDown(id, `watchdog auto-restart (percobaan ${hits.length}/3 dalam 1 jam)`);
+  console.error(`[watchdog] ${id}: auto-restart (attempt ${hits.length}/3 this hour)`);
+  alertDown(id, `watchdog auto-restart (attempt ${hits.length}/3 within 1 hour)`);
   gwCtl(id, "restart", () => {});
 }
 
-/* refresh status semua agent yang mendukungnya (dipanggil berkala).
-   R4: in-flight guard â€” jangan spawn status baru kalau yang lama belum selesai (cegah overlap/pileup). */
+/* refresh the status of every agent that supports it (called periodically).
+   R4: in-flight guard — don't spawn a new status check while the old one is still running (prevents overlap/pileup). */
 const polling = new Set();
 function pollAllStatus() {
   let agents; try { agents = loadConfig().agents; } catch { return; }
   for (const a of agents) {
     if (!a.enabled || !a.gateway) continue;
-    if (a.gateway.probe && a.gateway.probe.port) { probeAndCache(a.id, a.gateway.probe); continue; }  // R#7: probe menang
+    if (a.gateway.probe && a.gateway.probe.port) { probeAndCache(a.id, a.gateway.probe); continue; }  // R#7: probe wins
     if (gwActions(a).includes("status") && !polling.has(a.id)) {
       polling.add(a.id);
       gwCtl(a.id, "status", () => polling.delete(a.id));
@@ -436,15 +438,15 @@ function pollAllStatus() {
 
 /* ---------------- avatar ---------------- */
 function avatarUrl(id) {
-  for (const ext of ["png", "jpg", "webp", "svg"])   // svg = placeholder sementara; raster (upload) menang duluan
+  for (const ext of ["png", "jpg", "webp", "svg"])   // svg = temporary placeholder; raster (uploaded) wins first
     if (fs.existsSync(path.join(AVATAR_DIR, `${id}.${ext}`))) return `/avatars/${id}.${ext}`;
   return null;
 }
 function saveAvatar(id, dataUrl) {
   const m = /^data:image\/(png|jpeg|webp);base64,(.+)$/.exec(dataUrl || "");
-  if (!m) return { error: "format harus data:image/png|jpeg|webp;base64" };
+  if (!m) return { error: "format must be data:image/png|jpeg|webp;base64" };
   const buf = Buffer.from(m[2], "base64");
-  if (buf.length > 3e6) return { error: "maks 3 MB" };
+  if (buf.length > 3e6) return { error: "max 3 MB" };
   const ext = m[1] === "jpeg" ? "jpg" : m[1];
   for (const e of ["png", "jpg", "webp", "svg"]) { try { fs.unlinkSync(path.join(AVATAR_DIR, `${id}.${e}`)); } catch {} }
   fs.writeFileSync(path.join(AVATAR_DIR, `${id}.${ext}`), buf);
@@ -482,318 +484,12 @@ function buildGraph() {
   graphCache = { t: Date.now(), data: { nodes: [...nodes.values()], edges, generatedAt: new Date().toISOString() } };
   return graphCache.data;
   } catch (e) {
-    if (graphCache.data) return graphCache.data;   // R18: jangan poison cache ke null
+    if (graphCache.data) return graphCache.data;   // R18: don't poison the cache to null
     return { nodes: [], edges: [], generatedAt: new Date().toISOString(), error: e.message };
   }
 }
 
-/* ------- generateGraphifyHTML: builds vis-network HTML from graph.json ------- */
-const COMMUNITY_COLORS = [
-  "#4E79A7", "#F28E2B", "#E15759", "#76B7B2", "#59A14F",
-  "#EDC948", "#B07AA1", "#FF9DA7", "#9C755F", "#BAB0AC",
-];
-function esc(s) { return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;"); }
-
-function generateGraphifyHTML(g) {
-  const nodes = g.nodes || [];
-  const links = g.links || [];
-  // Degree map
-  const deg = {};
-  nodes.forEach(n => { deg[n.id] = 0; });
-  links.forEach(l => { deg[l.source] = (deg[l.source] || 0) + 1; deg[l.target] = (deg[l.target] || 0) + 1; });
-  const maxDeg = Math.max(1, ...Object.values(deg));
-  // Community labels + counts
-  const communityNodes = {};
-  nodes.forEach(n => {
-    const c = n.community ?? 0;
-    if (!communityNodes[c]) communityNodes[c] = [];
-    communityNodes[c].push(n);
-  });
-  // Build vis nodes
-  const visNodes = nodes.map(n => {
-    const cid = n.community ?? 0;
-    const color = COMMUNITY_COLORS[cid % COMMUNITY_COLORS.length];
-    const d = deg[n.id] || 0;
-    const size = 10 + 30 * (d / maxDeg);
-    const fontSize = d >= maxDeg * 0.15 ? 12 : 0;
-    const label = (n.label || n.id || "").replace(/<\/script>/gi, "");
-    return {
-      id: n.id, label,
-      color: { background: color, border: color, highlight: { background: "#ffffff", border: color } },
-      size: Math.round(size * 10) / 10,
-      font: { size: fontSize, color: "#ffffff" },
-      title: esc(label),
-      community: cid,
-      community_name: n.community_name || `Community ${cid}`,
-      source_file: n.source_file || "",
-      file_type: n.file_type || "",
-      degree: d,
-    };
-  });
-  // Build vis edges
-  const visEdges = links.map((l, i) => {
-    const conf = l.confidence || "EXTRACTED";
-    const rel = l.relation || "";
-    return {
-      from: l.source, to: l.target,
-      label: "",
-      title: esc(`${rel} [${conf}]`),
-      dashes: conf !== "EXTRACTED",
-      width: conf === "EXTRACTED" ? 2 : 1,
-      color: { opacity: conf === "EXTRACTED" ? 0.7 : 0.35 },
-    };
-  });
-  // Build legend data
-  const legendData = Object.keys(communityNodes).sort((a,b) => Number(a)-Number(b)).map(cidStr => {
-    const cid = Number(cidStr);
-    const color = COMMUNITY_COLORS[cid % COMMUNITY_COLORS.length];
-    const members = communityNodes[cid];
-    // Determine label: most common source_file prefix or community id
-    let lbl = `Community ${cid}`;
-    if (members.length > 0 && members[0].community_name) lbl = members[0].community_name;
-    return { cid, color, label: esc(lbl), count: members.length };
-  });
-  const stats = `${nodes.length} nodes &middot; ${links.length} edges &middot; ${Object.keys(communityNodes).length} communities`;
-  const nodesJSON = JSON.stringify(visNodes).replace(/<\//g, "<\\/");
-  const edgesJSON = JSON.stringify(visEdges).replace(/<\//g, "<\\/");
-  const legendJSON = JSON.stringify(legendData).replace(/<\//g, "<\\/");
-
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<title>Neural Vault — Knowledge Graph</title>
-<script src="https://unpkg.com/vis-network@9.1.6/standalone/umd/vis-network.min.js"
-        integrity="sha384-Ux6phic9PEHJ38YtrijhkzyJ8yQlH8i/+buBR8s3mAZOJrP1gwyvAcIYl3GWtpX1"
-        crossorigin="anonymous"><\/script>
-<style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: #0f0f1a; color: #e0e0e0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; display: flex; height: 100vh; overflow: hidden; }
-  #graph { flex: 1; }
-  #sidebar { width: 280px; background: #1a1a2e; border-left: 1px solid #2a2a4e; display: flex; flex-direction: column; overflow: hidden; }
-  #search-wrap { padding: 12px; border-bottom: 1px solid #2a2a4e; }
-  #search { width: 100%; background: #0f0f1a; border: 1px solid #3a3a5e; color: #e0e0e0; padding: 7px 10px; border-radius: 6px; font-size: 13px; outline: none; }
-  #search:focus { border-color: #4E79A7; }
-  #search-results { max-height: 140px; overflow-y: auto; padding: 4px 12px; border-bottom: 1px solid #2a2a4e; display: none; }
-  .search-item { padding: 4px 6px; cursor: pointer; border-radius: 4px; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .search-item:hover { background: #2a2a4e; }
-  #info-panel { padding: 14px; border-bottom: 1px solid #2a2a4e; min-height: 140px; }
-  #info-panel h3 { font-size: 13px; color: #aaa; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em; }
-  #info-content { font-size: 13px; color: #ccc; line-height: 1.6; }
-  #info-content .field { margin-bottom: 5px; }
-  #info-content .field b { color: #e0e0e0; }
-  #info-content .empty { color: #555; font-style: italic; }
-  .neighbor-link { display: block; padding: 2px 6px; margin: 2px 0; border-radius: 3px; cursor: pointer; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-left: 3px solid #333; }
-  .neighbor-link:hover { background: #2a2a4e; }
-  #neighbors-list { max-height: 160px; overflow-y: auto; margin-top: 4px; }
-  #legend-wrap { flex: 1; overflow-y: auto; padding: 12px; }
-  #legend-wrap h3 { font-size: 13px; color: #aaa; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.05em; }
-  .legend-item { display: flex; align-items: center; gap: 8px; padding: 4px 0; cursor: pointer; border-radius: 4px; font-size: 12px; }
-  .legend-item:hover { background: #2a2a4e; padding-left: 4px; }
-  .legend-item.dimmed { opacity: 0.35; }
-  .legend-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
-  .legend-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .legend-count { color: #666; font-size: 11px; }
-  #stats { padding: 10px 14px; border-top: 1px solid #2a2a4e; font-size: 11px; color: #555; }
-  #legend-controls { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; padding: 4px 0; }
-  #legend-controls label { display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 12px; color: #aaa; user-select: none; }
-  #legend-controls label:hover { color: #e0e0e0; }
-  .legend-cb, #select-all-cb { appearance: none; -webkit-appearance: none; width: 14px; height: 14px; border: 1.5px solid #3a3a5e; border-radius: 3px; background: #0f0f1a; cursor: pointer; position: relative; flex-shrink: 0; }
-  .legend-cb:checked, #select-all-cb:checked { background: #4E79A7; border-color: #4E79A7; }
-  .legend-cb:checked::after, #select-all-cb:checked::after { content: ''; position: absolute; left: 3.5px; top: 1px; width: 4px; height: 7px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg); }
-  #select-all-cb:indeterminate { background: #4E79A7; border-color: #4E79A7; }
-  #select-all-cb:indeterminate::after { content: ''; position: absolute; left: 2px; top: 5px; width: 8px; height: 2px; background: #fff; border: none; transform: none; }
-</style>
-</head>
-<body>
-<div id="graph"></div>
-<div id="sidebar">
-  <div id="search-wrap">
-    <input id="search" type="text" placeholder="Search nodes..." autocomplete="off">
-    <div id="search-results"></div>
-  </div>
-  <div id="info-panel">
-    <h3>Node Info</h3>
-    <div id="info-content"><span class="empty">Click a node to inspect it</span></div>
-  </div>
-  <div id="legend-wrap">
-    <h3>Communities</h3>
-    <div id="legend-controls">
-      <label><input type="checkbox" id="select-all-cb" checked onchange="toggleAllCommunities(!this.checked)">Select All</label>
-    </div>
-    <div id="legend"></div>
-  </div>
-  <div id="stats">${stats}</div>
-</div>
-<script>
-const RAW_NODES = ${nodesJSON};
-const RAW_EDGES = ${edgesJSON};
-const LEGEND = ${legendJSON};
-
-function esc(s) {
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
-}
-
-const nodesDS = new vis.DataSet(RAW_NODES.map(n => ({
-  id: n.id, label: n.label, color: n.color, size: n.size,
-  font: n.font, title: n.title,
-  _community: n.community, _community_name: n.community_name,
-  _source_file: n.source_file, _file_type: n.file_type, _degree: n.degree,
-})));
-
-const edgesDS = new vis.DataSet(RAW_EDGES.map((e, i) => ({
-  id: i, from: e.from, to: e.to,
-  label: '',
-  title: e.title,
-  dashes: e.dashes,
-  width: e.width,
-  color: e.color,
-  arrows: { to: { enabled: true, scaleFactor: 0.5 } },
-})));
-
-const container = document.getElementById('graph');
-const network = new vis.Network(container, { nodes: nodesDS, edges: edgesDS }, {
-  physics: {
-    enabled: true,
-    solver: 'forceAtlas2Based',
-    forceAtlas2Based: {
-      gravitationalConstant: -60,
-      centralGravity: 0.005,
-      springLength: 120,
-      springConstant: 0.08,
-      damping: 0.4,
-      avoidOverlap: 0.8,
-    },
-    stabilization: { iterations: 200, fit: true },
-  },
-  interaction: {
-    hover: true,
-    tooltipDelay: 100,
-    hideEdgesOnDrag: true,
-    navigationButtons: false,
-    keyboard: false,
-  },
-  nodes: { shape: 'dot', borderWidth: 1.5 },
-  edges: { smooth: { type: 'continuous', roundness: 0.2 }, selectionWidth: 3 },
-});
-
-network.once('stabilizationIterationsDone', () => {
-  network.setOptions({ physics: { enabled: false } });
-});
-
-function showInfo(nodeId) {
-  const n = nodesDS.get(nodeId);
-  if (!n) return;
-  const neighborIds = network.getConnectedNodes(nodeId);
-  const neighborItems = neighborIds.map(nid => {
-    const nb = nodesDS.get(nid);
-    const color = nb ? nb.color.background : '#555';
-    return '<span class="neighbor-link" style="border-left-color:'+esc(color)+'" onclick="focusNode('+JSON.stringify(nid)+')">'+esc(nb ? nb.label : nid)+'<\\/span>';
-  }).join('');
-  const isMd = n._source_file && n._source_file.endsWith('.md');
-  const obsLink = isMd ? '<div class="field" style="margin-top: 8px;"><a class="neighbor-link" style="color:#00E5FF; border-left-color:#00E5FF; display:inline-block; text-decoration:none; font-weight:bold;" href="obsidian://open?vault=Obsidian%20Vault&file='+encodeURIComponent(n._source_file.replace(/\\.md$/,''))+'">Open in Obsidian<\\/a><\\/div>' : '';
-  document.getElementById('info-content').innerHTML =
-    '<div class="field"><b>'+esc(n.label)+'<\\/b><\\/div>'+
-    '<div class="field">Type: '+esc(n._file_type || 'unknown')+'<\\/div>'+
-    '<div class="field">Community: '+esc(n._community_name)+'<\\/div>'+
-    '<div class="field">Source: '+esc(n._source_file || '-')+'<\\/div>'+
-    '<div class="field">Degree: '+n._degree+'<\\/div>'+
-    obsLink+
-    (neighborIds.length ? '<div class="field" style="margin-top:8px;color:#aaa;font-size:11px">Neighbors ('+neighborIds.length+')<\\/div><div id="neighbors-list">'+neighborItems+'<\\/div>' : '');
-}
-
-function focusNode(nodeId) {
-  network.focus(nodeId, { scale: 1.4, animation: true });
-  network.selectNodes([nodeId]);
-  showInfo(nodeId);
-}
-
-let hoveredNodeId = null;
-network.on('hoverNode', params => { hoveredNodeId = params.node; container.style.cursor = 'pointer'; });
-network.on('blurNode', () => { hoveredNodeId = null; container.style.cursor = 'default'; });
-container.addEventListener('click', () => {
-  if (hoveredNodeId !== null) { showInfo(hoveredNodeId); network.selectNodes([hoveredNodeId]); }
-});
-network.on('click', params => {
-  if (params.nodes.length > 0) { showInfo(params.nodes[0]); }
-  else if (hoveredNodeId === null) { document.getElementById('info-content').innerHTML = '<span class="empty">Click a node to inspect it<\\/span>'; }
-});
-
-const searchInput = document.getElementById('search');
-const searchResults = document.getElementById('search-results');
-searchInput.addEventListener('input', () => {
-  const q = searchInput.value.toLowerCase().trim();
-  searchResults.innerHTML = '';
-  if (!q) { searchResults.style.display = 'none'; return; }
-  const matches = RAW_NODES.filter(n => n.label.toLowerCase().includes(q)).slice(0, 20);
-  if (!matches.length) { searchResults.style.display = 'none'; return; }
-  searchResults.style.display = 'block';
-  matches.forEach(n => {
-    const el = document.createElement('div');
-    el.className = 'search-item';
-    el.textContent = n.label;
-    el.style.borderLeft = '3px solid '+n.color.background;
-    el.style.paddingLeft = '8px';
-    el.onclick = () => {
-      network.focus(n.id, { scale: 1.5, animation: true });
-      network.selectNodes([n.id]);
-      showInfo(n.id);
-      searchResults.style.display = 'none';
-      searchInput.value = '';
-    };
-    searchResults.appendChild(el);
-  });
-});
-document.addEventListener('click', e => {
-  if (!searchResults.contains(e.target) && e.target !== searchInput) searchResults.style.display = 'none';
-});
-
-const hiddenCommunities = new Set();
-const selectAllCb = document.getElementById('select-all-cb');
-
-function updateSelectAllState() {
-  const total = LEGEND.length;
-  const hidden = hiddenCommunities.size;
-  selectAllCb.checked = hidden === 0;
-  selectAllCb.indeterminate = hidden > 0 && hidden < total;
-}
-
-function toggleAllCommunities(hide) {
-  document.querySelectorAll('.legend-item').forEach(item => { hide ? item.classList.add('dimmed') : item.classList.remove('dimmed'); });
-  document.querySelectorAll('.legend-cb').forEach(cb => { cb.checked = !hide; });
-  LEGEND.forEach(c => { if (hide) hiddenCommunities.add(c.cid); else hiddenCommunities.delete(c.cid); });
-  const updates = RAW_NODES.map(n => ({ id: n.id, hidden: hide }));
-  nodesDS.update(updates);
-  updateSelectAllState();
-}
-
-const legendEl = document.getElementById('legend');
-LEGEND.forEach(c => {
-  const item = document.createElement('div');
-  item.className = 'legend-item';
-  const cb = document.createElement('input');
-  cb.type = 'checkbox';
-  cb.className = 'legend-cb';
-  cb.checked = true;
-  cb.addEventListener('change', (e) => {
-    e.stopPropagation();
-    if (cb.checked) { hiddenCommunities.delete(c.cid); item.classList.remove('dimmed'); }
-    else { hiddenCommunities.add(c.cid); item.classList.add('dimmed'); }
-    const updates = RAW_NODES.filter(n => n.community === c.cid).map(n => ({ id: n.id, hidden: !cb.checked }));
-    nodesDS.update(updates);
-    updateSelectAllState();
-  });
-  item.innerHTML = '<div class="legend-dot" style="background:'+c.color+'"><\\/div><span class="legend-label">'+c.label+'<\\/span><span class="legend-count">'+c.count+'<\\/span>';
-  item.prepend(cb);
-  item.onclick = (e) => { if (e.target === cb) return; cb.checked = !cb.checked; cb.dispatchEvent(new Event('change')); };
-  legendEl.appendChild(item);
-});
-<\/script>
-</body>
-</html>`;
-}
-
-/* ------- aktivitas Claude Code: sesi + subagent dari transcript jsonl ------- */
+/* ------- Claude Code activity: sessions + subagents from the transcript jsonl ------- */
 function tailRead(file, bytes) {
   try {
     const size = fs.statSync(file).size;
@@ -805,11 +501,12 @@ function tailRead(file, bytes) {
     return buf.toString("utf8");
   } catch { return ""; }
 }
+const HOME_PREFIX_RE = new RegExp("^" + os.homedir().replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "[\\\\/]", "i");
 function toolTarget(name, input) {
   if (!input) return "";
   const t = input.file_path || input.path || input.pattern || input.description ||
     (input.command ? String(input.command) : "") || input.prompt || "";
-  return String(t).replace(/^C:\\Users\\abrur\\/i, "").slice(0, 90);
+  return String(t).replace(HOME_PREFIX_RE, "").slice(0, 90);
 }
 function claudeActivity() {
   const sessions = [];
@@ -852,7 +549,7 @@ function claudeActivity() {
         if (b.name === "Agent" || b.name === "Task")
           spawns.set(b.id, {
             session: c.id.slice(0, 8), ts: o.timestamp || null,
-            desc: (b.input && (b.input.description || "")) || "(tanpa deskripsi)",
+            desc: (b.input && (b.input.description || "")) || "(no description)",
             type: (b.input && (b.input.subagent_type || "general-purpose")) || "general-purpose",
             status: "running",
           });
@@ -871,7 +568,7 @@ function claudeActivity() {
   return { sessions, subagents: allAgents.reverse().slice(0, 20) };
 }
 
-/* ------- telemetry lintas-agent: agentic-os/telemetry/<id>.jsonl ------- */
+/* ------- cross-agent telemetry: agentic-os/telemetry/<id>.jsonl ------- */
 function readTelemetry(id) {
   const file = path.join(TELEMETRY_DIR, `${id}.jsonl`);
   if (!fs.existsSync(file)) return [];
@@ -883,8 +580,8 @@ function readTelemetry(id) {
   return out.slice(-30).reverse();
 }
 
-/* Aktivitas seragam untuk agent non-Claude: turunkan sesi + subagent dari telemetry mereka
-   sendiri (bukan data palsu), shape sama dengan claudeActivity() supaya UI render identik. */
+/* Uniform activity for non-Claude agents: derive sessions + subagents from their own
+   telemetry (not fake data), same shape as claudeActivity() so the UI renders identically. */
 function telemetryActivity(events) {
   const subagents = [], subSeen = new Set();
   const sessions = [], taskSeen = new Set();
@@ -896,7 +593,7 @@ function telemetryActivity(events) {
         status: e.type === "subagent_done" ? "done" : "running", ts: e.ts || null });
     } else if (e.type === "task_start" || e.type === "task_progress" || e.type === "task_done") {
       const key = e.name || "";
-      if (taskSeen.has(key)) continue; taskSeen.add(key);   // status terbaru per task (newest-first)
+      if (taskSeen.has(key)) continue; taskSeen.add(key);   // latest status per task (newest-first)
       const ageMin = e.ts ? (Date.now() - Date.parse(e.ts)) / 60000 : 1e9;
       sessions.push({ id: (e.name || "task").slice(0, 8), project: e.detail || "",
         lastActivity: e.ts || null,
@@ -910,7 +607,7 @@ function telemetryActivity(events) {
 
 function agentDetail(id) {
   const agent = loadConfig().agents.find(a => a.id === id);
-  if (!agent) return { error: `agent '${id}' tidak dikenal` };
+  if (!agent) return { error: `unknown agent '${id}'` };
   const p = procs.get(id);
   const files = walkVault();
   const tele = readTelemetry(id);
@@ -924,9 +621,9 @@ function agentDetail(id) {
     cwd: agent.gateway && agent.gateway.cwd, bin: agent.gateway && agent.gateway.bin, actions: gwActions(agent),
     canSummon: !!(agent.gateway && agent.gateway.home && agent.gateway.trigger),
     proc: procInfo(id), ...agentVaultStatus(files, agent),
-    log: p && p.log.length ? p.log.slice(-40) : readDiskLog(id, 40),   // R#4: fallback ke disk pasca-restart
+    log: p && p.log.length ? p.log.slice(-40) : readDiskLog(id, 40),   // R#4: fall back to disk after a restart
     laneFiles, telemetry: tele,
-    // activity seragam semua agent: Claude dari transcript, lainnya dari telemetry mereka
+    // uniform activity for all agents: Claude from transcripts, the rest from their own telemetry
     activity: id === "claude-code" ? claudeActivity() : telemetryActivity(tele),
     source: id === "claude-code" ? "transcript" : "telemetry",
   };
@@ -971,32 +668,32 @@ function buildReport() {
   };
 }
 function reportMarkdown(r) {
-  const bar = n => "â–ˆ".repeat(Math.min(n, 30)) || "Â·";
+  const bar = n => "█".repeat(Math.min(n, 30)) || "·";
   const lines = [
     "---",
-    `title: "Laporan Agentic OS ${r.generatedAt.slice(0, 10)}"`,
+    `title: "Agentic OS Report ${r.generatedAt.slice(0, 10)}"`,
     `date: ${r.generatedAt.slice(0, 10)}`,
     "type: report",
     "created_by: agentic-os-dashboard",
     "tags: [report, agentic-os]",
     "---", "",
-    `# Laporan Agentic OS â€” ${r.generatedAt.slice(0, 16).replace("T", " ")}`, "",
-    `| Metrik | Nilai |`, `|---|---|`,
-    `| Total catatan vault | ${r.totals.notes} |`,
-    `| Koneksi antar catatan (wikilink) | ${r.totals.edges} |`,
-    `| Catatan aktif 7 hari | ${r.totals.active7d} |`,
-    `| Task terbuka | ${r.totals.openTasks} |`,
-    `| Gateway sedang jalan | ${r.totals.gwRunning} |`, "",
-    "## Aktivitas 14 hari (catatan diubah/hari)", "", "```",
+    `# Agentic OS Report — ${r.generatedAt.slice(0, 16).replace("T", " ")}`, "",
+    `| Metric | Value |`, `|---|---|`,
+    `| Total vault notes | ${r.totals.notes} |`,
+    `| Note-to-note links (wikilinks) | ${r.totals.edges} |`,
+    `| Notes active in 7 days | ${r.totals.active7d} |`,
+    `| Open tasks | ${r.totals.openTasks} |`,
+    `| Gateways running | ${r.totals.gwRunning} |`, "",
+    "## 14-day activity (notes changed/day)", "", "```",
     ...r.days.map(d => `${d.date}  ${String(d.count).padStart(3)}  ${bar(d.count)}`),
     "```", "",
-    "## Distribusi folder", "", `| Folder | Catatan |`, `|---|---|`,
+    "## Folder distribution", "", `| Folder | Notes |`, `|---|---|`,
     ...r.folders.map(f => `| ${f.name} | ${f.count} |`), "",
-    "## Status agent", "", `| Agent | Node | Catatan lane | Aktif 7d | Terakhir | Gateway |`, `|---|---|---|---|---|---|`,
+    "## Agent status", "", `| Agent | Node | Lane notes | Active 7d | Last seen | Gateway |`, `|---|---|---|---|---|---|`,
     ...r.agents.map(a => `| ${a.icon} ${a.name} | ${a.node} | ${a.laneNotes} | ${a.touched7d} | ${a.lastSeen || "-"} | ${a.gw} |`), "",
   ];
-  if (r.tasks.length) lines.push("## Task terbuka (maks 10)", "", ...r.tasks.map(t => `- [ ] ${t.text} _(${t.source})_`), "");
-  lines.push("---", "_Digenerate otomatis dari dashboard Agentic OS._");
+  if (r.tasks.length) lines.push("## Open tasks (max 10)", "", ...r.tasks.map(t => `- [ ] ${t.text} _(${t.source})_`), "");
+  lines.push("---", "_Generated automatically by the Agentic OS dashboard._");
   return lines.join("\n");
 }
 function localISO(d = new Date()) {
@@ -1008,38 +705,38 @@ function saveReport() {
     const dir = path.join(VAULT, "Reports");
     fs.mkdirSync(dir, { recursive: true });
     const l = localISO();
-    const name = `Laporan ${l.slice(0, 10)} ${l.slice(11, 19).replace(/:/g, ".")}.md`;  // detik â†’ tak saling timpa
+    const name = `Report ${l.slice(0, 10)} ${l.slice(11, 19).replace(/:/g, ".")}.md`;  // seconds → no overwrites
     fs.writeFileSync(path.join(dir, name), reportMarkdown(r), "utf8");
     return { ok: true, rel: `Reports/${name}` };
-  } catch (e) { return { error: `gagal simpan laporan: ${e.message}` }; }
+  } catch (e) { return { error: `failed to save report: ${e.message}` }; }
 }
 
-/* R#5: kirim task ke agent dari dashboard â†’ tulis checkbox ke vault Tasks/Inbox Tasks.md.
-   openTasks() scan semua Tasks/*.md â†’ otomatis muncul di Needs Review (kind task), agent ambil sendiri. */
+/* R#5: send a task to an agent from the dashboard → write a checkbox to vault Tasks/Inbox Tasks.md.
+   openTasks() scans all Tasks/*.md → it auto-appears in Needs Review (kind task), agents pick it up themselves. */
 function createTask(agentId, title, detail) {
   title = String(title || "").trim().replace(/[\r\n]+/g, " ").slice(0, 200);
-  if (!title) return { error: "judul task kosong" };
+  if (!title) return { error: "task title is empty" };
   const agent = loadConfig().agents.find(a => a.id === agentId);
-  const who = agent ? agent.name : (agentId ? agentId : "Umum");
+  const who = agent ? agent.name : (agentId ? agentId : "General");
   const date = localISO().slice(0, 10);
   const extra = detail ? `  ·  ${String(detail).trim().replace(/[\r\n]+/g, " ").slice(0, 300)}` : "";
   try {
     const dir = path.join(VAULT, "Tasks");
     fs.mkdirSync(dir, { recursive: true });
     const file = path.join(dir, "Inbox Tasks.md");
-    const line = `- [ ] ${title} — ${who} — ${date}${extra}\n`;   // — = em-dash bersih (hindari mojibake)
+    const line = `- [ ] ${title} — ${who} — ${date}${extra}\n`;   // — = clean em-dash (avoids mojibake)
     if (!fs.existsSync(file))
-      fs.writeFileSync(file, `# 📥 Inbox Tasks\n\n> Task dari dashboard. Agent ambil → tandai \`[x]\` saat selesai.\n\n${line}`, "utf8");
+      fs.writeFileSync(file, `# 📥 Inbox Tasks\n\n> Tasks from the dashboard. Agents pick them up → mark \`[x]\` when done.\n\n${line}`, "utf8");
     else
       fs.appendFileSync(file, line, "utf8");
     return { ok: true, rel: "Tasks/Inbox Tasks.md", line: line.trim() };
-  } catch (e) { return { error: `gagal tulis task: ${e.message}` }; }
+  } catch (e) { return { error: `failed to write task: ${e.message}` }; }
 }
 
-/* R#8: panel jadwal â€” baca Windows Scheduled Task tiap agent (next run, last run, last result). */
+/* R#8: schedule panel — read each agent's Windows Scheduled Task (next run, last run, last result). */
 function querySchtask(name, cb) {
   execFile("schtasks", ["/query", "/tn", name, "/fo", "LIST", "/v"], { windowsHide: true }, (e, out) => {
-    if (e) return cb({ name, error: String((e.message || "gagal query")).split("\n")[0].slice(0, 120) });
+    if (e) return cb({ name, error: String((e.message || "query failed")).split("\n")[0].slice(0, 120) });
     const grab = re => { const m = out.match(re); return m ? m[1].trim() : null; };
     const lr = grab(/Last Result:\s*(.+)/);
     cb({ name, taskState: grab(/Scheduled Task State:\s*(.+)/) || grab(/Status:\s*(.+)/),
@@ -1054,45 +751,45 @@ function buildSchedule(cb) {
   agents.forEach(a => querySchtask(a.gateway.schtask, r => { out.push({ id: a.id, agent: a.name, icon: a.icon, ...r }); if (--pending === 0) cb(out); }));
 }
 
-/* R#9: kesehatan vault â€” umur commit git terakhir + umur backup terakhir (cegah kehilangan otak).
-   Backup opsional via env BACKUP_PATH (folder/file); kalau tak diset, hanya lapor git. */
+/* R#9: vault health — age of the last git commit + age of the last backup (prevent losing the brain).
+   Backup optional via env BACKUP_PATH (folder/file); if unset, only git is reported. */
 function buildVaultHealth(cb) {
   const res = { vault: VAULT, gitCommitAt: null, gitAgeH: null, gitOk: false, backupAt: null, backupAgeH: null, backup: null };
   const backup = process.env.BACKUP_PATH || null;
-  if (backup) { try { const st = fs.statSync(backup); res.backupAt = new Date(st.mtimeMs).toISOString(); res.backupAgeH = Math.round((Date.now() - st.mtimeMs) / 3600000); res.backup = backup; } catch { res.backup = backup + " (tidak ditemukan)"; } }
+  if (backup) { try { const st = fs.statSync(backup); res.backupAt = new Date(st.mtimeMs).toISOString(); res.backupAgeH = Math.round((Date.now() - st.mtimeMs) / 3600000); res.backup = backup; } catch { res.backup = backup + " (not found)"; } }
   execFile("git", ["-C", VAULT, "log", "-1", "--format=%cI"], { windowsHide: true }, (e, out) => {
     if (!e && out && out.trim()) { const t = Date.parse(out.trim()); if (!Number.isNaN(t)) { res.gitCommitAt = out.trim(); res.gitAgeH = Math.round((Date.now() - t) / 3600000); res.gitOk = true; } }
-    else res.gitError = e ? String(e.message).split("\n")[0].slice(0, 120) : "tak ada commit";
+    else res.gitError = e ? String(e.message).split("\n")[0].slice(0, 120) : "no commits";
     cb(res);
   });
 }
 
-/* Bonus (dua-arah): tandai task selesai dari dashboard â†’ ubah `- [ ]` jadi `- [x]` di file vault. */
+/* Bonus (two-way): mark a task done from the dashboard → change `- [ ]` to `- [x]` in the vault file. */
 function markTaskDone(source, text) {
-  if (!source || !text) return { error: "butuh {source, text}" };
+  if (!source || !text) return { error: "requires {source, text}" };
   const rel = String(source).replace(/\\/g, "/");
-  if (!rel.startsWith("Tasks/") || rel.includes("..")) return { error: "source harus di dalam Tasks/" };
+  if (!rel.startsWith("Tasks/") || rel.includes("..")) return { error: "source must be inside Tasks/" };
   const file = path.join(VAULT, rel);
   try {
     let txt = fs.readFileSync(file, "utf8");
     const needle = String(text).trim();
     const lines = txt.split(/\r?\n/);
     const i = lines.findIndex(l => /^\s*[-*] \[ \]/.test(l) && l.includes(needle));
-    if (i === -1) return { error: "task tidak ketemu (mungkin sudah berubah)" };
+    if (i === -1) return { error: "task not found (it may have changed)" };
     lines[i] = lines[i].replace("[ ]", "[x]");
     fs.writeFileSync(file, lines.join("\n"), "utf8");
     return { ok: true, rel, line: lines[i].trim() };
-  } catch (e) { return { error: `gagal update: ${e.message}` }; }
+  } catch (e) { return { error: `update failed: ${e.message}` }; }
 }
 
 function readBody(req, res, cb) {
   let body = "", aborted = false;
   req.on("data", d => {
     body += d;
-    if (body.length > 5e6 && !aborted) {           // R5: balas 413, jangan biarkan client hang
+    if (body.length > 5e6 && !aborted) {           // R5: reply 413, don't leave the client hanging
       aborted = true;
       res.writeHead(413, { "Content-Type": "application/json; charset=utf-8" });
-      res.end(JSON.stringify({ error: "body melebihi 5MB" }));
+      res.end(JSON.stringify({ error: "body exceeds 5MB" }));
       req.destroy();
     }
   });
@@ -1100,31 +797,17 @@ function readBody(req, res, cb) {
 }
 
 /* ---------------- http ---------------- */
-/* S1: bandingkan token konstan-waktu (anti timing attack). S2: header saja, tak lagi terima ?token= */
+/* S1: constant-time token compare (anti timing attack). S2: header-only auth — ?token= query is not accepted */
 function safeEq(a, b) {
   const ba = Buffer.from(String(a || "")), bb = Buffer.from(String(b || ""));
-  if (ba.length !== bb.length) return false;
+  if (ba.length !== bb.length) { crypto.timingSafeEqual(bb, bb); return false; }
   return crypto.timingSafeEqual(ba, bb);
 }
 function authorized(req) {
   if (!TOKEN) return true;
   const remote = req.socket && (req.socket.remoteAddress || req.connection && req.connection.remoteAddress || "");
-  console.log(`[auth] remote=${remote}, TOKEN=${TOKEN ? "SET" : "UNSET"}, url=${req.url}`);
-  if (/^(127\.0\.0\.1|::1|::ffff:127\.0\.0\.1)$/.test(remote)) { console.log(`[auth] ✓ localhost bypass`); return true; }
-  let tokenVal = req.headers["x-dash-token"] || "";
-  if (!tokenVal && req.url.includes("?")) {
-    try {
-      const q = new URL(req.url, "http://x").searchParams.get("token");
-      if (q) tokenVal = q;
-    } catch {}
-  }
-  const a = Buffer.from(String(tokenVal));
-  if (a.length !== TOKEN.length) return safeEq(Buffer.alloc(TOKEN.length, 0), TOKEN);
-  return timingSafeCompare(a, TOKEN);
-}
-function timingSafeCompare(a, b) {
-  if (a.length !== b.length) return crypto.timingSafeEqual(Buffer.alloc(a.length, 0), b);
-  return crypto.timingSafeEqual(a, b);
+  if (/^(127\.0\.0\.1|::1|::ffff:127\.0\.0\.1)$/.test(remote)) return true;
+  return safeEq(req.headers["x-dash-token"] || "", TOKEN);
 }
 function json(res, code, obj) {
   res.writeHead(code, { "Content-Type": "application/json; charset=utf-8" });
@@ -1137,7 +820,7 @@ const server = http.createServer((req, res) => {
   const url = (req.url || "/").split("?")[0];
 
   if (url.startsWith("/api/")) {
-    if (!authorized(req)) return json(res, 401, { error: "token salah/kosong â€” set header x-dash-token" });
+    if (!authorized(req)) return json(res, 401, { error: "invalid/missing token — set the x-dash-token header" });
     try {
       if (url === "/api/state") return json(res, 200, buildState());
       if (url === "/api/procs") {
@@ -1170,40 +853,17 @@ const server = http.createServer((req, res) => {
         return;
       }
       if (url === "/api/graph") return json(res, 200, buildGraph());
-      if (url === "/api/graphify-html") {
-        // Coba graph.html dulu (dari graphify update)
-        const filePath = path.join(VAULT, "graphify-out", "graph.html");
-        if (fs.existsSync(filePath)) {
-          res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-          return res.end(fs.readFileSync(filePath));
-        }
-        // Fallback: generate vis-network HTML dari graph.json
-        const jsonPath = path.join(VAULT, "graphify-out", "graph.json");
-        if (!fs.existsSync(jsonPath)) {
-          res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
-          return res.end("graph.json not found. Silakan jalankan 'graphify update' di terminal.");
-        }
-        try {
-          const g = JSON.parse(fs.readFileSync(jsonPath, "utf8"));
-          const html = generateGraphifyHTML(g);
-          res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-          return res.end(html);
-        } catch (e) {
-          res.writeHead(500, { "Content-Type": "text/plain; charset=utf-8" });
-          return res.end("Error generating graph: " + e.message);
-        }
-      }
       if (url === "/api/report") return json(res, 200, buildReport());
       if (url === "/api/report/save" && req.method === "POST") return json(res, 200, saveReport());
       if (url === "/api/task" && req.method === "POST")
         return readBody(req, res, body => {
-          let d; try { d = JSON.parse(body); } catch { return json(res, 400, { error: "body harus JSON {agent,title,detail?}" }); }
+          let d; try { d = JSON.parse(body); } catch { return json(res, 400, { error: "body must be JSON {agent,title,detail?}" }); }
           const r = createTask(d.agent, d.title, d.detail);
           json(res, r.error ? 400 : 200, r);
         });
       if (url === "/api/task/done" && req.method === "POST")
         return readBody(req, res, body => {
-          let d; try { d = JSON.parse(body); } catch { return json(res, 400, { error: "body harus JSON {source,text}" }); }
+          let d; try { d = JSON.parse(body); } catch { return json(res, 400, { error: "body must be JSON {source,text}" }); }
           const r = markTaskDone(d.source, d.text);
           json(res, r.error ? 400 : 200, r);
         });
@@ -1214,18 +874,18 @@ const server = http.createServer((req, res) => {
       m = url.match(/^\/api\/agent\/([\w-]+)\/avatar$/);
       if (m && req.method === "POST") {
         const id = m[1];
-        if (!loadConfig().agents.some(a => a.id === id)) return json(res, 404, { error: "agent tidak dikenal" });
+        if (!loadConfig().agents.some(a => a.id === id)) return json(res, 404, { error: "unknown agent" });
         return readBody(req, res, body => {
-          let data; try { data = JSON.parse(body).data; } catch { return json(res, 400, { error: "body harus JSON {data}" }); }
+          let data; try { data = JSON.parse(body).data; } catch { return json(res, 400, { error: "body must be JSON {data}" }); }
           const r = saveAvatar(id, data);
           json(res, r.error ? 400 : 200, r);
         });
       }
       return json(res, 404, { error: "unknown api" });
-    } catch (err) { console.error("[api]", (err && err.stack) || err); return json(res, 500, { error: "internal error" }); }  // S12: jangan echo detail internal
+    } catch (err) { console.error("[api]", (err && err.stack) || err); return json(res, 500, { error: "internal error" }); }  // S12: don't echo internal details
   }
 
-  // S5: path-traversal guard pakai path.relative (bukan startsWith), + decode URL
+  // S5: path-traversal guard using path.relative (not startsWith), + URL decode
   let rel; try { rel = url === "/" ? "index.html" : decodeURIComponent(url.slice(1)); } catch { res.writeHead(400); return res.end("bad request"); }
   const file = path.normalize(path.join(PUBLIC, rel));
   const relToPublic = path.relative(PUBLIC, file);
@@ -1241,15 +901,15 @@ const server = http.createServer((req, res) => {
   } catch { res.writeHead(500, { "Content-Type": "text/plain" }); res.end("error"); }
 });
 
-/* R1+R3: shutdown & crash handler â€” SIGINT/SIGTERM/SIGHUP + uncaughtException tidak dijangkau
-   process.on("exit") (event loop mati di 'exit', taskkill async tak sempat). Di sini masih ada loop. */
+/* R1+R3: shutdown & crash handlers — SIGINT/SIGTERM/SIGHUP + uncaughtException are not covered by
+   process.on("exit") (the event loop is dead at 'exit', so async taskkill never runs). Here the loop is still alive. */
 let shuttingDown = false;
 function shutdown(sig) {
   if (shuttingDown) return; shuttingDown = true;
-  console.error(`[agentic-os] shutdown (${sig}) â€” hentikan proses owned`);
+  console.error(`[agentic-os] shutdown (${sig}) — stopping owned processes`);
   for (const id of procs.keys()) killOwned(id);
   try { server.close(); } catch {}
-  setTimeout(() => process.exit(0), 500);   // beri waktu taskkill async
+  setTimeout(() => process.exit(0), 500);   // give async taskkill time to finish
 }
 for (const sig of ["SIGINT", "SIGTERM", "SIGHUP"]) process.on(sig, () => shutdown(sig));
 process.on("uncaughtException", e => { console.error("[uncaughtException]", (e && e.stack) || e); shutdown("uncaughtException"); });
@@ -1257,23 +917,23 @@ process.on("unhandledRejection", e => { console.error("[unhandledRejection]", (e
 process.on("exit", () => { for (const id of procs.keys()) killOwned(id); });
 
 server.on("error", e => {
-  if (e.code === "EADDRINUSE") { console.error(`\n  Port ${PORT} sudah dipakai. Jalankan di port lain: set PORT=4322 lalu npm run dev\n`); }
+  if (e.code === "EADDRINUSE") { console.error(`\n  Port ${PORT} is already in use. Run on another port: set PORT=4322 then npm run dev\n`); }
   else console.error("[server]", (e && e.stack) || e);
   process.exit(1);
 });
 
 server.listen(PORT, () => {
-  console.log(`\n  Agentic OS jalan di  http://localhost:${PORT}`);
-  console.log(`  Vault sumber data:   ${VAULT}`);
-  console.log(`  Config agent:        ${CONFIG_PATH}`);
-  console.log(TOKEN ? "  Auth: token AKTIF (x-dash-token)" : "  Auth: tanpa token (lokal). Untuk remote: set DASH_TOKEN.\n");
-  setTimeout(pollAllStatus, 3000);       // status awal
-  setInterval(pollAllStatus, 45000);     // R4: interval (45s) > timeout gwCtl (30s) + in-flight guard
-  setTimeout(runDailyBridge, 10000);     // R#2: jalankan daily-bridge sekali di awal
-  setInterval(runDailyBridge, 3600000);  // R#2: lalu tiap jam (dulu ada tapi tak pernah dipanggil)
+  console.log(`\n  Agentic OS running at  http://localhost:${PORT}`);
+  console.log(`  Vault data source:     ${VAULT}`);
+  console.log(`  Agent config:          ${CONFIG_PATH}`);
+  console.log(TOKEN ? "  Auth: token ACTIVE (x-dash-token)" : "  Auth: no token (local only). For remote access: set DASH_TOKEN.\n");
+  setTimeout(pollAllStatus, 3000);       // initial status
+  setInterval(pollAllStatus, 45000);     // R4: interval (45s) > gwCtl timeout (30s) + in-flight guard
+  setTimeout(runDailyBridge, 10000);     // R#2: run the daily bridge once at startup
+  setInterval(runDailyBridge, 3600000);  // R#2: then hourly (it existed before but was never invoked)
 });
 
-/* R#2: jalankan scripts/hermes-daily-bridge.cjs (sync telemetry + vault daily note) */
+/* R#2: run scripts/hermes-daily-bridge.cjs (sync telemetry + vault daily note) */
 function runDailyBridge() {
   const f = path.join(__dirname, "scripts", "hermes-daily-bridge.cjs");
   if (!fs.existsSync(f)) return;

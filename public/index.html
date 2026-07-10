@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="id">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -31,7 +31,7 @@
     <div id="sideAgents" class="side-agents"></div>
     <div class="side-foot">
       <span id="clock"></span>
-      <a class="side-vault" href="obsidian://open?vault=Obsidian%20Vault" title="Buka Neural Vault di Obsidian">✳ Open Neural Vault</a>
+      <a class="side-vault" href="obsidian://open?vault=Obsidian%20Vault" title="Open Neural Vault in Obsidian">✳ Open Neural Vault</a>
       <span id="vaultPath" title=""></span>
     </div>
   </aside>
@@ -42,23 +42,24 @@
     <section id="view-command" class="view active">
       <header class="page-head">
         <h1>COMMAND CENTER</h1>
-        <div class="page-meta">Data live dari Obsidian Vault · <span id="stamp"></span></div>
+        <div class="page-meta">Live data from the Obsidian Vault · <span id="stamp"></span></div>
       </header>
       <div id="statTiles" class="tiles"></div>
 
       <div class="section-row">
-        <div class="section-label">AGENTS &amp; GATEWAYS</div>
-        <button id="runAll" class="btn btn-primary">▶ START SEMUA GATEWAY</button>
+        <div class="section-label">AGENT TOPOLOGY</div>
+        <button id="runAll" class="btn btn-primary">▶ START ALL GATEWAYS</button>
       </div>
+      <div id="topologyMap" class="topology-panel"></div>
       <div id="agentCards" class="agent-row"></div>
 
       <div class="two-col">
         <div class="panel">
           <div class="panel-head"><h2>NEEDS REVIEW</h2><span id="reviewCount" class="chip"></span></div>
           <form id="taskForm" class="task-form">
-            <select id="taskAgent" title="Tujukan ke agent"></select>
-            <input id="taskTitle" type="text" placeholder="Kasih task ke agent… (Enter kirim)" maxlength="200" autocomplete="off">
-            <button class="btn btn-run" type="submit">＋ Kirim</button>
+            <select id="taskAgent" title="Assign to agent"></select>
+            <input id="taskTitle" type="text" placeholder="Give an agent a task… (Enter to send)" maxlength="200" autocomplete="off">
+            <button class="btn btn-run" type="submit">＋ Send</button>
           </form>
           <div id="reviewList" class="review-list"></div>
         </div>
@@ -71,11 +72,11 @@
       <div class="two-col">
         <div class="panel">
           <div class="panel-head"><h2>VAULT HEALTH</h2><span class="chip chip-plain">anti data-loss</span></div>
-          <div id="vaultHealth" class="vault-health"><div class="empty">memuat…</div></div>
+          <div id="vaultHealth" class="vault-health"><div class="skeleton-block" aria-hidden="true"></div></div>
         </div>
         <div class="panel">
-          <div class="panel-head"><h2>JADWAL · SCHEDULED TASKS</h2><span class="chip chip-plain">schtasks</span></div>
-          <div id="scheduleList" class="sched-list"><div class="empty">memuat…</div></div>
+          <div class="panel-head"><h2>SCHEDULED TASKS</h2><span class="chip chip-plain">schtasks</span></div>
+          <div id="scheduleList" class="sched-list"><div class="skeleton-block" aria-hidden="true"></div></div>
         </div>
       </div>
     </section>
@@ -84,37 +85,46 @@
     <section id="view-agents" class="view">
       <header class="page-head">
         <h1>AGENTS</h1>
-        <div class="page-meta">Klik agent untuk detail: sesi aktif, subagent yang di-spawn, log gateway, telemetry. Klik foto untuk ganti avatar.</div>
+        <div class="page-meta">Click an agent for details: active sessions, spawned subagents, gateway log, telemetry. Click the photo to change the avatar.</div>
       </header>
       <div id="agentGrid" class="agent-row agent-row-wide"></div>
       <div id="agentDetail"></div>
     </section>
 
     <!-- NEURAL VAULT (GRAPH) -->
-    <section id="view-graph" class="view view-flush" style="padding: 0; margin: 0; overflow: hidden; height: calc(100vh - 52px);">
-      <iframe id="graphIframe" src="about:blank" style="width: 100%; height: 100%; border: none; background: #0f0f1a;"></iframe>
+    <section id="view-graph" class="view view-flush">
+      <div class="graph-bar">
+        <span class="graph-title">NEURAL VAULT</span>
+        <input id="graphSearch" class="graph-search" type="search" placeholder="Search nodes…" autocomplete="off">
+        <span id="graphStats" class="graph-stats"></span>
+        <a class="graph-open" href="obsidian://open?vault=Obsidian%20Vault" title="Open the vault in Obsidian">⧉ OPEN VAULT</a>
+      </div>
+      <div class="graph-wrap">
+        <canvas id="graphCanvas"></canvas>
+        <div class="graph-hint">drag to pan · scroll to zoom · click a node to open it in Obsidian</div>
+      </div>
     </section>
 
     <!-- REPORTS -->
     <section id="view-reports" class="view">
       <header class="page-head">
         <h1>REPORTS</h1>
-        <div class="page-meta">Laporan otomatis dari vault + status gateway, dengan visualisasi. Bisa disimpan sebagai catatan markdown ke <code>Reports/</code> di vault.</div>
+        <div class="page-meta">Automatic reports from the vault + gateway status, with visualizations. Can be saved as a markdown note to <code>Reports/</code> in the vault.</div>
       </header>
       <div class="section-row">
         <div class="section-label">GENERATOR</div>
         <div style="display:flex;gap:10px">
-          <button id="genReport" class="btn btn-primary">⟳ GENERATE LAPORAN</button>
-          <button id="saveReport" class="btn btn-run" disabled>💾 SIMPAN KE VAULT</button>
+          <button id="genReport" class="btn btn-primary">⟳ GENERATE REPORT</button>
+          <button id="saveReport" class="btn btn-run" disabled>💾 SAVE TO VAULT</button>
         </div>
       </div>
-      <div id="reportArea"><div class="empty">Klik <b>GENERATE LAPORAN</b> untuk membangun laporan dari kondisi vault sekarang.</div></div>
+      <div id="reportArea"><div class="empty">Click <b>GENERATE REPORT</b> to build a report from the current vault state.</div></div>
     </section>
 
     <!-- PROJECTS -->
     <section id="view-projects" class="view">
       <header class="page-head"><h1>PROJECTS</h1>
-        <div class="page-meta">Semua project note di <code>Projects/</code></div></header>
+        <div class="page-meta">All project notes in <code>Projects/</code></div></header>
       <div id="projectList" class="list-panel"></div>
     </section>
   </main>
@@ -122,13 +132,13 @@
 
 <input type="file" id="avatarFile" accept="image/png,image/jpeg,image/webp" hidden>
 
-<!-- login token inline (muncul kalau /api balik 401 dari akses non-lokal) -->
+<!-- Inline token login (shown when /api returns 401 for non-local access) -->
 <div id="tokenLogin" class="token-ov" hidden>
   <div class="token-box">
-    <div class="token-title">◈ AGENTIC//OS terkunci</div>
-    <div class="token-sub">Dashboard butuh token (DASH_TOKEN) untuk akses remote.</div>
-    <input id="tokenInput" type="password" placeholder="Masukkan token…" autocomplete="current-password">
-    <button id="tokenSubmit" class="btn btn-primary">Masuk</button>
+    <div class="token-title">◈ AGENTIC//OS locked</div>
+    <div class="token-sub">The dashboard requires a token (DASH_TOKEN) for remote access.</div>
+    <input id="tokenInput" type="password" placeholder="Enter token…" autocomplete="current-password">
+    <button id="tokenSubmit" class="btn btn-primary">Sign in</button>
     <div id="tokenHint" class="token-hint"></div>
   </div>
 </div>
