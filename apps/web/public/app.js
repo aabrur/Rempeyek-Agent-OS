@@ -7,6 +7,24 @@ let lastReport = null;
 let AGENTS = {};   // R#10: id -> agent (owner: native-service check for the confirm guard)
 
 const ACCENT = { "claude-code": "#00E5FF", hermes: "#A6FF3C", openclaw: "#4C9BFF", "kilo-code": "#8C5BFF", copilot: "#FFB01F", cline: "#F2FF3C", pi: "#3CFFC8", antigravity: "#FF8A3C" };
+
+/* Neural Cosmos Edition theme registry — must mirror the [data-theme] blocks in style.css.
+   sw = accent swatch, bg = swatch backdrop. "cosmos" is the base :root (no data-theme block needed). */
+const THEMES = [
+  { id: "rempeyek",       name: "Rempeyek",        sw: "#A78BFA", bg: "#07060E" },
+  { id: "cosmos",         name: "Neural Cosmos",   sw: "#00E5FF", bg: "#050310" },
+  { id: "ember",          name: "Ember",           sw: "#FFB01F", bg: "#0C0705" },
+  { id: "ghost-protocol", name: "Ghost Protocol",  sw: "#8CFFE0", bg: "#060A09" },
+  { id: "quantum-glass",  name: "Quantum Glass",   sw: "#7DD3FC", bg: "#050810" },
+  { id: "dark-matter",    name: "Dark Matter",     sw: "#9E8CFF", bg: "#030308" },
+  { id: "nebula",         name: "Nebula",          sw: "#FF7EDB", bg: "#0A0416" },
+  { id: "aurora",         name: "Aurora",          sw: "#55FFB8", bg: "#03100C" },
+  { id: "midnight",       name: "Midnight",        sw: "#4C9BFF", bg: "#030614" },
+  { id: "solaris",        name: "Solaris",         sw: "#FFC53D", bg: "#0D0900" },
+  { id: "crimson-rift",   name: "Crimson Rift",    sw: "#FF3D5E", bg: "#0F0308" },
+  { id: "monochrome",     name: "Monochrome",      sw: "#E6E6E6", bg: "#050505" },
+  { id: "nothing-os",     name: "Nothing OS",      sw: "#D71921", bg: "#0A0A0A" },
+];
 const TILE_C = ["#00E5FF", "#FF3DD8", "#A6FF3C", "#FFB01F"];
 const PALETTE = ["#00E5FF", "#FF3DD8", "#A6FF3C", "#FFB01F", "#8C5BFF", "#FF4D6A", "#3CFFC8", "#FF8A3C", "#4C9BFF", "#F2FF3C"];
 
@@ -70,7 +88,8 @@ function obsUri(rel) {
 function el(html) { const t = document.createElement("template"); t.innerHTML = html.trim(); return t.content.firstChild; }
 function esc(s) { return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
 function pill(status) { return `<span class="pill"><span class="dot ${status}"></span><span class="lbl-${status}">${status}</span></span>`; }
-function ac(id) { return ACCENT[id] || "#8C5BFF"; }
+/* per-agent accent: config-driven ("accent" in agents.config.json) wins, then the built-in map */
+function ac(id) { return (AGENTS[id] && AGENTS[id].accent) || ACCENT[id] || "#8C5BFF"; }
 function gwState(p) {
   if (!p || p.status === "off") return { cls: "idle", label: "not checked yet", tip: "" };
   if (p.status === "running") return { cls: "running", label: p.mode === "owned" ? `running · owned pid ${p.pid}` : "running · service", tip: p.statusText || "" };
@@ -744,12 +763,20 @@ document.getElementById("nav").addEventListener("click", e => {
   if (btn) switchView(btn.dataset.view);
 });
 
-/* ---------- theme switcher ---------- */
+/* ---------- theme switcher (Neural Cosmos Edition — swatch grid from THEMES) ---------- */
 function accent() { return (getComputedStyle(document.documentElement).getPropertyValue("--acc") || "#00E5FF").trim(); }
 function markTheme() {
   const t = document.documentElement.dataset.theme || "rempeyek";
   document.querySelectorAll("[data-theme-pick]").forEach(b => b.classList.toggle("on", b.dataset.themePick === t));
+  const nameEl = document.getElementById("themeName");
+  if (nameEl) { const th = THEMES.find(x => x.id === t); nameEl.textContent = th ? th.name : t; }
 }
+(function renderThemePick() {
+  const box = document.getElementById("themePick");
+  if (!box) return;
+  box.innerHTML = THEMES.map(t =>
+    `<button class="theme-sw" data-theme-pick="${t.id}" style="--sw:${t.sw};--sw-bg:${t.bg}" title="${t.name}" aria-label="Theme: ${t.name}"></button>`).join("");
+})();
 document.getElementById("themePick").addEventListener("click", e => {
   const b = e.target.closest("[data-theme-pick]");
   if (!b) return;
@@ -761,6 +788,45 @@ document.getElementById("themePick").addEventListener("click", e => {
   if (graph) graph.reheat();
 });
 markTheme();
+
+/* ---------- add agent (writes agents.config.json via /api/agents/add) ---------- */
+(function wireAddAgent() {
+  const ov = document.getElementById("addAgentOv");
+  const form = document.getElementById("addAgentForm");
+  const btn = document.getElementById("addAgentBtn");
+  if (!ov || !form || !btn) return;
+  const hint = document.getElementById("aaHint");
+  const nameIn = document.getElementById("aaName"), idIn = document.getElementById("aaId");
+  const slug = s => String(s).toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 32);
+  const open = () => { ov.hidden = false; hint.textContent = ""; hint.classList.remove("err"); nameIn.focus(); };
+  const close = () => { ov.hidden = true; form.reset(); };
+  btn.addEventListener("click", open);
+  document.getElementById("aaCancel").addEventListener("click", close);
+  ov.addEventListener("click", e => { if (e.target === ov) close(); });
+  nameIn.addEventListener("input", () => { if (!idIn.dataset.touched) idIn.value = slug(nameIn.value); });
+  idIn.addEventListener("input", () => { idIn.dataset.touched = "1"; });
+  form.addEventListener("submit", async e => {
+    e.preventDefault();
+    const body = {
+      id: slug(idIn.value || nameIn.value),
+      name: nameIn.value.trim(),
+      icon: document.getElementById("aaIcon").value.trim(),
+      role: document.getElementById("aaRole").value.trim(),
+      accent: document.getElementById("aaAccent").value,
+      trigger: document.getElementById("aaTrigger").value.trim(),
+      home: document.getElementById("aaHome").value.trim(),
+    };
+    if (!body.id || !body.name) { hint.textContent = "name (and id) required"; hint.classList.add("err"); return; }
+    const sub = form.querySelector("button[type=submit]");
+    const lbl = sub.textContent; sub.disabled = true; sub.textContent = "…";
+    const r = await api("/api/agents/add", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    sub.disabled = false; sub.textContent = lbl;
+    if (r.error) { hint.textContent = r.error; hint.classList.add("err"); return; }
+    close();
+    _lastStateKey = "";   // new node must appear even if the poll hasn't ticked yet
+    refresh();
+  });
+})();
 
 /* ---------- loop ---------- */
 async function refresh() {

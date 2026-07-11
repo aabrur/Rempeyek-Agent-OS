@@ -12,7 +12,8 @@ Obsidian Vault (the shared memory layer), with per-agent daily logs under
 ## Features
 
 - **Agent topology map** — live radial map of every agent and its gateway status
-- **Cosmic themes** — 3 switchable themes (Rempeyek violet · Cosmos cyan · Ember amber), persisted per browser
+- **Cosmic themes** — 13 switchable themes (Rempeyek · Neural Cosmos · Ember · Ghost Protocol · Quantum Glass · Dark Matter · Nebula · Aurora · Midnight · Solaris · Crimson Rift · Monochrome · Nothing OS), persisted per browser
+- **＋ Add Agent** — register new agents from the dashboard (auto node-numbering, per-agent accent color, optional summon CLI)
 - **Summon with install-gate** — one click opens an admin terminal at the agent's home folder and runs its CLI; if the CLI isn't installed, you get the install command + page instead
 - **Gateway control** — start / stop / restart / status / run agents from the dashboard
 - **Health monitoring** — TCP probes, 24h uptime history, watchdog auto-restart (opt-in), desktop alerts when an agent goes down
@@ -48,6 +49,22 @@ npm run dev                     # http://localhost:4321
 
 Port already taken? `set PORT=4322` then `npm run dev` again.
 
+## Repository structure
+
+```
+apps/web/        the dashboard (server.js + public/) — what `npm run dev` runs
+apps/desktop/    planned native shell (see its README)
+packages/        extraction targets, each README maps it to today's code
+docs/            Design-Bible · Architecture · Neural-Vault · Agent-System · MCP · Theme-System · Roadmap
+prompts/         system + role prompts for the agent fleet
+scripts/         bridges (telemetry ↔ vault)
+supabase/        optional cloud-mirror DDL
+telemetry/       per-agent JSONL event streams (runtime data)
+```
+
+Runtime data (`telemetry/`, `agents.config.json`, `.env`, your vault) stays at the
+repo root — see [docs/Architecture.md](docs/Architecture.md).
+
 ## Configuration
 
 ### `.env`
@@ -59,6 +76,8 @@ Port already taken? `set PORT=4322` then `npm run dev` again.
 | `DASH_TOKEN` | Auth token for remote access (localhost is always allowed) | none |
 | `CLAUDE_PROJECTS` | Claude Code transcripts folder | `%USERPROFILE%\.claude\projects` |
 | `BACKUP_PATH` | Vault backup location (enables the backup-age row in Vault Health) | none |
+| `SUPABASE_URL` | Optional cloud mirror — project URL (see `supabase/aos_agents.sql`) | none |
+| `SUPABASE_SERVICE_KEY` | service_role key for the mirror — **server-side only, never commit** | none |
 
 ### `agents.config.json`
 

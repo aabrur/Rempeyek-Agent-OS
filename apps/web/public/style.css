@@ -35,6 +35,59 @@
   --bg: #0C0705; --panel: #150F09; --card: #1E140B; --card-hi: #291B0E; --line: #3C2B15;
   --violet: #FF6B3C; --magenta: #FF3D6E; --muted: #B39A80; --text: #FFF3E6;
 }
+/* Neural Cosmos Edition — expanded theme set. Every theme stays dark (the cosmos
+   backdrop + rgba overlays assume it); each only re-tunes the token layer. */
+:root[data-theme="ghost-protocol"] {
+  --acc: #8CFFE0;
+  --bg: #060A09; --panel: #0B120F; --card: #101B17; --card-hi: #16241E; --line: #1F3229;
+  --magenta: #6EE7C8; --violet: #4ADEB8; --muted: #7FA396; --text: #EAFFF7;
+}
+:root[data-theme="quantum-glass"] {
+  --acc: #7DD3FC;
+  --bg: #050810; --panel: #0A101E; --card: #101828; --card-hi: #16223A; --line: #223354;
+  --magenta: #A5B4FC; --violet: #60A5FA; --muted: #8CA3C7; --text: #EAF2FF;
+}
+:root[data-theme="dark-matter"] {
+  --acc: #9E8CFF;
+  --bg: #030308; --panel: #08080F; --card: #0D0D16; --card-hi: #13131F; --line: #1D1D2E;
+  --magenta: #8B7BD8; --muted: #77748F; --text: #ECEAF7;
+}
+:root[data-theme="nebula"] {
+  --acc: #FF7EDB;
+  --bg: #0A0416; --panel: #120827; --card: #1A0D36; --card-hi: #241348; --line: #33205C;
+  --magenta: #FF7EDB; --violet: #9D6BFF; --muted: #A98FD1; --text: #F5EBFF;
+}
+:root[data-theme="aurora"] {
+  --acc: #55FFB8;
+  --bg: #03100C; --panel: #071812; --card: #0B211A; --card-hi: #102B22; --line: #1B4033;
+  --magenta: #3CFFC8; --violet: #55D6FF; --muted: #7FB8A3; --text: #E8FFF5;
+}
+:root[data-theme="midnight"] {
+  --acc: #4C9BFF;
+  --bg: #030614; --panel: #060B20; --card: #0A122E; --card-hi: #0F1A3E; --line: #1B2A55;
+  --magenta: #6C8CFF; --violet: #4C6FFF; --muted: #7C89B8; --text: #E9EEFF;
+}
+:root[data-theme="solaris"] {
+  --acc: #FFC53D;
+  --bg: #0D0900; --panel: #171104; --card: #201807; --card-hi: #2C210B; --line: #443413;
+  --magenta: #FF8A3C; --violet: #FFA94D; --muted: #B8A578; --text: #FFF7E0;
+}
+:root[data-theme="crimson-rift"] {
+  --acc: #FF3D5E;
+  --bg: #0F0308; --panel: #180610; --card: #220A16; --card-hi: #2E0F1E; --line: #47182D;
+  --magenta: #FF3D8A; --violet: #FF6B7A; --muted: #B87F92; --text: #FFECF1;
+}
+:root[data-theme="monochrome"] {
+  --acc: #E6E6E6;
+  --bg: #050505; --panel: #0C0C0C; --card: #121212; --card-hi: #1A1A1A; --line: #262626;
+  --cyan: #F0F0F0; --magenta: #BFBFBF; --lime: #D9D9D9; --amber: #A6A6A6; --violet: #8C8C8C;
+  --muted: #8A8A8A; --text: #F2F2F2;
+}
+:root[data-theme="nothing-os"] {
+  --acc: #D71921;
+  --bg: #0A0A0A; --panel: #101010; --card: #161616; --card-hi: #1E1E1E; --line: #2A2A2A;
+  --magenta: #D71921; --violet: #8C8C8C; --muted: #909090; --text: #F5F5F5;
+}
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { height: 100%; }
 body {
@@ -596,9 +649,23 @@ body {
   backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
 }
 
-/* theme switcher pills (sidebar) */
-.theme-pick { display: flex; gap: 5px; padding: 0 8px; flex-wrap: wrap; }
-.theme-pick .lyr { flex: 1; text-align: center; font-size: 8.5px; padding: 4px 6px; }
+/* theme switcher — swatch grid (Neural Cosmos Edition: 13 themes) */
+.theme-pick { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; padding: 0 8px; }
+.theme-sw {
+  position: relative; width: 100%; aspect-ratio: 1; border-radius: 7px; cursor: pointer;
+  border: 1px solid var(--line); background: var(--sw-bg, #0A0A14); transition: border-color .15s, box-shadow .15s, transform .15s;
+  padding: 0;
+}
+.theme-sw::after {
+  content: ""; position: absolute; inset: 27%; border-radius: 50%;
+  background: var(--sw, var(--acc)); box-shadow: 0 0 7px var(--sw, var(--acc));
+}
+.theme-sw:hover { border-color: var(--sw); transform: translateY(-1px); }
+.theme-sw.on { border-color: var(--sw); box-shadow: 0 0 10px color-mix(in srgb, var(--sw) 55%, transparent); }
+.theme-name {
+  font-family: var(--mono); font-size: 9px; letter-spacing: .14em; color: var(--acc);
+  text-transform: uppercase; padding: 6px 8px 0; opacity: .85;
+}
 .brand-name { line-height: 1.25; }
 
 /* topology shockwaves: expanding rings from the hub core and running agents */
@@ -612,6 +679,22 @@ body {
     100% { transform: scale(3.1); opacity: 0; }
   }
 }
+
+/* ---------------- add-agent modal ---------------- */
+.aa-box { width: min(460px, 92vw); }
+.aa-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.aa-field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.aa-field.wide { grid-column: 1 / -1; }
+.aa-field label { font-family: var(--mono); font-size: 9px; letter-spacing: .16em; color: var(--muted); text-transform: uppercase; }
+.aa-field input {
+  padding: 8px 10px; border-radius: 7px; border: 1px solid var(--line);
+  background: var(--bg); color: var(--text); font: 12px var(--mono); min-width: 0;
+}
+.aa-field input:focus { outline: none; border-color: var(--acc); }
+.aa-field input[type="color"] { padding: 2px 4px; height: 34px; cursor: pointer; }
+.aa-actions { display: flex; flex-direction: row; align-items: center; gap: 8px; justify-content: flex-end; margin-top: 4px; }
+.aa-hint { font-size: 10.5px; color: var(--muted); font-family: var(--mono); min-height: 14px; }
+.aa-hint.err { color: var(--red); }
 
 /* responsive */
 @media (max-width: 1000px) {

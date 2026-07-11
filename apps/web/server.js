@@ -10,9 +10,13 @@ const os = require("os");
 const { spawn, execFile, spawnSync } = require("child_process");
 const crypto = require("crypto");
 
+/* Monorepo layout: this file lives in apps/web/, but runtime data (vault, config,
+   telemetry, scripts, .env) stays at the repo ROOT so agent CLIs and bridges keep working. */
+const ROOT = path.resolve(__dirname, "..", "..");
+
 /* load .env (KEY=VALUE per line; real env vars win over file contents) */
 try {
-  for (const line of fs.readFileSync(path.join(__dirname, ".env"), "utf8").split(/\r?\n/)) {
+  for (const line of fs.readFileSync(path.join(ROOT, ".env"), "utf8").split(/\r?\n/)) {
     const m = line.match(/^\s*([A-Z_][A-Z0-9_]*)\s*=\s*(.*)\s*$/);
     if (m && !line.trim().startsWith("#") && process.env[m[1]] === undefined)
       process.env[m[1]] = m[2].replace(/^["']|["']$/g, "");
@@ -20,15 +24,15 @@ try {
 } catch {}
 
 const PORT = process.env.PORT || 4321;
-const VAULT = process.env.VAULT_PATH || path.join(__dirname, "Obsidian Vault");
-const CONFIG_PATH = process.env.AGENTS_CONFIG || path.join(__dirname, "agents.config.json");
+const VAULT = process.env.VAULT_PATH || path.join(ROOT, "Obsidian Vault");
+const CONFIG_PATH = process.env.AGENTS_CONFIG || path.join(ROOT, "agents.config.json");
 const TOKEN = process.env.DASH_TOKEN || "";
 const PUBLIC = path.join(__dirname, "public");
 const IGNORE = new Set([".git", ".obsidian", "Assets", "node_modules"]);
 const DAY = 86400000;
 const LOG_MAX = 800;
 const AVATAR_DIR = path.join(PUBLIC, "avatars");
-const TELEMETRY_DIR = path.join(__dirname, "telemetry");
+const TELEMETRY_DIR = path.join(ROOT, "telemetry");
 const LOG_DIR = path.join(TELEMETRY_DIR, "logs");   // R#4: per-agent run log, survives restarts
 const TERMS_DIR = path.join(TELEMETRY_DIR, "terms"); // summoned-terminal pid/kill handshake files
 const LOG_FILE_MAX = 1_000_000;                     // 1 MB/agent → naive rotation (keep the tail half)
@@ -51,6 +55,68 @@ function loadConfig() {
     if (_cfgCache.data) { console.error("[config] parse failed, using last-good:", e.message); configError = { msg: e.message, at: new Date().toISOString() }; return _cfgCache.data; }
     throw e;
   }
+}
+
+/* saveConfig: the ONLY write path for agents.config.json — backs up the current file
+   to <config>.bak first, writes pretty JSON, and invalidates the mtime cache. */
+function saveConfig(cfg) {
+  try { fs.copyFileSync(CONFIG_PATH, CONFIG_PATH + ".bak"); } catch {}
+  fs.writeFileSync(CONFIG_PATH, JSON.stringify(cfg, null, 2) + "\n", "utf8");
+  _cfgCache = { mtime: 0, data: null };   // force reload on next loadConfig()
+}
+
+/* /api/agents/add — register a new agent from the dashboard.
+   Minimal shape: id, name; optional icon/role/accent; optional trigger+home → summonable (actions []). */
+function addAgent(body) {
+  const id = String(body.id || "").trim();
+  if (!/^[a-z0-9][a-z0-9-]{1,31}$/.test(id)) return { error: "id must be a 2-32 char slug (a-z, 0-9, -)" };
+  const name = String(body.name || "").trim().slice(0, 40);
+  if (!name) return { error: "name is required" };
+  const cfg = loadConfig();
+  if (cfg.agents.some(a => a.id === id)) return { error: `agent '${id}' already exists` };
+  const accent = /^#[0-9a-fA-F]{6}$/.test(String(body.accent || "")) ? body.accent : undefined;
+  const trigger = String(body.trigger || "").trim().slice(0, 200) || undefined;
+  const home = String(body.home || "").trim().slice(0, 260) || undefined;
+  const nodeNums = cfg.agents.map(a => Number((String(a.node || "").match(/(\d+)$/) || [])[1])).filter(n => !Number.isNaN(n));
+  const agent = {
+    id, name,
+    icon: String(body.icon || "🤖").slice(0, 4),
+    role: String(body.role || "Agent").trim().slice(0, 80),
+    node: `Node-${(nodeNums.length ? Math.max(...nodeNums) : 0) + 1}`,
+    lane: name.replace(/[^A-Za-z0-9]/g, ""),
+    enabled: true,
+    ...(accent ? { accent } : {}),
+    note: `Registered via dashboard ${localISO().slice(0, 10)}.${trigger ? "" : " Observe-only (no trigger CLI configured)."}`,
+    ...(trigger ? { gateway: { home: home || path.join(os.homedir(), "." + id), trigger, actions: [] } } : {}),
+  };
+  cfg.agents.push(agent);
+  try { saveConfig(cfg); } catch (e) { return { error: `failed to write config: ${e.message}` }; }
+  sysEvent(id, "ok", `agent registered via dashboard (${agent.node})`);
+  sbMirrorAgents();   // fire-and-forget cloud mirror (no-op when Supabase is not configured)
+  return { ok: true, agent };
+}
+
+/* ---------------- optional Supabase mirror ----------------
+   When SUPABASE_URL + SUPABASE_SERVICE_KEY are set in .env (service key = server-side ONLY,
+   never shipped to public/), the agent registry is mirrored to table aos_agents via PostgREST.
+   Purely additive: the filesystem stays the source of truth; failures only log. */
+const SUPABASE_URL = (process.env.SUPABASE_URL || "").replace(/\/+$/, "");
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || "";
+const sbEnabled = () => !!(SUPABASE_URL && SUPABASE_KEY && typeof fetch === "function");
+async function sbMirrorAgents() {
+  if (!sbEnabled()) return;
+  try {
+    const cfg = loadConfig();
+    const rows = cfg.agents.map(a => ({ id: a.id, config: { ...a, gateway: undefined }, updated_at: new Date().toISOString() }));
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/aos_agents?on_conflict=id`, {
+      method: "POST",
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, "Content-Type": "application/json", Prefer: "resolution=merge-duplicates" },
+      body: JSON.stringify(rows),
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status} ${(await res.text()).slice(0, 120)}`);
+    console.log(`[supabase] mirrored ${rows.length} agents → aos_agents`);
+  } catch (e) { console.error("[supabase] mirror failed:", e.message); }
 }
 
 /* ---------------- vault scan (view: Command Center) ---------------- */
@@ -1130,6 +1196,12 @@ const server = http.createServer((req, res) => {
           const r = markTaskDone(d.source, d.text);
           json(res, r.error ? 400 : 200, r);
         });
+      if (url === "/api/agents/add" && req.method === "POST")
+        return readBody(req, res, body => {
+          let d; try { d = JSON.parse(body); } catch { return json(res, 400, { error: "body must be JSON {id,name,icon?,role?,accent?,trigger?,home?}" }); }
+          const r = addAgent(d);
+          json(res, r.error ? 400 : 200, r);
+        });
       if (url === "/api/schedule") return buildSchedule(r => json(res, 200, r));      // R#8
       if (url === "/api/vault-health") return buildVaultHealth(r => json(res, 200, r)); // R#9
       m = url.match(/^\/api\/agent\/([\w-]+)\/detail$/);
@@ -1196,11 +1268,12 @@ server.listen(PORT, () => {
   setInterval(pollSummons, 45000);       // keep summoned-terminal liveness fresh
   setTimeout(runDailyBridge, 10000);     // R#2: run the daily bridge once at startup
   setInterval(runDailyBridge, 3600000);  // R#2: then hourly (it existed before but was never invoked)
+  if (sbEnabled()) { console.log("  Supabase mirror:       ACTIVE (aos_agents)"); setTimeout(sbMirrorAgents, 5000); }
 });
 
 /* R#2: run scripts/hermes-daily-bridge.cjs (sync telemetry + vault daily note) */
 function runDailyBridge() {
-  const f = path.join(__dirname, "scripts", "hermes-daily-bridge.cjs");
+  const f = path.join(ROOT, "scripts", "hermes-daily-bridge.cjs");
   if (!fs.existsSync(f)) return;
   execFile(process.execPath, [f], { windowsHide: true, env: process.env }, e => { if (e) console.error("[daily-bridge]", e.message); });
 }

@@ -50,7 +50,8 @@
       "node": "Node-3",
       "lane": "CliAgent",
       "enabled": true,
-      "note": "No gateway subcommand — actions: [] means observability-only. The dashboard shows status from telemetry and offers a Summon button (opens an admin terminal at `home` and runs `trigger`). If the CLI is missing, Summon shows `install` guidance (cmd + url) instead of opening a dead terminal.",
+      "accent": "#3CFFC8",
+      "note": "No gateway subcommand — actions: [] means observability-only. The dashboard shows status from telemetry and offers a Summon button (opens an admin terminal at `home` and runs `trigger`). If the CLI is missing, Summon shows `install` guidance (cmd + url) instead of opening a dead terminal. `accent` (optional #hex) colors this agent everywhere in the UI; agents added via the dashboard's ＋ ADD AGENT button get it automatically.",
       "gateway": {
         "home": "C:\\Users\\you\\.cli-agent",
         "trigger": "cli-agent",

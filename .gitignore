@@ -5,8 +5,8 @@
 node_modules/
 telemetry/*.jsonl
 telemetry/logs/
-public/avatars/*
-!public/avatars/.gitkeep
+apps/web/public/avatars/*
+!apps/web/public/avatars/.gitkeep
 
 # Personal memory layer (lives on disk, not in this repo)
 Obsidian Vault/

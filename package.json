@@ -1,10 +1,11 @@
 {
-  "name": "agentic-os",
-  "version": "1.0.0",
-  "description": "AI-Agent Agentic OS — command center dashboard membaca live dari Obsidian Vault",
+  "name": "rempeyek-agent-os",
+  "version": "2.0.0",
+  "description": "REMPEYEK AGENT OS — Neural Cosmos Edition. Agentic operating system: command center dashboard reading live from the Obsidian Vault.",
   "private": true,
   "scripts": {
-    "dev": "node server.js",
-    "start": "node server.js"
+    "dev": "node apps/web/server.js",
+    "start": "node apps/web/server.js",
+    "web": "node apps/web/server.js"
   }
 }

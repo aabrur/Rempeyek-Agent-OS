@@ -31,11 +31,8 @@
     <div class="side-label">AGENTS</div>
     <div id="sideAgents" class="side-agents"></div>
     <div class="side-label">THEME</div>
-    <div id="themePick" class="theme-pick">
-      <button class="lyr" data-theme-pick="rempeyek" title="Violet — Rempeyek">REMPEYEK</button>
-      <button class="lyr" data-theme-pick="cosmos" title="Cyan — Cosmos">COSMOS</button>
-      <button class="lyr" data-theme-pick="ember" title="Amber — Ember">EMBER</button>
-    </div>
+    <div id="themePick" class="theme-pick"></div>
+    <div id="themeName" class="theme-name"></div>
     <div class="side-foot">
       <span id="clock"></span>
       <a class="side-vault" href="obsidian://open?vault=Obsidian%20Vault" title="Open Neural Vault in Obsidian">✳ Open Neural Vault</a>
@@ -94,6 +91,10 @@
         <h1>AGENTS</h1>
         <div class="page-meta">Click an agent for details: active sessions, spawned subagents, gateway log, telemetry. Click the photo to change the avatar.</div>
       </header>
+      <div class="section-row">
+        <div class="section-label">REGISTERED NODES</div>
+        <button id="addAgentBtn" class="btn btn-primary">＋ ADD AGENT</button>
+      </div>
       <div id="agentGrid" class="agent-row agent-row-wide"></div>
       <div id="agentDetail"></div>
     </section>
@@ -144,6 +145,28 @@
 </div>
 
 <input type="file" id="avatarFile" accept="image/png,image/jpeg,image/webp" hidden>
+
+<!-- Add-agent modal -->
+<div id="addAgentOv" class="token-ov" hidden>
+  <div class="token-box aa-box">
+    <div class="token-title">＋ REGISTER NEW AGENT</div>
+    <div class="token-sub">Add a node to the mesh. It appears in the topology, cards, and sidebar immediately; give it a trigger CLI to make it summonable.</div>
+    <form id="addAgentForm" class="aa-grid">
+      <div class="aa-field"><label for="aaName">Name *</label><input id="aaName" required maxlength="40" placeholder="Nova"></div>
+      <div class="aa-field"><label for="aaId">ID (slug)</label><input id="aaId" maxlength="32" pattern="[a-z0-9][a-z0-9-]*" placeholder="nova"></div>
+      <div class="aa-field"><label for="aaIcon">Icon (emoji)</label><input id="aaIcon" maxlength="4" placeholder="🤖"></div>
+      <div class="aa-field"><label for="aaAccent">Accent</label><input id="aaAccent" type="color" value="#8C5BFF"></div>
+      <div class="aa-field wide"><label for="aaRole">Role</label><input id="aaRole" maxlength="80" placeholder="Research & analysis specialist"></div>
+      <div class="aa-field"><label for="aaTrigger">Trigger CLI (optional)</label><input id="aaTrigger" maxlength="200" placeholder="nova"></div>
+      <div class="aa-field"><label for="aaHome">Home dir (optional)</label><input id="aaHome" maxlength="200" placeholder="C:\Users\you\.nova"></div>
+      <div class="aa-field wide aa-actions">
+        <span id="aaHint" class="aa-hint" style="margin-right:auto"></span>
+        <button type="button" id="aaCancel" class="btn btn-dim">Cancel</button>
+        <button type="submit" class="btn btn-primary">＋ Register</button>
+      </div>
+    </form>
+  </div>
+</div>
 
 <!-- Inline token login (shown when /api returns 401 for non-local access) -->
 <div id="tokenLogin" class="token-ov" hidden>
