@@ -27,7 +27,12 @@ const PORT = process.env.PORT || 4321;
 const VAULT = process.env.VAULT_PATH || path.join(ROOT, "Obsidian Vault");
 const CONFIG_PATH = process.env.AGENTS_CONFIG || path.join(ROOT, "agents.config.json");
 const TOKEN = process.env.DASH_TOKEN || "";
+/* PUBLIC = static source (images + runtime-uploaded avatars, never wiped by a build).
+   DIST   = the built React app (`npm run build`). Requests resolve DIST first, then
+   PUBLIC, then fall back to index.html — /avatars always comes from PUBLIC, because
+   Vite's emptyOutDir would otherwise delete uploads on the next build. */
 const PUBLIC = path.join(__dirname, "public");
+const DIST = path.join(__dirname, "dist");
 const IGNORE = new Set([".git", ".obsidian", "Assets", "node_modules"]);
 const DAY = 86400000;
 const LOG_MAX = 800;
@@ -92,31 +97,7 @@ function addAgent(body) {
   cfg.agents.push(agent);
   try { saveConfig(cfg); } catch (e) { return { error: `failed to write config: ${e.message}` }; }
   sysEvent(id, "ok", `agent registered via dashboard (${agent.node})`);
-  sbMirrorAgents();   // fire-and-forget cloud mirror (no-op when Supabase is not configured)
   return { ok: true, agent };
-}
-
-/* ---------------- optional Supabase mirror ----------------
-   When SUPABASE_URL + SUPABASE_SERVICE_KEY are set in .env (service key = server-side ONLY,
-   never shipped to public/), the agent registry is mirrored to table aos_agents via PostgREST.
-   Purely additive: the filesystem stays the source of truth; failures only log. */
-const SUPABASE_URL = (process.env.SUPABASE_URL || "").replace(/\/+$/, "");
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || "";
-const sbEnabled = () => !!(SUPABASE_URL && SUPABASE_KEY && typeof fetch === "function");
-async function sbMirrorAgents() {
-  if (!sbEnabled()) return;
-  try {
-    const cfg = loadConfig();
-    const rows = cfg.agents.map(a => ({ id: a.id, config: { ...a, gateway: undefined }, updated_at: new Date().toISOString() }));
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/aos_agents?on_conflict=id`, {
-      method: "POST",
-      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, "Content-Type": "application/json", Prefer: "resolution=merge-duplicates" },
-      body: JSON.stringify(rows),
-      signal: AbortSignal.timeout(10000),
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status} ${(await res.text()).slice(0, 120)}`);
-    console.log(`[supabase] mirrored ${rows.length} agents → aos_agents`);
-  } catch (e) { console.error("[supabase] mirror failed:", e.message); }
 }
 
 /* ---------------- vault scan (view: Command Center) ---------------- */
@@ -745,7 +726,7 @@ function buildGraph() {
   const seen = new Set();
   const push = (s, t, type) => {
     if (s === t) return;
-    const key = (s < t ? s + " " + t : t + " " + s) + " " + type;
+    const key = (s < t ? s + "\0" + t : t + "\0" + s) + "\0" + type;
     if (seen.has(key)) return;
     seen.add(key);
     edges.push({ s, t, type });
@@ -1222,15 +1203,29 @@ const server = http.createServer((req, res) => {
 
   // S5: path-traversal guard using path.relative (not startsWith), + URL decode
   let rel; try { rel = url === "/" ? "index.html" : decodeURIComponent(url.slice(1)); } catch { res.writeHead(400); return res.end("bad request"); }
-  const file = path.normalize(path.join(PUBLIC, rel));
-  const relToPublic = path.relative(PUBLIC, file);
-  if (relToPublic.startsWith("..") || path.isAbsolute(relToPublic)) {
-    res.writeHead(403, { "Content-Type": "text/plain" }); return res.end("forbidden");
+
+  /* Resolve a request against a root, refusing anything that escapes it. */
+  const resolve = (root, r) => {
+    const file = path.normalize(path.join(root, r));
+    const inside = path.relative(root, file);
+    if (inside.startsWith("..") || path.isAbsolute(inside)) return null;
+    try { return fs.existsSync(file) && !fs.statSync(file).isDirectory() ? file : null; } catch { return null; }
+  };
+
+  // /avatars/* is runtime-written → always from PUBLIC, never the (rebuilt) dist copy
+  const roots = rel.startsWith("avatars/") ? [PUBLIC] : [DIST, PUBLIC];
+  let file = null;
+  for (const root of roots) { file = resolve(root, rel); if (file) break; }
+
+  // SPA fallback: unknown non-asset path → the built index.html (client-side routing)
+  if (!file && !path.extname(rel)) file = resolve(DIST, "index.html");
+
+  if (!file) {
+    const hint = fs.existsSync(DIST) ? "not found" : "not built — run: npm run build";
+    res.writeHead(404, { "Content-Type": "text/plain" });
+    return res.end(hint);
   }
   try {
-    if (!fs.existsSync(file) || fs.statSync(file).isDirectory()) {
-      res.writeHead(404, { "Content-Type": "text/plain" }); return res.end("not found");
-    }
     res.writeHead(200, { "Content-Type": MIME[path.extname(file)] || "application/octet-stream" });
     res.end(fs.readFileSync(file));
   } catch { res.writeHead(500, { "Content-Type": "text/plain" }); res.end("error"); }
@@ -1268,7 +1263,6 @@ server.listen(PORT, () => {
   setInterval(pollSummons, 45000);       // keep summoned-terminal liveness fresh
   setTimeout(runDailyBridge, 10000);     // R#2: run the daily bridge once at startup
   setInterval(runDailyBridge, 3600000);  // R#2: then hourly (it existed before but was never invoked)
-  if (sbEnabled()) { console.log("  Supabase mirror:       ACTIVE (aos_agents)"); setTimeout(sbMirrorAgents, 5000); }
 });
 
 /* R#2: run scripts/hermes-daily-bridge.cjs (sync telemetry + vault daily note) */

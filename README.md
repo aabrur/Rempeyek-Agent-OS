@@ -5,9 +5,10 @@ and their latest results — all from a single screen. Live data is read from an
 Obsidian Vault (the shared memory layer), with per-agent daily logs under
 `Brains/<Lane>/`.
 
-**Zero dependencies.** Pure Node.js (no npm packages), vanilla JS frontend, no build step.
+**Zero-dependency server.** The API is pure Node.js (no npm packages). The frontend is
+React + Vite, split into components across an npm-workspaces monorepo.
 
-![Platform](https://img.shields.io/badge/platform-Windows-blue) ![Node](https://img.shields.io/badge/node-%E2%89%A518-green) ![Deps](https://img.shields.io/badge/dependencies-0-brightgreen)
+![Platform](https://img.shields.io/badge/platform-Windows-blue) ![Node](https://img.shields.io/badge/node-%E2%89%A518-green) ![Server deps](https://img.shields.io/badge/server%20deps-0-brightgreen) ![UI](https://img.shields.io/badge/ui-React%20%2B%20Vite-61DAFB)
 
 ## Features
 
@@ -34,8 +35,8 @@ Obsidian Vault (the shared memory layer), with per-agent daily logs under
 ## Quick start
 
 ```powershell
-git clone <this-repo> agentic-os
-cd agentic-os
+git clone <this-repo> rempeyek-agent-os
+cd rempeyek-agent-os
 
 # 1. Configure environment
 copy .env.example .env          # then edit: VAULT_PATH, DASH_TOKEN, ...
@@ -43,22 +44,32 @@ copy .env.example .env          # then edit: VAULT_PATH, DASH_TOKEN, ...
 # 2. Configure your agents
 copy agents.config.example.json agents.config.json   # then edit paths/commands
 
-# 3. Run
-npm run dev                     # http://localhost:4321
+# 3. Install + run
+npm install                     # React/Vite + workspace links
+npm run dev                     # builds the UI, then serves http://localhost:4321
 ```
 
 Port already taken? `set PORT=4322` then `npm run dev` again.
 
+### Working on the UI
+
+```powershell
+npm run server   # API on :4321
+npm run ui       # Vite dev server on :5173 with hot reload (proxies /api → :4321)
+```
+
+`npm run build` emits `apps/web/dist/`, which the server serves in production.
+
 ## Repository structure
 
 ```
-apps/web/        the dashboard (server.js + public/) — what `npm run dev` runs
+apps/web/        server.js (zero-dep API) + src/ (React app) + dist/ (built UI)
 apps/desktop/    planned native shell (see its README)
-packages/        extraction targets, each README maps it to today's code
+packages/        ui · design-system · theme-engine · neural-engine (live)
+                 neural-vault · agent-runtime · workflow-engine · mcp · shared (planned)
 docs/            Design-Bible · Architecture · Neural-Vault · Agent-System · MCP · Theme-System · Roadmap
 prompts/         system + role prompts for the agent fleet
 scripts/         bridges (telemetry ↔ vault)
-supabase/        optional cloud-mirror DDL
 telemetry/       per-agent JSONL event streams (runtime data)
 ```
 
@@ -76,8 +87,6 @@ repo root — see [docs/Architecture.md](docs/Architecture.md).
 | `DASH_TOKEN` | Auth token for remote access (localhost is always allowed) | none |
 | `CLAUDE_PROJECTS` | Claude Code transcripts folder | `%USERPROFILE%\.claude\projects` |
 | `BACKUP_PATH` | Vault backup location (enables the backup-age row in Vault Health) | none |
-| `SUPABASE_URL` | Optional cloud mirror — project URL (see `supabase/aos_agents.sql`) | none |
-| `SUPABASE_SERVICE_KEY` | service_role key for the mirror — **server-side only, never commit** | none |
 
 ### `agents.config.json`
 

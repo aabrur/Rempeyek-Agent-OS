@@ -3,9 +3,15 @@
   "version": "2.0.0",
   "description": "REMPEYEK AGENT OS — Neural Cosmos Edition. Agentic operating system: command center dashboard reading live from the Obsidian Vault.",
   "private": true,
+  "workspaces": [
+    "apps/web",
+    "packages/*"
+  ],
   "scripts": {
-    "dev": "node apps/web/server.js",
+    "dev": "npm run build && node apps/web/server.js",
     "start": "node apps/web/server.js",
-    "web": "node apps/web/server.js"
+    "build": "npm run build --workspace @rempeyek/web",
+    "ui": "npm run dev --workspace @rempeyek/web",
+    "server": "node apps/web/server.js"
   }
 }

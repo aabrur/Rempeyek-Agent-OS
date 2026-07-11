@@ -63,8 +63,7 @@ Agents report via `telemetry/<id>.jsonl`, one JSON object per line:
 Claude Code is special-cased: sessions/subagents are parsed from its transcript JSONL
 (`CLAUDE_PROJECTS`) instead.
 
-## Cloud mirror (optional)
+## Storage
 
-With `SUPABASE_URL` + `SUPABASE_SERVICE_KEY` in `.env`, the registry is upserted to the
-`aos_agents` table on startup and after every add (gateway block stripped — local paths
-never leave the machine). See [MCP.md](MCP.md).
+`agents.config.json` on disk is the only store — no database, no cloud mirror. See
+[MCP.md](MCP.md) for why the Supabase experiment was removed.

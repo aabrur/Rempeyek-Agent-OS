@@ -1,11 +1,23 @@
 # @rempeyek/ui
 
-**Extraction target — code lives in `apps/web` today.**
+**Live package.** React primitives shared by every view.
 
-Reusable UI primitives: `.panel`, `.tile`, `.agent-card`, `.pill`/`.chip`, `.btn` family,
-modal (`.token-ov`/`.token-box`), toggle pills (`.lyr`), empty/skeleton states.
+`Btn` · `Pill` · `Chip` · `Panel` · `Empty` · `Skeleton` · `SectionRow` · `PageHead` ·
+`Overlay` (modals) · `Avatar`
 
-Current source: `apps/web/public/style.css` (component blocks) + render helpers in
-`apps/web/public/app.js` (`el`, `esc`, `pill`, `avatarHtml`, `gwButtons`).
+Pure and stateless: no data fetching, no side effects. They render the
+[`@rempeyek/design-system`](../design-system) class names rather than carrying their own
+CSS, so a token change restyles everything at once and visual fidelity is guaranteed by
+the stylesheet.
 
-Extract when: `apps/desktop` or a second surface needs the same primitives.
+```jsx
+import { Btn, Panel, Pill } from "@rempeyek/ui";
+
+<Panel title="AGENT STATUS" chip="live">
+  <Pill status="running" label="running · service" />
+  <Btn variant="primary" onClick={start}>▶ Start</Btn>
+</Panel>
+```
+
+`Btn variant`: `primary` · `run` · `stop` · `dim`.
+`Pill status`: `running` · `working` · `waiting` · `idle` · `exited` · `error`.

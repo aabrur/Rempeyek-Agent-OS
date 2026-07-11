@@ -14,7 +14,11 @@ Obsidian Vault/
 
 # Generated artifacts
 graphify-out/
+apps/web/dist/
 *.log
+
+# Config backup written by the dashboard's Add Agent
+agents.config.json.bak
 
 # OS / editor
 Thumbs.db

@@ -1,0 +1,8 @@
+{
+  "name": "@rempeyek/neural-engine",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "main": "src/NeuralGraph.js",
+  "exports": { ".": "./src/NeuralGraph.js" }
+}

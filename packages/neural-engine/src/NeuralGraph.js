@@ -3,7 +3,7 @@
    API: const g = NeuralGraph(canvas, {onOpen});
         g.setData({nodes,edges,stats}); g.setQuery(q);
         g.setLayers({link,ghost,tag,folder}); g.reheat(); g.destroy() */
-function NeuralGraph(canvas, opts = {}) {
+export function NeuralGraph(canvas, opts = {}) {
   const ctx = canvas.getContext("2d");
   const PALETTE = ["#8C5BFF", "#4C9BFF", "#00E5FF", "#FFB01F", "#FF3DD8", "#3CFFC8", "#A78BFA", "#FF8A3C", "#F2E34C", "#FF4D6A"];
   const TAG_COLOR = "#FF3DD8", GHOST_COLOR = "#8E88BE", FOLDER_COLOR = "#7C5CFF";
