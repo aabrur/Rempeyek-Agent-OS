@@ -6,18 +6,19 @@ let graph = null, graphLoaded = false;
 let lastReport = null;
 let AGENTS = {};   // R#10: id -> agent (owner: native-service check for the confirm guard)
 
-const ACCENT = { "claude-code": "#00E5FF", hermes: "#A6FF3C", openclaw: "#4C9BFF", zcode: "#8C5BFF", copilot: "#FFB01F", "kimi-code": "#F2FF3C", antigravity: "#FF8A3C" };
+const ACCENT = { "claude-code": "#00E5FF", hermes: "#A6FF3C", openclaw: "#4C9BFF", "kilo-code": "#8C5BFF", copilot: "#FFB01F", cline: "#F2FF3C", pi: "#3CFFC8", antigravity: "#FF8A3C" };
 const TILE_C = ["#00E5FF", "#FF3DD8", "#A6FF3C", "#FFB01F"];
 const PALETTE = ["#00E5FF", "#FF3DD8", "#A6FF3C", "#FFB01F", "#8C5BFF", "#FF4D6A", "#3CFFC8", "#FF8A3C", "#4C9BFF", "#F2FF3C"];
 
 const WORKFLOWS = [
   { id: "openclaw", who: "OpenClaw", t: "Strategy & Business", d: "Business analysis, SWOT, founder-grade memos, persona-driven writing, multi-agent orchestration." },
   { id: "hermes", who: "Hermes", t: "Crypto & Market Ops", d: "Trading bot, market analysis, cron & heartbeat 24/7. Real-money moves only with Boss approval." },
-  { id: "zcode", who: "ZCode", t: "Build & Debug", d: "Interactive coding, software engineering, systematic debugging, orchestration of 200+ skills." },
+  { id: "kilo-code", who: "Kilo Code", t: "Build & Debug", d: "Terminal AI coding agent (kilo.ai) — code generation, task automation, 500+ models behind one CLI." },
   { id: "claude-code", who: "Claude Code", t: "Dev & Vault Ops", d: "Full dev, file ops, MCP, ecosystem integration, guardian of the vault constitution." },
-  { id: "kimi-code", who: "Kimi Code", t: "Backup Coding", d: "Standby coding agent — long-context implementation and code review when extra capacity is needed." },
+  { id: "cline", who: "Cline", t: "Autonomous Coding", d: "Autonomous coding agent (cline.bot) — interactive sessions, one-shot tasks, and kanban-driven runs." },
   { id: "copilot", who: "Copilot CLI", t: "Inline Assist", d: "Manual CLI coding assistant — quick edits, completions, and MCP/plugin-driven tasks in its own terminal." },
   { id: "antigravity", who: "Antigravity", t: "Agentic Integration", d: "Gemini-based advanced agentic coding, dashboard building, and knowledge-graph visualization." },
+  { id: "pi", who: "Pi", t: "Minimal Agent Ops", d: "Lean open-source coding agent (pi.dev) — read/write/edit/bash tools, subscription or API login, fast one-off runs." },
 ];
 
 /* ---------- util ---------- */
@@ -26,7 +27,7 @@ function headers() { return TOKEN ? { "x-dash-token": TOKEN } : {}; }
    R6/F12 401 retry uses a counter capped at 2 (not unbounded recursion). */
 async function api(path, opts = {}, attempt = 0) {
   try {
-    const res = await fetch(path, { ...opts, headers: { ...headers(), ...(opts.headers || {}) }, signal: AbortSignal.timeout(8000) });
+    const res = await fetch(path, { ...opts, headers: { ...headers(), ...(opts.headers || {}) }, signal: AbortSignal.timeout(opts.timeoutMs || 8000) });
     if (res.status === 401) {
       if (TOKEN && attempt < 1) {
         return api(path, opts, attempt + 1);
@@ -55,7 +56,17 @@ function showTokenLogin() {
   input.onkeydown = e => { if (e.key === "Enter") go(); };
   if (input) input.focus();
 }
-function obsUri(rel) { return `obsidian://open?vault=${encodeURIComponent(VAULT_NAME)}&file=${encodeURIComponent(rel.replace(/\.md$/, ""))}`; }
+/* The registered Obsidian vault is the repo root (see obsidian.json), so its name isn't "Obsidian Vault".
+   Use the name-independent `path=` param with the file's absolute path — Obsidian resolves the vault by path.
+   VAULT_ABS is the absolute path to the Obsidian Vault folder, set from /api/state.vault in render(). */
+let VAULT_ABS = "";
+function obsUri(rel) {
+  if (VAULT_ABS) {
+    const abs = VAULT_ABS.replace(/[\\/]+$/, "") + "\\" + String(rel).replace(/\//g, "\\");
+    return `obsidian://open?path=${encodeURIComponent(abs)}`;
+  }
+  return `obsidian://open?vault=${encodeURIComponent(VAULT_NAME)}&file=${encodeURIComponent(rel.replace(/\.md$/, ""))}`;
+}
 function el(html) { const t = document.createElement("template"); t.innerHTML = html.trim(); return t.content.firstChild; }
 function esc(s) { return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
 function pill(status) { return `<span class="pill"><span class="dot ${status}"></span><span class="lbl-${status}">${status}</span></span>`; }
@@ -83,39 +94,43 @@ function avatarHtml(a, lg) {
   return `<div class="avatar ${lg ? "avatar-lg" : ""}" style="--ac:${ac(a.id)}">${inner}
     ${lg ? `<button class="avatar-edit" data-act="avatar" data-id="${a.id}" title="Change profile photo">✎</button>` : ""}</div>`;
 }
-const ACT_LABEL = { start: "▶ Start", stop: "■ Stop", restart: "↻ Restart", status: "◇ Status", run: "⚡ Run" };
-const ACT_CLS = { start: "btn-run", stop: "btn-stop", restart: "btn-dim", status: "btn-dim", run: "btn-dim" };
+const ACT_LABEL = { start: "▶ Start", stop: "■ Stop", "stop-term": "■ Stop terminal", restart: "↻ Restart", status: "◇ Status", run: "⚡ Run" };
+const ACT_CLS = { start: "btn-run", stop: "btn-stop", "stop-term": "btn-stop", restart: "btn-dim", status: "btn-dim", run: "btn-dim" };
 function gwBtn(act, id) { return `<button class="btn ${ACT_CLS[act] || "btn-dim"}" data-act="${act}" data-id="${id}">${ACT_LABEL[act] || act}</button>`; }
-/* Start = split button: main click starts the gateway; caret = other terminal options + headless start */
-function startSplit(a) {
-  return `<div class="gw-split">
-    <button class="btn btn-run gw-main" data-act="start" data-id="${a.id}" title="Start the ${esc(a.name)} gateway (background service) — the agent comes up and can be monitored">▶ Start</button>
-    <button class="btn btn-run gw-caret" data-menu="${a.id}" title="More options">▾</button>
-    <div class="gw-menu" data-menufor="${a.id}">
-      <button data-term="summon" data-id="${a.id}">⧉ Open terminal · summon agent</button>
-      <button data-term="run" data-id="${a.id}">⧉ Gateway run · terminal (foreground)</button>
-      <div class="gw-menu-sep"></div>
-      <button data-act="status" data-id="${a.id}">◇ Status</button>
-      <button data-act="restart" data-id="${a.id}">↻ Restart</button>
-    </div>
-  </div>`;
-}
 function summonBtn(a) {
   return `<button class="btn btn-run" data-term="summon" data-id="${a.id}" title="Open an admin terminal + summon ${esc(a.name)}">⧉ Summon</button>`;
+}
+/* Summon = the primary action for EVERY agent: opens an admin terminal running the agent's CLI.
+   Gateway agents keep their service actions (start/run/status/restart) in the caret menu. */
+function summonSplit(a) {
+  const acts = a.actions || [];
+  const menu = [
+    acts.includes("start") ? `<button data-act="start" data-id="${a.id}">▶ Start gateway (service)</button>` : "",
+    acts.includes("run") ? `<button data-term="run" data-id="${a.id}">⚡ Gateway run · terminal (foreground)</button>` : "",
+    (acts.includes("status") || acts.includes("restart")) ? `<div class="gw-menu-sep"></div>` : "",
+    acts.includes("status") ? `<button data-act="status" data-id="${a.id}">◇ Status</button>` : "",
+    acts.includes("restart") ? `<button data-act="restart" data-id="${a.id}">↻ Restart</button>` : "",
+  ].join("");
+  if (!menu.trim()) return summonBtn(a);
+  return `<div class="gw-split">
+    <button class="btn btn-run gw-main" data-term="summon" data-id="${a.id}" title="Open an admin terminal + summon ${esc(a.name)}">⧉ Summon</button>
+    <button class="btn btn-run gw-caret" data-menu="${a.id}" title="More options">▾</button>
+    <div class="gw-menu" data-menufor="${a.id}">${menu}</div>
+  </div>`;
 }
 function gwButtons(a, compact) {
   if (!a.enabled) return `<button class="btn btn-dim" disabled title="${esc(a.note || "disabled")}">setup required</button>`;
   const acts = a.actions || [];
+  const termAlive = a.term && a.term.alive;
   const running = a.proc && a.proc.status === "running";
-  const hasStart = acts.includes("start");
   if (compact) {
+    if (termAlive) return gwBtn("stop-term", a.id);
     if (running) return gwBtn("stop", a.id);
-    if (hasStart) return startSplit(a);
-    return a.canSummon ? summonBtn(a) : (acts[0] ? gwBtn(acts[0], a.id) : "");
+    return a.canSummon ? summonSplit(a) : (acts[0] ? gwBtn(acts[0], a.id) : "");
   }
-  // detail: split Start (gateway) or Summon button (non-gateway agents like Copilot) + remaining headless actions
+  // detail: Summon split (all agents) + Stop-terminal when a summoned terminal is live + headless service actions
   const rest = acts.filter(x => x !== "start").map(x => gwBtn(x, a.id)).join("");
-  return (hasStart ? startSplit(a) : (a.canSummon ? summonBtn(a) : "")) + rest;
+  return (a.canSummon ? summonSplit(a) : "") + (termAlive ? gwBtn("stop-term", a.id) : "") + rest;
 }
 
 /* ---------- agent topology map ---------- */
@@ -132,40 +147,155 @@ function nodeStatus(a) {
   return { cls: "top-idle", ring: "#8E88BE", label: "idle" };
 }
 function renderTopology(state) {
+  const ACC = accent();
   const box = document.getElementById("topologyMap");
   if (!box) return;
   const agents = state.agents;
-  const W = 960, H = 320, cx = W / 2, cy = H / 2, rx = 380, ry = 108;
+  const W = 760, H = 460, cx = W / 2, cy = H / 2 - 14, rx = 292, ry = 152;
   const n = agents.length;
-  let defs = "", links = "", nodes = "";
+  let defs = `<filter id="topoGlow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="3.2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <radialGradient id="hubCore"><stop offset="0" stop-color="#12324A"/><stop offset="1" stop-color="#14112A"/></radialGradient>
+    <radialGradient id="hubHalo"><stop offset="0" stop-color="${ACC}" stop-opacity=".28"/><stop offset=".6" stop-color="#8C5BFF" stop-opacity=".1"/><stop offset="1" stop-color="#8C5BFF" stop-opacity="0"/></radialGradient>`;
+  let links = "", nodes = "";
   agents.forEach((a, i) => {
     const ang = -Math.PI / 2 + (i * 2 * Math.PI) / n;
     const x = cx + rx * Math.cos(ang), y = cy + ry * Math.sin(ang);
     const st = nodeStatus(a);
     const col = ac(a.id);
+    const run = st.cls === "top-run";
     const dash = st.cls === "top-obs" ? `stroke-dasharray="4 4"` : "";
-    const pulse = st.cls === "top-run" ? `<circle class="top-pulse" cx="${x}" cy="${y}" r="24" fill="none" stroke="${st.ring}" stroke-width="1.5" opacity=".8"/>` : "";
-    links += `<line x1="${cx}" y1="${cy}" x2="${x}" y2="${y}" stroke="${st.cls === "top-run" ? col : "#2A2744"}" stroke-width="${st.cls === "top-run" ? 1.6 : 1}" opacity="${st.cls === "top-run" ? .75 : .5}" ${dash}/>`;
-    nodes += `<g class="top-node ${st.cls}" data-open="${a.id}" transform="translate(${x},${y})" style="cursor:pointer">
-      ${pulse ? pulse.replace(`cx="${x}" cy="${y}"`, `cx="0" cy="0"`) : ""}
-      <circle r="21" fill="#100E1F" stroke="${st.ring}" stroke-width="2" ${dash}/>
-      <text y="6" text-anchor="middle" font-size="17">${a.icon || "◈"}</text>
-      <text y="38" text-anchor="middle" font-size="10.5" fill="#EEEBFF" font-family="Bahnschrift,sans-serif" font-weight="600">${esc(a.name)}</text>
-      <text y="51" text-anchor="middle" font-size="8.5" fill="${st.ring}" font-family="Cascadia Mono,monospace">${st.label}</text>
-      <text y="-30" text-anchor="middle" font-size="8" fill="#8E88BE" font-family="Cascadia Mono,monospace">${esc(a.node || "")}</text>
+    const dx = x - cx, dy = y - cy, len = Math.hypot(dx, dy) || 1;
+    const sx = cx + dx / len * 62, sy = cy + dy / len * 62;
+    const tx = x - dx / len * 42, ty = y - dy / len * 42;
+    // curved synapse: control point pushed perpendicular so links arc like dendrites
+    const bend = (i % 2 ? 1 : -1) * Math.min(46, len * 0.16);
+    const mx = (sx + tx) / 2 - (ty - sy) / len * bend;
+    const my = (sy + ty) / 2 + (tx - sx) / len * bend;
+    const d = `M${sx.toFixed(1)},${sy.toFixed(1)} Q${mx.toFixed(1)},${my.toFixed(1)} ${tx.toFixed(1)},${ty.toFixed(1)}`;
+    defs += `<linearGradient id="lg-${a.id}" gradientUnits="userSpaceOnUse" x1="${sx.toFixed(1)}" y1="${sy.toFixed(1)}" x2="${tx.toFixed(1)}" y2="${ty.toFixed(1)}">
+        <stop offset="0" stop-color="${ACC}" stop-opacity="${run ? .8 : .35}"/><stop offset="1" stop-color="${col}" stop-opacity="${run ? .95 : .5}"/></linearGradient>
+      <radialGradient id="ng-${a.id}"><stop offset="0" stop-color="${col}" stop-opacity="${run ? ".5" : ".3"}"/><stop offset="1" stop-color="${col}" stop-opacity="0"/></radialGradient>`;
+    links += `<path class="${run ? "top-link-run" : "top-link"}" d="${d}" fill="none"
+        stroke="url(#lg-${a.id})" stroke-width="${run ? 2 : 1.1}" opacity="${run ? .95 : .55}" filter="url(#topoGlow)"/>
+      <circle r="${run ? 2.6 : 1.7}" fill="${col}" opacity="${run ? .95 : .45}" filter="url(#topoGlow)">
+        <animateMotion dur="${(run ? 2.2 : 5.5) + i * 0.35}s" repeatCount="indefinite" path="${d}"/></circle>`;
+    nodes += `<g class="top-node ${st.cls}" data-open="${a.id}" transform="translate(${x.toFixed(1)},${y.toFixed(1)})" style="cursor:pointer">
+      <circle r="52" fill="url(#ng-${a.id})"/>
+      ${run ? `<circle class="top-shock" r="26" fill="none" stroke="${st.ring}" stroke-width="1.2"/>` : ""}
+      <circle r="31" fill="none" stroke="${col}" stroke-width="1" opacity=".28"/>
+      ${run ? `<g class="top-orbit"><circle r="27.5" fill="none" stroke="${st.ring}" stroke-width="1.6" stroke-dasharray="2 9.5" opacity=".9"/></g>` : ""}
+      ${run ? `<circle class="top-pulse" r="24" fill="none" stroke="${st.ring}" stroke-width="1.5" opacity=".8"/>` : ""}
+      <circle r="24" fill="none" stroke="${st.ring}" stroke-width="2.4" ${dash} filter="url(#topoGlow)"/>
+      <circle r="19" fill="#100E1FE6" stroke="#2A2744" stroke-width="1"/>
+      <text y="6" text-anchor="middle" font-size="16">${a.icon || "◈"}</text>
+      <text y="46" text-anchor="middle" font-size="11" fill="#EEEBFF" font-family="Bahnschrift,sans-serif" font-weight="600">${esc(a.name)}</text>
+      <text y="59" text-anchor="middle" font-size="8.5" fill="${st.ring}" font-family="Cascadia Mono,monospace">${st.label}</text>
+      <text y="-37" text-anchor="middle" font-size="8" fill="#8E88BE" font-family="Cascadia Mono,monospace">${esc(a.node || "")}</text>
     </g>`;
   });
-  const runningCount = agents.filter(a => a.proc && a.proc.status === "running").length;
-  box.innerHTML = `<svg class="topology" viewBox="0 0 ${W} ${H}" role="img" aria-label="Agent topology map">
-    ${defs}${links}
-    <g class="top-hub">
-      <circle cx="${cx}" cy="${cy}" r="34" fill="#14112A" stroke="#00E5FF" stroke-width="1.6"/>
-      <circle class="top-pulse" cx="${cx}" cy="${cy}" r="40" fill="none" stroke="#00E5FF" stroke-width="1" opacity=".5"/>
-      <text x="${cx}" y="${cy - 2}" text-anchor="middle" font-size="15" fill="#00E5FF" font-family="Bahnschrift,sans-serif" font-weight="700">◈</text>
-      <text x="${cx}" y="${cy + 13}" text-anchor="middle" font-size="7.5" fill="#8E88BE" font-family="Cascadia Mono,monospace">${runningCount}/${n} LIVE</text>
+  const running = agents.filter(a => a.proc && a.proc.status === "running").length;
+  const errCount = agents.filter(a => a.proc && (a.proc.status === "exited" || a.proc.status === "error")).length;
+  const observing = agents.filter(a => !(a.actions || []).length && !(a.proc && a.proc.status === "running")).length;
+  const idle = Math.max(0, n - running - errCount - observing);
+  const uptimes = agents.map(a => a.uptime && a.uptime.pct).filter(v => typeof v === "number");
+  const upAvg = uptimes.length ? Math.round(uptimes.reduce((s, v) => s + v, 0) / uptimes.length) : null;
+  const locked = state.auth === "token-locked";
+
+  const svg = `<svg class="topology" viewBox="0 0 ${W} ${H}" role="img" aria-label="Agent topology map">
+    <defs>${defs}</defs>${links}
+    <g class="top-hub" transform="translate(${cx},${cy})">
+      <circle r="120" fill="url(#hubHalo)"/>
+      <circle class="top-shock" r="46" fill="none" stroke="${ACC}" stroke-width="1.3"/>
+      <circle class="top-shock s2" r="46" fill="none" stroke="#8C5BFF" stroke-width="1.1"/>
+      <circle r="56" fill="none" stroke="${ACC}" stroke-width="1" opacity=".14"/>
+      <g class="top-spin"><circle r="48" fill="none" stroke="${ACC}" stroke-width="1" stroke-dasharray="4 9" opacity=".5"/></g>
+      <circle class="top-pulse" r="46" fill="none" stroke="${ACC}" stroke-width="1" opacity=".5"/>
+      <circle r="40" fill="url(#hubCore)" stroke="${ACC}" stroke-width="1.6" filter="url(#topoGlow)"/>
+      <text y="-2" text-anchor="middle" font-size="18" fill="${ACC}" font-family="Bahnschrift,sans-serif" font-weight="700">◈</text>
+      <text y="16" text-anchor="middle" font-size="8.5" fill="#8E88BE" font-family="Cascadia Mono,monospace">${running}/${n} LIVE</text>
     </g>
     ${nodes}
   </svg>`;
+
+  const evs = state.events || [];
+  const logHtml = evs.length ? evs.map(ev => `<div class="topo-ev">
+      <span class="t">${esc((ev.ts || "").slice(11, 19))}</span>
+      <span class="a" style="color:${ac(ev.id)}">${esc((AGENTS[ev.id] && AGENTS[ev.id].name) || ev.id)}</span>
+      <span class="m lv-${esc(ev.level || "ok")}">${esc(ev.msg)}</span></div>`).join("")
+    : `<div class="topo-ev-empty">No gateway events yet — Summon / Start / Status actions and status changes appear here.</div>`;
+
+  box.innerHTML = `
+  <div class="topo-grid">
+    <aside class="topo-side">
+      <div class="topo-box">
+        <div class="topo-h">NETWORK OVERVIEW</div>
+        <div class="topo-stat"><span>TOTAL NODES</span><b>${n}</b></div>
+        <div class="topo-stat"><span><i class="dot running"></i>ACTIVE</span><b>${running}</b></div>
+        <div class="topo-stat"><span><i class="dot exited"></i>OBSERVING</span><b>${observing}</b></div>
+        <div class="topo-stat"><span><i class="dot idle"></i>IDLE</span><b>${idle}</b></div>
+        ${errCount ? `<div class="topo-stat"><span><i class="dot error"></i>ERROR</span><b>${errCount}</b></div>` : ""}
+      </div>
+      <div class="topo-box">
+        <div class="topo-h">NETWORK LOAD</div>
+        <svg id="topoLoad" viewBox="0 0 200 44" preserveAspectRatio="none"></svg>
+      </div>
+      <div class="topo-box">
+        <div class="topo-h">SECURITY STATUS</div>
+        <div class="topo-big ${locked ? "tb-ok" : ""}">🛡 ${locked ? "TOKEN-LOCKED" : "LOCAL-ONLY"}</div>
+      </div>
+      <div class="topo-box">
+        <div class="topo-h">MEAN UPTIME 24H</div>
+        <div class="topo-big">${upAvg == null ? "—" : upAvg + "%"}</div>
+      </div>
+    </aside>
+    <div class="topo-map">${svg}</div>
+    <aside class="topo-side">
+      <div class="topo-box topo-log-box">
+        <div class="topo-h">SYSTEM LOG</div>
+        <div class="topo-log">${logHtml}</div>
+      </div>
+      <div class="topo-box">
+        <div class="topo-h">VAULT ACTIVITY</div>
+        <div class="topo-stat"><span>NOTES</span><b>${state.stats.notes.value}</b></div>
+        <div class="topo-stat"><span>CHANGED 7D</span><b>${state.stats.activeWeek.value}</b></div>
+        <div class="topo-stat"><span>OPEN TASKS</span><b>${state.stats.openTasks.value}</b></div>
+      </div>
+    </aside>
+  </div>
+  <div class="topo-legend">
+    <span class="topo-h">AGENT STATUS LEGEND</span>
+    <span class="tl"><i style="background:#A6FF3C;box-shadow:0 0 6px #A6FF3C"></i>RUNNING<em>active &amp; processing</em></span>
+    <span class="tl"><i style="background:#8E88BE"></i>IDLE<em>standby</em></span>
+    <span class="tl"><i class="tl-dash"></i>OBSERVE<em>monitoring / summon-only</em></span>
+    <span class="tl"><i style="background:#FF4D6A"></i>ERROR<em>exited / down</em></span>
+    <span class="tl"><i style="background:#3A3654"></i>OFFLINE<em>disabled</em></span>
+  </div>
+  <div class="topo-foot">🔒 ${esc(state.agency || "AGENTIC//OS")} MESH · ${locked ? "TOKEN AUTH" : "LOCAL ONLY"} · ${n} NODES</div>`;
+  drawTopoLoad();
+}
+
+/* NETWORK LOAD sparkline — client-side rolling buffer of the running-agent ratio.
+   Updated by every refresh() (before the dirty-check, so it moves even when nothing else changed). */
+const _topoLoad = [];
+function updateTopoLive(state) {
+  try {
+    if (!state || !Array.isArray(state.agents)) return;
+    const running = state.agents.filter(a => a.proc && a.proc.status === "running").length;
+    _topoLoad.push(state.agents.length ? running / state.agents.length : 0);
+    if (_topoLoad.length > 40) _topoLoad.splice(0, _topoLoad.length - 40);
+    drawTopoLoad();
+  } catch {}
+}
+function drawTopoLoad() {
+  const ACC = accent();
+  const svg = document.getElementById("topoLoad");
+  if (!svg || !_topoLoad.length) return;
+  const W = 200, H = 44, step = W / 39;
+  const pts = _topoLoad.map((v, i) => `${(i * step).toFixed(1)},${(H - 6 - v * (H - 16)).toFixed(1)}`).join(" ");
+  const pctNow = Math.round(_topoLoad[_topoLoad.length - 1] * 100);
+  svg.innerHTML = `<polyline points="${pts}" fill="none" stroke="${ACC}" stroke-width="1.6" opacity=".9"/>
+    <text x="${W - 3}" y="12" text-anchor="end" font-size="10" fill="#8E88BE" font-family="Cascadia Mono,monospace">${pctNow}%</text>`;
 }
 
 /* ---------- main render ---------- */
@@ -193,6 +323,10 @@ function render(state) {
   }
   const vp = document.getElementById("vaultPath");
   vp.textContent = state.vault; vp.title = state.vault;
+  if (state.vault) {
+    VAULT_ABS = state.vault;                                   // enables name-independent obsidian:// links
+    document.querySelectorAll(".side-vault, .graph-open").forEach(a => { a.href = obsUri("INDEX.md"); });
+  }
   if (state.agency) {
     const bn = document.querySelector(".brand-name");
     if (bn && bn.textContent !== state.agency) bn.textContent = state.agency;
@@ -325,12 +459,14 @@ async function renderDetail() {
     <div class="detail-grid">
       <div class="dsec" style="grid-column:1/-1"><h3>Gateway control ${checked ? `<span class="cnt" style="text-transform:none;letter-spacing:0">· checked ${checked}</span>` : ""}</h3>
         <div class="gw-ctl">${gwButtons(d, false) || `<span class="muted">${esc(d.note || "no actions")}</span>`}</div>
+        ${d.term && d.term.alive ? `<div class="gw-note" style="color:var(--ac)">⧉ Summoned terminal active — pid ${d.term.pid}${d.term.startedAt ? ` · since ${esc(String(d.term.startedAt).slice(11, 19))}` : ""} · Stop terminal closes it</div>`
+          : (d.term && d.term.pending ? `<div class="gw-note">⧉ Summoning… waiting for the admin terminal (UAC confirmation)</div>` : "")}
         ${d.note ? `<div class="gw-note">ℹ ${esc(d.note)}</div>` : ""}
         ${statusOut}</div>
-      <div class="dsec"><h3>Sessions / Activity <span class="cnt">${act.sessions.length}</span></h3>${sessions}</div>
-      <div class="dsec"><h3>Subagents / Tasks <span class="cnt">${act.subagents.length}</span></h3>${subs}</div>
-      <div class="dsec"><h3>Telemetry <span class="cnt">${d.telemetry.length}</span></h3>${tele}</div>
-      <div class="dsec"><h3>Vault lane — Brains/</h3>${lane}</div>
+      <div class="dsec"><h3>Sessions / Activity <span class="cnt">${act.sessions.length}</span></h3><div class="dsec-body">${sessions}</div></div>
+      <div class="dsec"><h3>Subagents / Tasks <span class="cnt">${act.subagents.length}</span></h3><div class="dsec-body">${subs}</div></div>
+      <div class="dsec"><h3>Telemetry <span class="cnt">${d.telemetry.length}</span></h3><div class="dsec-body">${tele}</div></div>
+      <div class="dsec"><h3>Vault lane — Brains/</h3><div class="dsec-body">${lane}</div></div>
       <div class="dsec" style="grid-column:1/-1"><h3>Gateway run log (owned, live)</h3>
         <pre class="logpane" id="logpane">${d.log.length ? d.log.map(l => `[${l.t}] ${l.s === "err" ? "⚠ " : ""}${esc(l.line)}`).join("\n") : "(nothing yet — appears when you click Run / foreground)"}</pre></div>
     </div>
@@ -374,6 +510,12 @@ async function loadGraph(force) {
     graph = NeuralGraph(canvas, { onOpen: n => { location.href = obsUri(n.id); } });
     const search = document.getElementById("graphSearch");
     if (search) search.addEventListener("input", () => graph.setQuery(search.value));
+    document.querySelectorAll("#graphLayers .lyr").forEach(b => b.addEventListener("click", () => {
+      b.classList.toggle("on");
+      const on = {};
+      document.querySelectorAll("#graphLayers .lyr").forEach(x => { on[x.dataset.l] = x.classList.contains("on"); });
+      graph.setLayers(on);
+    }));
   }
   if (graphLoaded && !force) { graph.reheat(); return; }
   const data = await api("/api/graph");
@@ -381,11 +523,13 @@ async function loadGraph(force) {
   graph.setData(data);
   graphLoaded = true;
   const stats = document.getElementById("graphStats");
-  if (stats) stats.textContent = `${data.nodes.length} notes · ${data.edges.length} links`;
+  const s = data.stats || {};
+  if (stats) stats.textContent = `${s.notes ?? data.nodes.length} notes · ${s.links ?? "?"} links · ${s.tagEdges ?? 0} tag · ${s.orphans ?? "?"} orphans`;
 }
 
 /* ---------- reports ---------- */
 function svgBar(days) {
+  const ACC = accent();
   const W = 560, H = 170, P = 26;
   const max = Math.max(1, ...days.map(d => d.count));
   const bw = (W - P * 2) / days.length;
@@ -399,7 +543,7 @@ function svgBar(days) {
   });
   return `<svg class="rep-svg" viewBox="0 0 ${W} ${H}">
     <defs><linearGradient id="gcy" x1="0" y1="1" x2="0" y2="0">
-      <stop offset="0" stop-color="#0A6E7A"/><stop offset="1" stop-color="#00E5FF"/></linearGradient>
+      <stop offset="0" stop-color="#0A6E7A"/><stop offset="1" stop-color="${ACC}"/></linearGradient>
       <filter id="glow"><feGaussianBlur stdDeviation="1.6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
     ${bars}</svg>`;
 }
@@ -497,9 +641,19 @@ document.body.addEventListener("click", async e => {
     const { term: mode, id } = term.dataset;
     closeMenus();
     const lbl = term.textContent; term.disabled = true; term.textContent = "…";
-    const r = await api(`/api/proc/${id}/terminal?mode=${mode}`, { method: "POST" });
+    // summon waits for the UAC answer server-side (up to 45s) — give it room
+    const r = await api(`/api/proc/${id}/terminal?mode=${mode}`, { method: "POST", timeoutMs: 60000 });
     term.textContent = lbl; term.disabled = false;
-    if (r.error) alert(r.error);
+    if (r.notInstalled) {
+      const i = r.install || {};
+      let msg = r.error;
+      if (i.cmd) msg += `\n\nInstall with:\n  ${i.cmd}`;
+      if (i.note) msg += `\n\n${i.note}`;
+      if (i.url) { if (confirm(`${msg}\n\nOpen the install page?`)) window.open(i.url, "_blank", "noopener"); }
+      else alert(msg);
+    }
+    else if (r.error) alert(r.error);
+    else setTimeout(() => { refresh(); if (openAgent) renderDetail(); }, 5000);
     return;
   }
 
@@ -515,15 +669,17 @@ document.body.addEventListener("click", async e => {
   }
 
   const btn = e.target.closest("[data-act]");
-  if (btn && ["start", "stop", "restart", "status", "run"].includes(btn.dataset.act)) {
+  if (btn && ["start", "stop", "stop-term", "restart", "status", "run"].includes(btn.dataset.act)) {
     e.stopPropagation();
     const { act, id } = btn.dataset;
     // R#10: one confirm before destructive actions on 24/7 native-service agents
+    // (stop-term only closes the summoned terminal — never the service — so it needs no confirm)
     if (["stop", "restart", "run"].includes(act) && AGENTS[id] && AGENTS[id].owner === "native-service"
         && !confirm(`${AGENTS[id].name} is a 24/7 service. Really '${act}'? This can disrupt the running instance.`)) return;
     const label = btn.textContent;
     btn.disabled = true; btn.textContent = "…";
-    const r = await api(`/api/proc/${id}/${act}`, { method: "POST" });
+    // stop-term = kill-file handshake + up to 10s verify (+ elevated fallback) — needs a longer timeout
+    const r = await api(`/api/proc/${id}/${act}`, { method: "POST", timeoutMs: act === "stop-term" ? 90000 : undefined });
     btn.textContent = label; btn.disabled = false;
     if (r.error) alert(r.error);
     else if (act === "status" && r.output) alert(`${id} · status:\n\n${r.output}`);
@@ -588,6 +744,24 @@ document.getElementById("nav").addEventListener("click", e => {
   if (btn) switchView(btn.dataset.view);
 });
 
+/* ---------- theme switcher ---------- */
+function accent() { return (getComputedStyle(document.documentElement).getPropertyValue("--acc") || "#00E5FF").trim(); }
+function markTheme() {
+  const t = document.documentElement.dataset.theme || "rempeyek";
+  document.querySelectorAll("[data-theme-pick]").forEach(b => b.classList.toggle("on", b.dataset.themePick === t));
+}
+document.getElementById("themePick").addEventListener("click", e => {
+  const b = e.target.closest("[data-theme-pick]");
+  if (!b) return;
+  document.documentElement.dataset.theme = b.dataset.themePick;
+  try { localStorage.setItem("aos-theme", b.dataset.themePick); } catch {}
+  markTheme();
+  _lastStateKey = "";   // force a full re-render so the SVG topology re-reads --acc
+  refresh();
+  if (graph) graph.reheat();
+});
+markTheme();
+
 /* ---------- loop ---------- */
 async function refresh() {
   const state = await api("/api/state");
@@ -598,6 +772,7 @@ async function refresh() {
     return;
   }
   if (cb && !state.configError) cb.hidden = true;
+  updateTopoLive(state);   // sparkline moves every poll, even when the dirty-check skips the rebuild
   render(state);
 }
 const visible = () => document.visibilityState === "visible";   // F3: don't poll while the tab is hidden

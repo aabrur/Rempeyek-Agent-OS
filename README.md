@@ -1,4 +1,4 @@
-# AGENTIC//OS — Neural Command Deck
+# REMPEYEK AGENT OS — Agentic Operating System
 
 One dashboard for all your AI agents: what they can do, what is running right now,
 and their latest results — all from a single screen. Live data is read from an
@@ -12,6 +12,8 @@ Obsidian Vault (the shared memory layer), with per-agent daily logs under
 ## Features
 
 - **Agent topology map** — live radial map of every agent and its gateway status
+- **Cosmic themes** — 3 switchable themes (Rempeyek violet · Cosmos cyan · Ember amber), persisted per browser
+- **Summon with install-gate** — one click opens an admin terminal at the agent's home folder and runs its CLI; if the CLI isn't installed, you get the install command + page instead
 - **Gateway control** — start / stop / restart / status / run agents from the dashboard
 - **Health monitoring** — TCP probes, 24h uptime history, watchdog auto-restart (opt-in), desktop alerts when an agent goes down
 - **Task board** — send tasks to agents (written to the vault), mark them done
@@ -107,5 +109,5 @@ in your vault — pan, zoom, drag, search. Click a node to open it in Obsidian.
 
 ## License
 
-Private — not yet published. (Publishing checklist: set a license, strip personal
-config, done — the code itself contains no hardcoded personal paths.)
+MIT — see [LICENSE](LICENSE). Personal config (`agents.config.json`, `.env`) stays
+local and git-ignored; start from the `.example` files.

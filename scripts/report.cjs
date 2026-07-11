@@ -3,7 +3,7 @@
    Usage:   node scripts/report.cjs <id> "<task name>" [progress 0-100] [detail...]
    Wrapper: report.cmd <id> "<task name>" [progress] [detail...]
    progress: 0 → task_start · 100 → task_done · other/empty → task_progress
-   id: claude-code | hermes | openclaw | zcode | kimi-code | copilot | antigravity */
+   id: claude-code | hermes | openclaw | kilo-code | cline | pi | copilot | antigravity */
 const fs = require("fs");
 const path = require("path");
 

@@ -3,7 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>AGENTIC//OS — Neural Command Deck</title>
+<title>REMPEYEK AGENT OS — Agentic Operating System</title>
+<script>document.documentElement.dataset.theme = localStorage.getItem("aos-theme") || "rempeyek";</script>
 <link rel="stylesheet" href="style.css">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧠</text></svg>">
 </head>
@@ -16,8 +17,8 @@
     <div class="brand">
       <div class="brand-mark">◈</div>
       <div>
-        <div class="brand-name">AGENTIC<span class="brand-slash">//</span>OS</div>
-        <div class="brand-sub">neural command deck</div>
+        <div class="brand-name">REMPEYEK<br>AGENT&nbsp;OS</div>
+        <div class="brand-sub">agentic operating system</div>
       </div>
     </div>
     <nav id="nav">
@@ -29,6 +30,12 @@
     </nav>
     <div class="side-label">AGENTS</div>
     <div id="sideAgents" class="side-agents"></div>
+    <div class="side-label">THEME</div>
+    <div id="themePick" class="theme-pick">
+      <button class="lyr" data-theme-pick="rempeyek" title="Violet — Rempeyek">REMPEYEK</button>
+      <button class="lyr" data-theme-pick="cosmos" title="Cyan — Cosmos">COSMOS</button>
+      <button class="lyr" data-theme-pick="ember" title="Amber — Ember">EMBER</button>
+    </div>
     <div class="side-foot">
       <span id="clock"></span>
       <a class="side-vault" href="obsidian://open?vault=Obsidian%20Vault" title="Open Neural Vault in Obsidian">✳ Open Neural Vault</a>
@@ -96,6 +103,12 @@
       <div class="graph-bar">
         <span class="graph-title">NEURAL VAULT</span>
         <input id="graphSearch" class="graph-search" type="search" placeholder="Search nodes…" autocomplete="off">
+        <span id="graphLayers" class="graph-layers">
+          <button class="lyr on" data-l="link" title="Real [[wikilinks]] between notes">LINKS</button>
+          <button class="lyr on" data-l="tag" title="Notes sharing a #tag">TAGS</button>
+          <button class="lyr on" data-l="folder" title="Folder structure skeleton">FOLDERS</button>
+          <button class="lyr on" data-l="ghost" title="Links to notes that do not exist yet">GHOSTS</button>
+        </span>
         <span id="graphStats" class="graph-stats"></span>
         <a class="graph-open" href="obsidian://open?vault=Obsidian%20Vault" title="Open the vault in Obsidian">⧉ OPEN VAULT</a>
       </div>

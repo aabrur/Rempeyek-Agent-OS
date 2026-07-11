@@ -16,6 +16,7 @@
         "cwd": "C:\\Users\\you\\.claude",
         "home": "C:\\Users\\you\\.claude",
         "trigger": "claude",
+        "install": { "cmd": "npm install -g @anthropic-ai/claude-code", "url": "https://claude.com/claude-code" },
         "actions": ["start", "stop", "restart", "status", "run"]
       }
     },
@@ -49,10 +50,11 @@
       "node": "Node-3",
       "lane": "CliAgent",
       "enabled": true,
-      "note": "No gateway subcommand — actions: [] means observability-only. The dashboard shows status from telemetry and offers a Summon button (opens an admin terminal at `home` and runs `trigger`).",
+      "note": "No gateway subcommand — actions: [] means observability-only. The dashboard shows status from telemetry and offers a Summon button (opens an admin terminal at `home` and runs `trigger`). If the CLI is missing, Summon shows `install` guidance (cmd + url) instead of opening a dead terminal.",
       "gateway": {
         "home": "C:\\Users\\you\\.cli-agent",
         "trigger": "cli-agent",
+        "install": { "cmd": "npm install -g your-cli-agent", "url": "https://example.com/install" },
         "actions": []
       }
     }

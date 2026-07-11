@@ -7,7 +7,7 @@ const fs = require("fs");
 const path = require("path");
 const net = require("net");
 const os = require("os");
-const { spawn, execFile } = require("child_process");
+const { spawn, execFile, spawnSync } = require("child_process");
 const crypto = require("crypto");
 
 /* load .env (KEY=VALUE per line; real env vars win over file contents) */
@@ -30,9 +30,10 @@ const LOG_MAX = 800;
 const AVATAR_DIR = path.join(PUBLIC, "avatars");
 const TELEMETRY_DIR = path.join(__dirname, "telemetry");
 const LOG_DIR = path.join(TELEMETRY_DIR, "logs");   // R#4: per-agent run log, survives restarts
+const TERMS_DIR = path.join(TELEMETRY_DIR, "terms"); // summoned-terminal pid/kill handshake files
 const LOG_FILE_MAX = 1_000_000;                     // 1 MB/agent → naive rotation (keep the tail half)
 const CLAUDE_PROJECTS = process.env.CLAUDE_PROJECTS || path.join(os.homedir(), ".claude", "projects");
-for (const d of [AVATAR_DIR, TELEMETRY_DIR, LOG_DIR]) { try { fs.mkdirSync(d, { recursive: true }); } catch {} }
+for (const d of [AVATAR_DIR, TELEMETRY_DIR, LOG_DIR, TERMS_DIR]) { try { fs.mkdirSync(d, { recursive: true }); } catch {} }
 
 /* loadConfig: memoize by mtime (B6) + tolerate config broken mid-edit → return last-good (R10).
    R#11: keep the last error so the dashboard can show a banner (not silently serve last-good). */
@@ -121,6 +122,8 @@ function buildState() {
     agency: cfg.agency || "AGENTIC//OS",
     generatedAt: new Date().toISOString(),
     configError,                              // R#11: null when healthy, {msg,at} when config is broken
+    auth: TOKEN ? "token-locked" : "local-only",
+    events: sysLog.slice(-30).reverse(),      // topology SYSTEM LOG (newest first)
 
     stats: {
       notes: { value: files.length, label: "Total vault notes" },
@@ -128,7 +131,7 @@ function buildState() {
       openTasks: { value: tasks.length, label: "Open checkboxes in Tasks/" },
       projects: { value: projects.length, label: "Active project notes" },
     },
-    agents: cfg.agents.map(a => ({ ...a, gateway: undefined, actions: gwActions(a), canSummon: !!(a.gateway && a.gateway.home && a.gateway.trigger), ...agentVaultStatus(files, a), proc: procInfo(a.id), avatar: avatarUrl(a.id), uptime: um[a.id] || null })),
+    agents: cfg.agents.map(a => ({ ...a, gateway: undefined, actions: gwActions(a), canSummon: !!(a.gateway && a.gateway.home && a.gateway.trigger), ...agentVaultStatus(files, a), proc: procInfo(a.id), term: termInfo(a.id), avatar: avatarUrl(a.id), uptime: um[a.id] || null })),
     review: [
       ...inbox.map(f => ({ title: f.rel.split("/").pop().replace(".md", ""), meta: f.rel, kind: "inbox" })),
       ...tasks.slice(0, 6).map(t => ({ title: t.text, meta: t.source, kind: "task" })),
@@ -147,6 +150,14 @@ function buildState() {
    procs = `run` processes owned by the dashboard. gwCache = last status result per agent. */
 const procs = new Map();   // id -> {child,pid,log:[],seq,status,startedAt,exitCode}
 const gwCache = new Map();  // id -> {running,text,at,exitCode}
+const summons = new Map();  // id -> {pid,startedAt,alive,launchedAt} — summoned admin terminals (pid-file handshake)
+
+/* system-event ring buffer (topology SYSTEM LOG panel) */
+const sysLog = [];
+function sysEvent(id, level, msg) {
+  sysLog.push({ ts: new Date().toISOString(), id, level, msg: String(msg).slice(0, 160) });
+  if (sysLog.length > 50) sysLog.splice(0, sysLog.length - 50);
+}
 
 function agentById(id) { return loadConfig().agents.find(a => a.id === id); }
 function gwActions(agent) { return (agent && agent.gateway && agent.gateway.actions) || []; }
@@ -165,6 +176,13 @@ function procInfo(id) {
   // a dashboard-owned run process wins while it's still alive
   if (p && p.status === "running")
     return { status: "running", mode: "owned", pid: p.pid, startedAt: p.startedAt, exitCode: null, logSize: p.seq, reason: null, statusText: c && c.text || null, checkedAt: c && new Date(c.at).toISOString() || null };
+  // a live summoned terminal counts as "running" for agents with no service status of their own
+  const st = summons.get(id);
+  if (st && st.alive) {
+    const ag = agentById(id);
+    if (ag && !gwActions(ag).includes("status") && !(ag.gateway && ag.gateway.probe))
+      return { status: "running", mode: "terminal", pid: st.pid, startedAt: st.startedAt, exitCode: null, logSize: p ? p.seq : 0, reason: null, statusText: `Summoned terminal · pid ${st.pid}` };
+  }
   let reason = null;
   if (p && (p.status === "exited" || p.status === "error")) {
     const out = p.log.filter(l => l.s === "out" || l.s === "err");
@@ -252,6 +270,7 @@ function alertDown(id, reason) {
       `---\ntype: alert\nagent: ${id}\ncreated: ${stamp}\ntags: [alert, agentic-os]\n---\n\n` +
       `# ⚠ ${name} — gateway down\n\n- Time: ${stamp.slice(0, 19).replace("T", " ")}\n- Cause: ${reason}\n- Source: agentic-os dashboard (automatic detection)\n`, "utf8");
   } catch (e) { console.error("[alert] failed to write inbox note:", e.message); }
+  sysEvent(id, "error", `DOWN — ${reason}`);
   notifyWindows(`⚠ ${name} down`, reason);
 }
 
@@ -304,6 +323,7 @@ function gwCtl(id, action, cb) {
       logUptime(id, running);
       if (prev && prev.running && !running) { alertDown(id, `gateway went down (detected during ${action})`); if (action === "status") maybeWatchdog(id); }
     } else if (action === "stop") { gwCache.set(id, { running: false, text, at: Date.now(), exitCode: code }); logUptime(id, false); }
+    if (action !== "status") sysEvent(id, code === 0 ? "ok" : "error", `gateway ${action} → ${running ? "running" : "stopped"}${code ? ` (exit ${code})` : ""}`);
     finish({ ok: code === 0, code, action, running, output: text });
   });
 }
@@ -333,37 +353,187 @@ function gwRun(id) {
     if (code !== 0) { const last = p.log.filter(l => l.s === "out" || l.s === "err").slice(-1)[0]; alertDown(id, `run (owned) exit code ${code}${last ? " — " + last.line : ""}`); } });
   child.on("error", err => { p.status = "error"; p.exitCode = -1; pushLog(p, "sys", `[agentic-os] spawn error: ${err.message}`); });
   procs.set(id, p);
+  sysEvent(id, "ok", `gateway run (owned) pid ${child.pid}`);
   return { ok: true, pid: child.pid, mode: "run (owned)" };
 }
 
-/* terminal: open a Windows Terminal (elevated/admin) that cd's to the default folder & auto-runs the trigger.
-   NOT owned by the dashboard (detached + unref) — that's why Stop/Stop-all won't close this CLI/TUI terminal. */
-function gwTerminal(id, mode) {
+/* ---------------- summoned terminals (pid-file handshake + kill-file self-termination) ----------------
+   Summon opens an ADMIN terminal (wt.exe/powershell -Verb RunAs) that runs the agent's trigger CLI.
+   The dashboard is non-elevated, so it can't kill the elevated shell directly. Instead the elevated
+   shell registers its own $PID to telemetry/terms/<id>.pid and runs a background job that watches for
+   telemetry/terms/<id>.kill — when that file appears, the shell taskkills its own tree (no second UAC). */
+function termPidFile(id) { return path.join(TERMS_DIR, `${id}.pid`); }
+function termKillFile(id) { return path.join(TERMS_DIR, `${id}.kill`); }
+function readTermPid(id) {
+  try { const o = JSON.parse(fs.readFileSync(termPidFile(id), "utf8")); return o && o.pid ? o : null; } catch { return null; }
+}
+function cleanupTerm(id) {
+  try { fs.unlinkSync(termPidFile(id)); } catch {}
+  try { fs.unlinkSync(termKillFile(id)); } catch {}
+  summons.delete(id);
+}
+/* poll liveness of every tracked summoned terminal with ONE tasklist call.
+   Image-name check (powershell/pwsh) guards against PID recycling. */
+function pollSummons(cb) {
+  let ids = [];
+  try { ids = loadConfig().agents.map(a => a.id); } catch { ids = [...summons.keys()]; }
+  const tracked = [];
+  for (const id of ids) {
+    const f = readTermPid(id);
+    if (f) {
+      const s = summons.get(id) || { launchedAt: 0, alive: false };
+      summons.set(id, { ...s, pid: f.pid, startedAt: f.startedAt || s.startedAt || null });
+      tracked.push(id);
+    }
+  }
+  if (!tracked.length) { cb && cb(); return; }
+  execFile("tasklist", ["/FO", "CSV", "/NH"], { windowsHide: true }, (e, out) => {
+    const img = new Map();  // pid -> image name
+    if (!e) for (const line of String(out).split(/\r?\n/)) {
+      const m = line.match(/^"([^"]+)","(\d+)"/);
+      if (m) img.set(Number(m[2]), m[1].toLowerCase());
+    }
+    for (const id of tracked) {
+      const s = summons.get(id);
+      if (!s) continue;
+      const alive = /powershell|pwsh/.test(img.get(s.pid) || "");
+      if (alive) s.alive = true;
+      else if (s.alive || Date.now() - (s.launchedAt || 0) > 120000) {
+        if (s.alive) sysEvent(id, "warn", `summoned terminal pid ${s.pid} closed`);
+        cleanupTerm(id);  // was alive & now gone, or stale pid file from a previous boot
+      }
+    }
+    cb && cb();
+  });
+}
+function termInfo(id) {
+  const s = summons.get(id);
+  if (!s) return null;
+  if (s.alive) return { pid: s.pid, startedAt: s.startedAt, alive: true };
+  if (Date.now() - (s.launchedAt || 0) < 120000) return { alive: false, pending: true };
+  return null;
+}
+
+/* terminal: open a Windows Terminal (elevated/admin unless gateway.elevate === false) that cd's to the
+   agent folder & auto-runs the command. Summon mode registers the shell for tracked stop (see above). */
+function gwTerminal(id, mode, cb) {
   const agent = agentById(id);
-  if (!agent) return { error: `unknown agent '${id}'` };
+  if (!agent) return cb({ error: `unknown agent '${id}'` });
   const g = agent.gateway;
-  if (!agent.enabled || !g) return { error: agent.note || `gateway '${id}' not ready (enabled:false)` };
+  if (!agent.enabled || !g) return cb({ error: agent.note || `gateway '${id}' not ready (enabled:false)` });
   let dir, cmd;
   if (mode === "summon") {
-    if (!g.trigger) return { error: `${agent.name} has no trigger to summon it with` };
+    if (!g.trigger) return cb({ error: `${agent.name} has no trigger to summon it with` });
     dir = g.home || loadConfig().workdir; cmd = g.trigger;
-  } else if (mode === "start") { if (!g.bin) return { error: `${agent.name} has no gateway` }; dir = g.cwd || loadConfig().workdir; cmd = `${g.bin} start`; }
-  else if (mode === "run") { if (!g.bin) return { error: `${agent.name} has no gateway` }; dir = g.cwd || loadConfig().workdir; cmd = g.runCmd || `${g.bin} run`; }
-  else return { error: `unknown terminal mode '${mode}' (summon|start|run)` };
-  if (!fs.existsSync(dir)) return { error: `folder does not exist: ${dir}` };
+    const cur = summons.get(id);
+    if (cur && cur.alive) return cb({ error: `${agent.name} already has a summoned terminal (pid ${cur.pid}) — stop it first` });
+    // install gate: if the CLI is not on this machine, don't open a dead terminal —
+    // point the user at the agent's installer instead (gateway.install {cmd,url})
+    const exe = String(g.trigger).trim().split(/\s+/)[0];
+    const found = /[\\/]/.test(exe)
+      ? fs.existsSync(exe)
+      : spawnSync("where.exe", [exe], { windowsHide: true, timeout: 4000 }).status === 0;
+    if (!found) {
+      const inst = g.install || null;
+      return cb({
+        error: `${agent.name} CLI '${exe}' is not installed on this machine`,
+        notInstalled: true,
+        install: inst || { note: "no installer configured — add gateway.install {cmd,url} in agents.config.json" },
+      });
+    }
+  } else if (mode === "start") { if (!g.bin) return cb({ error: `${agent.name} has no gateway` }); dir = g.cwd || loadConfig().workdir; cmd = `${g.bin} start`; }
+  else if (mode === "run") { if (!g.bin) return cb({ error: `${agent.name} has no gateway` }); dir = g.cwd || loadConfig().workdir; cmd = g.runCmd || `${g.bin} run`; }
+  else return cb({ error: `unknown terminal mode '${mode}' (summon|start|run)` });
+  if (!fs.existsSync(dir)) {
+    if (mode === "summon" && g.home) { try { fs.mkdirSync(dir, { recursive: true }); } catch {} }
+    if (!fs.existsSync(dir)) return cb({ error: `folder does not exist: ${dir}` });
+  }
 
-  // ponytail: dir & cmd come from config (trusted). Escape single quotes for the PowerShell string.
+  // ponytail: dir & cmd come from config (trusted). Escape single quotes for the PowerShell strings.
   const q = s => String(s).replace(/'/g, "''");
+  // inner bootstrap runs INSIDE the (possibly elevated) terminal; -EncodedCommand avoids nested quoting
+  let inner = "Set-Location -LiteralPath '" + q(dir) + "'\n" + cmd + "\n";
+  if (mode === "summon") {
+    inner =
+      "$ErrorActionPreference='SilentlyContinue'\n" +
+      "Set-Content -LiteralPath '" + q(termPidFile(id)) + "' -Value ('{\"pid\":' + $PID + ',\"startedAt\":\"' + (Get-Date -Format o) + '\"}') -Encoding ASCII\n" +
+      "$null = Start-Job -ArgumentList $PID,'" + q(termKillFile(id)) + "' -ScriptBlock { param($p,$k) while($true){ if(Test-Path $k){ Remove-Item $k -Force; taskkill /PID $p /T /F | Out-Null }; Start-Sleep -Seconds 2 } }\n" +
+      "Set-Location -LiteralPath '" + q(dir) + "'\n" +
+      cmd + "\n";
+  }
+  const b64 = Buffer.from(inner, "utf16le").toString("base64");
+  const elevate = g.elevate !== false;
+  const verb = elevate ? "-Verb RunAs " : "";
   const ps =
-    `$d='${q(dir)}'; $c='${q(cmd)}'; ` +
     `$wt = Get-Command wt.exe -ErrorAction SilentlyContinue; ` +
-    `if ($wt) { Start-Process wt.exe -Verb RunAs -ArgumentList '-d',$d,'powershell','-NoExit','-Command',$c } ` +
-    `else { Start-Process powershell -Verb RunAs -ArgumentList '-NoExit','-Command',("Set-Location -LiteralPath '" + $d + "'; " + $c) }`;
-  try {
-    const child = spawn("powershell", ["-NoProfile", "-Command", ps], { detached: true, windowsHide: true, stdio: "ignore" });
-    child.unref();
-    return { ok: true, mode, dir, cmd, terminal: true };
-  } catch (e) { return { error: `failed to open terminal: ${e.message}` }; }
+    `if ($wt) { Start-Process wt.exe ${verb}-ArgumentList '-d','${q(dir)}','powershell','-NoExit','-EncodedCommand','${b64}' } ` +
+    `else { Start-Process powershell ${verb}-ArgumentList '-NoExit','-EncodedCommand','${b64}' }`;
+
+  if (mode === "summon") {
+    try { fs.unlinkSync(termPidFile(id)); } catch {}
+    try { fs.unlinkSync(termKillFile(id)); } catch {}
+    summons.set(id, { pid: null, startedAt: null, alive: false, launchedAt: Date.now() });
+  }
+  // attached spawn (NOT detached): Start-Process -Verb RunAs throws when UAC is declined,
+  // so the exit code + stderr tell us whether the terminal actually opened.
+  let done = false, errOut = "", child;
+  const finish = obj => { if (done) return; done = true; clearTimeout(timer); cb(obj); };
+  try { child = spawn("powershell", ["-NoProfile", "-Command", ps], { windowsHide: true, stdio: ["ignore", "ignore", "pipe"] }); }
+  catch (e) { if (mode === "summon") summons.delete(id); return cb({ error: `failed to open terminal: ${e.message}` }); }
+  // UAC prompts can sit unanswered — after 45s report "pending" and let the poll settle it later
+  const timer = setTimeout(() => finish({ ok: true, mode, dir, cmd, terminal: true, pending: true, note: "waiting for UAC confirmation" }), 45000);
+  child.stderr.on("data", d => { errOut += d; });
+  child.on("error", err => { if (mode === "summon") summons.delete(id); finish({ error: `failed to open terminal: ${err.message}` }); });
+  child.on("exit", code => {
+    if (code === 0) {
+      if (mode === "summon") {
+        sysEvent(id, "ok", "summon terminal opened");
+        appendDiskLog(id, [{ t: new Date().toISOString().slice(11, 19), s: "sys", line: `[agentic-os] summon terminal opened (${elevate ? "admin" : "user"}): ${cmd}  (cwd: ${dir})` }]);
+        setTimeout(pollSummons, 4000); setTimeout(pollSummons, 12000);
+      }
+      return finish({ ok: true, mode, dir, cmd, terminal: true, elevated: elevate });
+    }
+    const msg = /canceled by the user/i.test(errOut) ? "UAC declined by user" : ((errOut.trim().split(/\r?\n/)[0] || `exit code ${code}`).slice(0, 200));
+    if (mode === "summon") { summons.delete(id); sysEvent(id, "error", `summon failed: ${msg}`); }
+    finish({ error: `terminal not opened: ${msg}` });
+  });
+}
+
+/* stop-term: close a summoned terminal. Normal path = write the kill file (the elevated shell kills
+   itself → no UAC). Fallback after 10s = elevated taskkill (one UAC prompt). */
+function gwStopTerm(id, cb) {
+  const agent = agentById(id);
+  if (!agent) return cb({ error: `unknown agent '${id}'` });
+  pollSummons(() => {
+    const s = summons.get(id);
+    if (!s || !s.pid || !s.alive) return cb({ error: `no summoned terminal tracked for ${agent.name}` });
+    const pid = s.pid;
+    try { fs.writeFileSync(termKillFile(id), String(Date.now())); } catch (e) { return cb({ error: `cannot write kill file: ${e.message}` }); }
+    const t0 = Date.now();
+    const check = () => {
+      execFile("tasklist", ["/FO", "CSV", "/NH", "/FI", `PID eq ${pid}`], { windowsHide: true }, (e, out) => {
+        const alive = !e && /"\d+"/.test(String(out));
+        if (!alive) {
+          cleanupTerm(id);
+          sysEvent(id, "ok", `summoned terminal pid ${pid} closed`);
+          appendDiskLog(id, [{ t: new Date().toISOString().slice(11, 19), s: "sys", line: `[agentic-os] summoned terminal pid ${pid} closed` }]);
+          return cb({ ok: true, pid, closed: true });
+        }
+        if (Date.now() - t0 < 10000) return setTimeout(check, 1000);
+        // watcher didn't fire → escalate: elevated taskkill (one UAC prompt)
+        const ps2 = `Start-Process taskkill -Verb RunAs -ArgumentList '/PID','${pid}','/T','/F' -Wait`;
+        execFile("powershell", ["-NoProfile", "-Command", ps2], { windowsHide: true, timeout: 60000 }, () => {
+          execFile("tasklist", ["/FO", "CSV", "/NH", "/FI", `PID eq ${pid}`], { windowsHide: true }, (e2, out2) => {
+            if (!e2 && /"\d+"/.test(String(out2))) return cb({ error: "terminal still alive — UAC declined or kill failed" });
+            cleanupTerm(id);
+            sysEvent(id, "ok", `summoned terminal pid ${pid} force-closed`);
+            cb({ ok: true, pid, closed: true, forced: true });
+          });
+        });
+      });
+    };
+    setTimeout(check, 1500);
+  });
 }
 
 /* kill the dashboard-owned run process (if any) */
@@ -417,6 +587,7 @@ function maybeWatchdog(id) {
   if (hits.length >= 3) { console.error(`[watchdog] ${id}: 3x/hour limit reached, stopping auto-restart`); return; }
   hits.push(now); restartLog.set(id, hits);
   console.error(`[watchdog] ${id}: auto-restart (attempt ${hits.length}/3 this hour)`);
+  sysEvent(id, "warn", `watchdog auto-restart (attempt ${hits.length}/3)`);
   alertDown(id, `watchdog auto-restart (attempt ${hits.length}/3 within 1 hour)`);
   gwCtl(id, "restart", () => {});
 }
@@ -453,39 +624,130 @@ function saveAvatar(id, dataUrl) {
   return { ok: true, url: `/avatars/${id}.${ext}` };
 }
 
-/* ---------------- graph vault (view: Neural Vault) ---------------- */
+/* ---------------- graph vault (view: Neural Vault) ----------------
+   Four layers, each tagged on the edge so the client can toggle them and the
+   report can still count wikilinks alone (totals.edges must stay honest):
+     link   — a real [[wikilink]] or [](note.md) between two existing notes
+     ghost  — a wikilink whose target note does not exist yet (Obsidian shows these too)
+     tag    — note → #tag hub (a star, not a clique: a 20-note tag costs 20 edges, not 190)
+     folder — note → containing folder → parent folder (the structural skeleton)
+   Link resolution is path-aware: the vault holds 52 duplicate basenames, and a
+   first-wins basename map silently orphans every one of the losers. */
+const CODE_FENCE = /(^|\n)\s*(```|~~~)[\s\S]*?(\n\s*\2|$)/g;
+const INLINE_CODE = /`[^`\n]*`/g;
+
+function resolveLink(raw, fromRel, byPath, byBase) {
+  const clean = raw.trim().replace(/\\/g, "/").replace(/\.md$/i, "").replace(/^\.\//, "");
+  if (!clean) return null;
+  const lc = clean.toLowerCase();
+  if (byPath.has(lc)) return byPath.get(lc);            // [[Brains/Copilot/Note]] — exact path
+  const cands = byBase.get(lc.split("/").pop());
+  if (!cands || !cands.length) return null;
+  if (cands.length === 1) return cands[0];
+  // Ambiguous basename. Prefer a path ending with what was written, then a sibling
+  // of the source note, then the shallowest path — Obsidian's own resolution order.
+  const suffix = cands.find(c => c.toLowerCase().replace(/\.md$/, "").endsWith("/" + lc));
+  if (suffix) return suffix;
+  const dir = fromRel.slice(0, fromRel.lastIndexOf("/") + 1);
+  const sibling = cands.find(c => c.startsWith(dir) && !c.slice(dir.length).includes("/"));
+  if (sibling) return sibling;
+  return cands.slice().sort((a, b) => a.split("/").length - b.split("/").length || a.localeCompare(b))[0];
+}
+
 let graphCache = { t: 0, data: null };
 function buildGraph() {
   if (graphCache.data && Date.now() - graphCache.t < 60000) return graphCache.data;
   try {
   const files = walkVault();
-  const nodes = new Map(); // rel -> node
-  const byTitle = new Map(); // lowercase basename -> rel
+  const nodes = new Map();   // id -> node
+  const byPath = new Map();  // "brains/hermes/note" -> rel
+  const byBase = new Map();  // "note" -> [rel, rel, …]  — every candidate, not first-wins
+
+  const addNode = (id, n) => { if (!nodes.has(id)) nodes.set(id, { id, deg: 0, ...n }); return nodes.get(id); };
+
   for (const f of files) {
     const label = f.rel.split("/").pop().replace(/\.md$/, "");
-    const folder = f.rel.includes("/") ? f.rel.split("/")[0] : "(root)";
-    nodes.set(f.rel, { id: f.rel, label, folder, mtime: f.mtime, deg: 0 });
-    if (!byTitle.has(label.toLowerCase())) byTitle.set(label.toLowerCase(), f.rel);
+    const dir = f.rel.includes("/") ? f.rel.slice(0, f.rel.lastIndexOf("/")) : "";
+    addNode(f.rel, { label, folder: dir || "(root)", type: "note", mtime: f.mtime });
+    byPath.set(f.rel.toLowerCase().replace(/\.md$/, ""), f.rel);
+    const base = label.toLowerCase();
+    if (!byBase.has(base)) byBase.set(base, []);
+    byBase.get(base).push(f.rel);
   }
+
   const edges = [];
   const seen = new Set();
+  const push = (s, t, type) => {
+    if (s === t) return;
+    const key = (s < t ? s + " " + t : t + " " + s) + " " + type;
+    if (seen.has(key)) return;
+    seen.add(key);
+    edges.push({ s, t, type });
+    nodes.get(s).deg++; nodes.get(t).deg++;
+  };
+
   for (const f of files) {
     let text; try { text = fs.readFileSync(path.join(VAULT, f.rel), "utf8"); } catch { continue; }
-    for (const m of text.matchAll(/\[\[([^\]|#\n]+)/g)) {
-      const target = byTitle.get(m[1].trim().toLowerCase());
-      if (!target || target === f.rel) continue;
-      const key = f.rel < target ? f.rel + "|" + target : target + "|" + f.rel;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      edges.push({ s: f.rel, t: target });
-      nodes.get(f.rel).deg++; nodes.get(target).deg++;
+    const body = text.replace(CODE_FENCE, "\n").replace(INLINE_CODE, " ");
+
+    // [[Target|alias]] · [[Target#heading]] · ![[Embed]]
+    for (const m of body.matchAll(/!?\[\[([^\]\n]+?)\]\]/g)) {
+      const raw = m[1].split("|")[0].split("#")[0];
+      if (!raw.trim()) continue;
+      const target = resolveLink(raw, f.rel, byPath, byBase);
+      if (target) { push(f.rel, target, "link"); continue; }
+      const name = raw.trim().replace(/\.md$/i, "").split("/").pop();
+      if (!/^[\w][\w .'&()+-]{1,60}$/.test(name)) continue;   // drop prose noise: "...", "[ abc", ":/"
+      const gid = "ghost:" + name;
+      addNode(gid, { label: name, folder: "(unresolved)", type: "ghost", mtime: 0 });
+      push(f.rel, gid, "ghost");
+    }
+    // [text](Some Note.md)
+    for (const m of body.matchAll(/\]\(([^)\s]+\.md)\)/g)) {
+      let raw; try { raw = decodeURIComponent(m[1]); } catch { raw = m[1]; }
+      const target = resolveLink(raw, f.rel, byPath, byBase);
+      if (target) push(f.rel, target, "link");
+    }
+    // #tag — code is already stripped, and "# Heading" needs a space so it cannot match
+    for (const m of body.matchAll(/(?:^|[\s(])#([A-Za-z][\w-]*(?:\/[\w-]+)*)/gm)) {
+      const tid = "tag:" + m[1].toLowerCase();
+      addNode(tid, { label: "#" + m[1], folder: "(tags)", type: "tag", mtime: 0 });
+      push(f.rel, tid, "tag");
     }
   }
-  graphCache = { t: Date.now(), data: { nodes: [...nodes.values()], edges, generatedAt: new Date().toISOString() } };
+
+  // folder skeleton: note → its folder → parent folder → …
+  for (const f of files) {
+    if (!f.rel.includes("/")) continue;
+    const parts = f.rel.split("/").slice(0, -1);
+    let prev = null;
+    for (let i = 0; i < parts.length; i++) {
+      const fid = "folder:" + parts.slice(0, i + 1).join("/");
+      addNode(fid, { label: parts[i], folder: parts[0], type: "folder", mtime: 0 });
+      if (prev) push(prev, fid, "folder");
+      prev = fid;
+    }
+    if (prev) push(f.rel, prev, "folder");
+  }
+
+  const linked = new Set();
+  for (const e of edges) {
+    if (e.type !== "link" && e.type !== "ghost") continue;
+    linked.add(e.s); linked.add(e.t);
+  }
+  const stats = {
+    notes: files.length,
+    links: edges.filter(e => e.type === "link").length,
+    ghosts: edges.filter(e => e.type === "ghost").length,
+    tagEdges: edges.filter(e => e.type === "tag").length,
+    folderEdges: edges.filter(e => e.type === "folder").length,
+    orphans: [...nodes.values()].filter(n => n.type === "note" && !linked.has(n.id)).length,
+  };
+  graphCache = { t: Date.now(), data: { nodes: [...nodes.values()], edges, stats, generatedAt: new Date().toISOString() } };
   return graphCache.data;
   } catch (e) {
     if (graphCache.data) return graphCache.data;   // R18: don't poison the cache to null
-    return { nodes: [], edges: [], generatedAt: new Date().toISOString(), error: e.message };
+    return { nodes: [], edges: [], stats: { notes: 0, links: 0, ghosts: 0, tagEdges: 0, folderEdges: 0, orphans: 0 }, generatedAt: new Date().toISOString(), error: e.message };
   }
 }
 
@@ -620,7 +882,7 @@ function agentDetail(id) {
     enabled: agent.enabled, note: agent.note || null, avatar: avatarUrl(id),
     cwd: agent.gateway && agent.gateway.cwd, bin: agent.gateway && agent.gateway.bin, actions: gwActions(agent),
     canSummon: !!(agent.gateway && agent.gateway.home && agent.gateway.trigger),
-    proc: procInfo(id), ...agentVaultStatus(files, agent),
+    proc: procInfo(id), term: termInfo(id), ...agentVaultStatus(files, agent),
     log: p && p.log.length ? p.log.slice(-40) : readDiskLog(id, 40),   // R#4: fall back to disk after a restart
     laneFiles, telemetry: tele,
     // uniform activity for all agents: Claude from transcripts, the rest from their own telemetry
@@ -659,7 +921,7 @@ function buildReport() {
   return {
     generatedAt: localISO(),
     totals: {
-      notes: files.length, edges: graph.edges.length, openTasks: tasks.length,
+      notes: files.length, edges: graph.stats.links, openTasks: tasks.length,
       active7d: files.filter(f => now - f.mtime < 7 * DAY).length,
       gwRunning: cfg.agents.filter(a => procInfo(a.id).status === "running").length,
     },
@@ -827,7 +1089,7 @@ const server = http.createServer((req, res) => {
         const cfg = loadConfig();
         return json(res, 200, cfg.agents.map(a => ({ id: a.id, name: a.name, icon: a.icon, enabled: a.enabled, note: a.note || null, cwd: a.gateway && a.gateway.cwd, bin: a.gateway && a.gateway.bin, actions: gwActions(a), ...procInfo(a.id) })));
       }
-      let m = url.match(/^\/api\/proc\/([\w-]+)\/(start|stop|restart|status|run|log|terminal)$/);
+      let m = url.match(/^\/api\/proc\/([\w-]+)\/(start|stop|restart|status|run|log|terminal|stop-term)$/);
       if (m) {
         const [, id, action] = m;
         if (action === "log") {
@@ -838,8 +1100,9 @@ const server = http.createServer((req, res) => {
         if (req.method !== "POST") return json(res, 405, { error: "POST only" });
         if (action === "terminal") {
           const mode = new URL(req.url, "http://x").searchParams.get("mode") || "summon";
-          const r = gwTerminal(id, mode); return json(res, r.error ? 400 : 200, r);
+          return gwTerminal(id, mode, r => json(res, r.error ? 400 : 200, r));
         }
+        if (action === "stop-term") return gwStopTerm(id, r => json(res, r.error ? 400 : 200, r));
         if (action === "run") { const r = gwRun(id); return json(res, r.error ? 400 : 200, r); }
         if (action === "stop") return gwStop(id, r => json(res, r.error ? 400 : 200, r));
         return gwCtl(id, action, r => json(res, r.error ? 400 : 200, r)); // start | restart | status
@@ -929,6 +1192,8 @@ server.listen(PORT, () => {
   console.log(TOKEN ? "  Auth: token ACTIVE (x-dash-token)" : "  Auth: no token (local only). For remote access: set DASH_TOKEN.\n");
   setTimeout(pollAllStatus, 3000);       // initial status
   setInterval(pollAllStatus, 45000);     // R4: interval (45s) > gwCtl timeout (30s) + in-flight guard
+  setTimeout(pollSummons, 3000);         // pick up summoned-terminal pid files from a previous run
+  setInterval(pollSummons, 45000);       // keep summoned-terminal liveness fresh
   setTimeout(runDailyBridge, 10000);     // R#2: run the daily bridge once at startup
   setInterval(runDailyBridge, 3600000);  // R#2: then hourly (it existed before but was never invoked)
 });

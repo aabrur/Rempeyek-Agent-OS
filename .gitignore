@@ -20,3 +20,23 @@ graphify-out/
 Thumbs.db
 Desktop.ini
 .DS_Store
+
+# Secrets / dumps — NEVER commit (repomix embeds .env)
+repomix-output.xml
+
+# Personal config & tooling (copy agents.config.example.json instead)
+agents.config.json
+.claude/
+
+# Runtime handshake files
+telemetry/terms/
+
+# Local scratch (graphify pipeline one-offs, personal canvas)
+do_semantic*.py
+ast_and_cache.py
+gen_subagents.py
+prep_system.py
+summarize*.py
+subagents.json
+system_prompt.txt
+*.canvas
