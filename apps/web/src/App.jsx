@@ -4,14 +4,15 @@ import { TokenLogin } from "./components/TokenLogin";
 import { ConfigBanner } from "./components/Panels";
 import { CommandCenter } from "./views/CommandCenter";
 import { AgentsView } from "./views/AgentsView";
-import { NeuralVaultView, ProjectsView, ReportsView } from "./views/SimpleViews";
+import { NeuralVaultView, ReportsView } from "./views/SimpleViews";
+import { WorkspaceView } from "./views/Workspace";
 import { useDashboard, useOps } from "./hooks/useDashboard";
 import { useTheme } from "./hooks/useTheme";
 import { useGateway } from "./hooks/useGateway";
 import { setUnauthorizedHandler } from "./api";
 
 export default function App() {
-  const [view, setView] = useState("command");
+  const [view, setView] = useState("workspace");   // front door: projects, not plumbing
   const [openAgent, setOpenAgent] = useState(null);
   const [locked, setLocked] = useState(false);
 
@@ -74,7 +75,7 @@ export default function App() {
           ) : view === "reports" ? (
             <ReportsView accent={accent} />
           ) : (
-            <ProjectsView projects={state.projects} />
+            <WorkspaceView projects={state.projects} agents={state.agents} agentsById={agentsById} refresh={refresh} />
           )}
         </main>
       </div>

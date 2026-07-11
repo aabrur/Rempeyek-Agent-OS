@@ -11,8 +11,14 @@
       (Vite + npm workspaces); `ui`, `design-system`, `theme-engine`, and
       `neural-engine` are now real packages
 - [x] Supabase mirror removed — nothing read from it; the filesystem is the only store
+- [x] **Workspace front door** — `Projects/<slug>/` workspaces (project.md · decisions.md
+      · next.md), Continue hero, decision log, resume-brief dispatch, and telemetry
+      `task_done` → decisions.md memory capture (watermarked)
 
 ## Next
+
+- [ ] **Workspace upgrade path** — convert existing flat `Projects/<name>.md` notes and
+      legacy folders (spaces/uppercase names) into workspaces from the dashboard
 
 - [ ] **Theme-aware background layer** — procedural SVG fibers/nebula bound to `--acc`
       per theme, PNGs demoted to optional texture

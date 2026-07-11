@@ -154,6 +154,241 @@ function openTasks() {
   return items;
 }
 
+/* ---------------- project workspaces (view: Workspace) ----------------
+   Projects/<slug>/ folders are WORKSPACES: project.md (goal/progress/status),
+   decisions.md (append-only cross-agent log), next.md (resume pointer).
+   Flat Projects/<name>.md notes still render (kind "note"), read-only.
+   The dashboard writes ONLY inside Projects/<slug>/ it created or that already exists. */
+const _docCache = new Map();   // abs path -> {mtime, text} — mtime-keyed, bounded
+function readDoc(abs) {
+  try {
+    const st = fs.statSync(abs);
+    const hit = _docCache.get(abs);
+    if (hit && hit.mtime === st.mtimeMs) return hit.text;
+    const text = fs.readFileSync(abs, "utf8");
+    if (_docCache.size > 500) _docCache.clear();
+    _docCache.set(abs, { mtime: st.mtimeMs, text });
+    return text;
+  } catch { return null; }
+}
+
+function parseFM(text) {
+  const fm = {}; let body = text || "";
+  const m = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/.exec(body);
+  if (m) {
+    body = body.slice(m[0].length);
+    for (const line of m[1].split(/\r?\n/)) {
+      const kv = line.match(/^(\w[\w-]*):\s*(.*)$/);
+      if (kv) fm[kv[1].toLowerCase()] = kv[2].trim().replace(/^["']|["']$/g, "");
+    }
+  }
+  return { fm, body };
+}
+
+function slugify(name) {
+  return String(name).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40);
+}
+
+/* slug is path-safe by construction (no dots/slashes pass the regex) */
+function projectBySlug(slug) {
+  if (!/^[a-z0-9][a-z0-9-]{0,63}$/.test(String(slug))) return null;
+  const dir = path.join(VAULT, "Projects", slug);
+  try { if (fs.statSync(dir).isDirectory()) return { slug, kind: "workspace", dir, rel: `Projects/${slug}/project.md` }; } catch {}
+  const flat = path.join(VAULT, "Projects", `${slug}.md`);
+  try { if (fs.statSync(flat).isFile()) return { slug, kind: "note", rel: `Projects/${slug}.md` }; } catch {}
+  return null;
+}
+
+/* goal/progress/status from the main note: frontmatter wins, checkboxes fill the gap */
+function projectMeta(rel, mtime) {
+  const text = readDoc(path.join(VAULT, rel)) || "";
+  const { fm, body } = parseFM(text);
+  const boxes = body.match(/^\s*[-*] \[[ xX]\]/gm) || [];
+  const done = body.match(/^\s*[-*] \[[xX]\]/gm) || [];
+  let progress = Number(fm.progress);
+  if (Number.isFinite(progress)) progress = Math.max(0, Math.min(100, Math.round(progress)));
+  else progress = boxes.length ? Math.round((done.length / boxes.length) * 100) : null;
+  const goal = String(fm.goal || (body.split(/\r?\n/).find(l => l.trim() && !/^[#>\-*!\[|`]/.test(l.trim())) || "")).slice(0, 240);
+  const agents = fm.agents ? fm.agents.replace(/[[\]]/g, "").split(",").map(s => s.trim()).filter(Boolean) : [];
+  const days = mtime ? Math.floor((Date.now() - mtime) / DAY) : 999;
+  const status = String(fm.status || (days <= 7 ? "active" : "parked")).toLowerCase().slice(0, 16);
+  return { title: fm.title || null, goal, progress, agents, status, tasksOpen: boxes.length - done.length };
+}
+
+function decisionList(slug, limit = 14) {
+  const text = readDoc(path.join(VAULT, "Projects", slug, "decisions.md"));
+  if (!text) return [];
+  return text.split(/\r?\n/)
+    .filter(l => /^\s*[-*]\s+\S/.test(l))
+    .map(l => l.replace(/^\s*[-*]\s+/, "").replace(/\*\*/g, "").slice(0, 240))
+    .slice(-limit).reverse();   // newest last on disk → newest first for the UI
+}
+
+function nextPointer(slug) {
+  const text = readDoc(path.join(VAULT, "Projects", slug, "next.md"));
+  if (!text) return null;
+  const line = parseFM(text).body.split(/\r?\n/).find(l => l.trim() && !/^[#>]/.test(l.trim()));
+  return line ? line.trim().slice(0, 300) : null;
+}
+
+function buildProjects(files) {
+  const out = [];
+  const bySlug = new Map();   // workspace slug -> newest mtime anywhere in the folder
+  for (const f of files) {
+    if (!f.rel.startsWith("Projects/")) continue;
+    const parts = f.rel.split("/");
+    if (parts.length >= 3) {
+      const slug = parts[1];
+      if (!bySlug.has(slug) || f.mtime > bySlug.get(slug)) bySlug.set(slug, f.mtime);
+    }
+  }
+  for (const [slug, mtime] of bySlug) {
+    if (!/^[a-z0-9][a-z0-9-]{0,63}$/.test(slug)) continue;   // unsafe folder name → not routable, skip
+    const rel = `Projects/${slug}/project.md`;
+    if (!files.some(f => f.rel === rel)) continue;   // folder without project.md → not a workspace
+    const meta = projectMeta(rel, mtime);
+    const dec = decisionList(slug, 1);
+    out.push({
+      slug, kind: "workspace", rel, name: meta.title || slug,
+      updated: new Date(mtime).toISOString().slice(0, 10), updatedAt: mtime,
+      goal: meta.goal, progress: meta.progress, status: meta.status,
+      agents: meta.agents, tasksOpen: meta.tasksOpen,
+      lastDecision: dec.length ? dec[0] : null,
+    });
+  }
+  for (const f of files) {
+    if (!(f.rel.startsWith("Projects/") && f.rel.split("/").length === 2 && f.rel.endsWith(".md"))) continue;
+    const name = f.rel.replace("Projects/", "").replace(".md", "");
+    const meta = projectMeta(f.rel, f.mtime);
+    out.push({
+      slug: slugify(name) || name, kind: "note", rel: f.rel, name: meta.title || name,
+      updated: new Date(f.mtime).toISOString().slice(0, 10), updatedAt: f.mtime,
+      goal: meta.goal, progress: meta.progress, status: meta.status,
+      agents: meta.agents, tasksOpen: meta.tasksOpen, lastDecision: null,
+    });
+  }
+  return out.sort((a, b) => b.updatedAt - a.updatedAt);
+}
+
+/* the Continue brief: what an agent needs to resume this project with full context */
+function projectBrief(p, meta, decisions, next) {
+  return [
+    `## Resume brief — ${meta.title || p.slug}`,
+    meta.goal ? `**Goal:** ${meta.goal}` : null,
+    `**Status:** ${meta.status}${meta.progress != null ? ` · ${meta.progress}%` : ""}${meta.tasksOpen ? ` · ${meta.tasksOpen} open tasks` : ""}`,
+    next ? `**Next:** ${next}` : null,
+    decisions.length ? `**Recent decisions:**\n${decisions.slice(0, 5).map(d => `- ${d}`).join("\n")}` : null,
+    `**Workspace:** Projects/${p.slug}/ (project.md · decisions.md · next.md)`,
+  ].filter(Boolean).join("\n");
+}
+
+function projectDetail(slug) {
+  const p = projectBySlug(slug);
+  if (!p) return { error: `unknown project '${slug}'` };
+  const files = walkVault();
+  let mtime = 0;
+  for (const f of files) if (f.rel.startsWith(p.kind === "workspace" ? `Projects/${slug}/` : p.rel) && f.mtime > mtime) mtime = f.mtime;
+  const meta = projectMeta(p.rel, mtime);
+  const decisions = p.kind === "workspace" ? decisionList(slug) : [];
+  const next = p.kind === "workspace" ? nextPointer(slug) : null;
+  const docs = p.kind === "workspace"
+    ? files.filter(f => f.rel.startsWith(`Projects/${slug}/`)).sort((a, b) => b.mtime - a.mtime).slice(0, 8)
+        .map(f => ({ rel: f.rel, updated: new Date(f.mtime).toISOString().slice(0, 16).replace("T", " ") }))
+    : [];
+  return {
+    slug, kind: p.kind, rel: p.rel, name: meta.title || slug,
+    goal: meta.goal, progress: meta.progress, status: meta.status,
+    agents: meta.agents, tasksOpen: meta.tasksOpen,
+    updated: mtime ? new Date(mtime).toISOString().slice(0, 10) : null,
+    decisions, next, docs,
+    brief: projectBrief(p, meta, decisions, next),
+  };
+}
+
+function createProject(body) {
+  const name = String(body.name || "").trim().slice(0, 60);
+  if (!name) return { error: "name is required" };
+  const slug = slugify(name);
+  if (!/^[a-z0-9][a-z0-9-]{1,39}$/.test(slug)) return { error: "name must contain letters or numbers" };
+  const dir = path.join(VAULT, "Projects", slug);
+  if (fs.existsSync(dir) || fs.existsSync(path.join(VAULT, "Projects", `${slug}.md`)))
+    return { error: `project '${slug}' already exists` };
+  const goal = String(body.goal || "").trim().replace(/\r?\n/g, " ").slice(0, 300);
+  const date = localISO().slice(0, 10);
+  try {
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, "project.md"),
+      `---\ntitle: ${name}\nstatus: active\nprogress: 0\ncreated: ${date}\ngoal: ${goal || "(define the goal)"}\n---\n\n# ${name}\n\n${goal ? goal + "\n\n" : ""}## Milestones\n\n- [ ] Define the first milestone\n`, "utf8");
+    fs.writeFileSync(path.join(dir, "decisions.md"),
+      `# Decisions — ${name}\n\n> Append-only log. ⚡auto entries are captured from agent telemetry.\n\n- **${localISO().slice(0, 16).replace("T", " ")}** · Dashboard — workspace created\n`, "utf8");
+    fs.writeFileSync(path.join(dir, "next.md"),
+      `# Next — ${name}\n\nDefine the next concrete step here. The Continue brief leads with it.\n`, "utf8");
+    sysEvent("dashboard", "ok", `project workspace created: ${slug}`);
+    return { ok: true, slug };
+  } catch (e) { return { error: `failed to create workspace: ${e.message}` }; }
+}
+
+function addDecision(slug, body) {
+  const p = projectBySlug(slug);
+  if (!p) return { error: `unknown project '${slug}'` };
+  if (p.kind !== "workspace") return { error: "flat note projects have no decision log — create a workspace" };
+  const text = String(body.text || "").trim().replace(/[\r\n]+/g, " ").slice(0, 400);
+  if (!text) return { error: "decision text is empty" };
+  const who = String(body.agent || "Boss").trim().slice(0, 40) || "Boss";
+  const line = `- **${localISO().slice(0, 16).replace("T", " ")}** · ${who} — ${text}\n`;
+  try {
+    const f = path.join(p.dir, "decisions.md");
+    if (!fs.existsSync(f))
+      fs.writeFileSync(f, `# Decisions — ${slug}\n\n> Append-only log. ⚡auto entries are captured from agent telemetry.\n\n${line}`, "utf8");
+    else fs.appendFileSync(f, line, "utf8");
+    return { ok: true, line: line.trim() };
+  } catch (e) { return { error: `failed to write decision: ${e.message}` }; }
+}
+
+/* -------- project memory capture: telemetry task_done → decisions.md --------
+   Watermarked per agent (telemetry/memory-capture.json) so nothing is written twice.
+   An event lands in a workspace when it carries an explicit `project` field, or when
+   its name/detail mentions the workspace slug. Honest capture only — no inference. */
+const MEM_WM = path.join(TELEMETRY_DIR, "memory-capture.json");
+function captureMemory() {
+  let cfg; try { cfg = loadConfig(); } catch { return; }
+  let slugs = [];
+  try {
+    slugs = fs.readdirSync(path.join(VAULT, "Projects"), { withFileTypes: true })
+      .filter(e => e.isDirectory()).map(e => e.name);
+  } catch {}
+  if (!slugs.length) return;
+  let wm = {}; try { wm = JSON.parse(fs.readFileSync(MEM_WM, "utf8")); } catch {}
+  let dirty = false;
+  for (const a of cfg.agents) {
+    const last = wm[a.id] || 0;
+    let maxTs = last;
+    const hits = [];
+    for (const e of readTelemetry(a.id)) {   // newest-first, ≤30 events
+      const ts = e.ts ? Date.parse(e.ts) : 0;
+      if (!ts || ts <= last) continue;
+      if (ts > maxTs) maxTs = ts;
+      if (e.type !== "task_done") continue;
+      const hay = `${e.project || ""} ${e.name || ""} ${e.detail || ""}`.toLowerCase();
+      const slug = (e.project && slugs.includes(String(e.project))) ? String(e.project)
+        : slugs.find(s => hay.includes(s.toLowerCase()));
+      if (slug) hits.push({ slug, e, ts });
+    }
+    for (const { slug, e, ts } of hits.reverse()) {   // oldest first → chronological log
+      const line = `- **${new Date(ts).toISOString().slice(0, 16).replace("T", " ")}** · ${a.name} — ${String(e.name || "task").slice(0, 120)}${e.detail ? `: ${String(e.detail).replace(/[\r\n]+/g, " ").slice(0, 200)}` : ""} ⚡auto\n`;
+      try {
+        const f = path.join(VAULT, "Projects", slug, "decisions.md");
+        if (!fs.existsSync(f))
+          fs.writeFileSync(f, `# Decisions — ${slug}\n\n> Append-only log. ⚡auto entries are captured from agent telemetry.\n\n${line}`, "utf8");
+        else fs.appendFileSync(f, line, "utf8");
+        sysEvent(a.id, "ok", `memory captured → Projects/${slug}`);
+      } catch (err) { console.error("[memory]", err.message); }
+    }
+    if (maxTs > last) { wm[a.id] = maxTs; dirty = true; }
+  }
+  if (dirty) { try { fs.writeFileSync(MEM_WM, JSON.stringify(wm), "utf8"); } catch {} }
+}
+
 function buildState() {
   const cfg = loadConfig();
   const files = walkVault();
@@ -161,9 +396,7 @@ function buildState() {
   const tasks = openTasks();
   const um = uptimeMap();                       // R#2: 24-hour uptime per agent (single file read)
   const inbox = files.filter(f => f.rel.startsWith("Inbox/"));
-  const projects = files.filter(f => f.rel.startsWith("Projects/") && f.rel.split("/").length === 2)
-    .sort((a, b) => b.mtime - a.mtime)
-    .map(f => ({ name: f.rel.replace("Projects/", "").replace(".md", ""), rel: f.rel, updated: new Date(f.mtime).toISOString().slice(0, 10) }));
+  const projects = buildProjects(files);
   return {
     vault: VAULT,
     agency: cfg.agency || "AGENTIC//OS",
@@ -176,7 +409,7 @@ function buildState() {
       notes: { value: files.length, label: "Total vault notes" },
       activeWeek: { value: files.filter(f => now - f.mtime < 7 * DAY).length, label: "Notes changed in the last 7 days" },
       openTasks: { value: tasks.length, label: "Open checkboxes in Tasks/" },
-      projects: { value: projects.length, label: "Active project notes" },
+      projects: { value: projects.length, label: "Projects in the workspace" },
     },
     agents: cfg.agents.map(a => ({ ...a, gateway: undefined, actions: gwActions(a), canSummon: !!(a.gateway && a.gateway.home && a.gateway.trigger), ...agentVaultStatus(files, a), proc: procInfo(a.id), term: termInfo(a.id), avatar: avatarUrl(a.id), uptime: um[a.id] || null })),
     review: [
@@ -1171,6 +1404,24 @@ const server = http.createServer((req, res) => {
           const r = createTask(d.agent, d.title, d.detail);
           json(res, r.error ? 400 : 200, r);
         });
+      if (url === "/api/projects") return json(res, 200, buildProjects(walkVault()));
+      if (url === "/api/project" && req.method === "POST")
+        return readBody(req, res, body => {
+          let d; try { d = JSON.parse(body); } catch { return json(res, 400, { error: "body must be JSON {name,goal?}" }); }
+          const r = createProject(d);
+          json(res, r.error ? 400 : 200, r);
+        });
+      m = url.match(/^\/api\/project\/([\w-]+)$/);
+      if (m) { const d = projectDetail(m[1]); return json(res, d.error ? 404 : 200, d); }
+      m = url.match(/^\/api\/project\/([\w-]+)\/decision$/);
+      if (m && req.method === "POST") {
+        const slug = m[1];
+        return readBody(req, res, body => {
+          let d; try { d = JSON.parse(body); } catch { return json(res, 400, { error: "body must be JSON {text,agent?}" }); }
+          const r = addDecision(slug, d);
+          json(res, r.error ? 400 : 200, r);
+        });
+      }
       if (url === "/api/task/done" && req.method === "POST")
         return readBody(req, res, body => {
           let d; try { d = JSON.parse(body); } catch { return json(res, 400, { error: "body must be JSON {source,text}" }); }
@@ -1263,6 +1514,8 @@ server.listen(PORT, () => {
   setInterval(pollSummons, 45000);       // keep summoned-terminal liveness fresh
   setTimeout(runDailyBridge, 10000);     // R#2: run the daily bridge once at startup
   setInterval(runDailyBridge, 3600000);  // R#2: then hourly (it existed before but was never invoked)
+  setTimeout(captureMemory, 8000);       // project memory: telemetry task_done → decisions.md
+  setInterval(captureMemory, 120000);    // watermarked, so re-runs never duplicate entries
 });
 
 /* R#2: run scripts/hermes-daily-bridge.cjs (sync telemetry + vault daily note) */

@@ -12,6 +12,12 @@ React + Vite, split into components across an npm-workspaces monorepo.
 
 ## Features
 
+- **Workspace (the front door)** — open on your projects, not your tools: a Continue
+  hero for the most recently touched project (goal, progress, last decision), one-click
+  resume, and a per-project decision log under `Projects/<slug>/`
+- **Project memory capture** — agents' `task_done` telemetry is auto-captured into the
+  matching project's `decisions.md` (⚡auto entries, watermarked — never duplicated), and
+  a **resume brief** can be dispatched to any agent via the task board
 - **Agent topology map** — live radial map of every agent and its gateway status
 - **Cosmic themes** — 13 switchable themes (Rempeyek · Neural Cosmos · Ember · Ghost Protocol · Quantum Glass · Dark Matter · Nebula · Aurora · Midnight · Solaris · Crimson Rift · Monochrome · Nothing OS), persisted per browser
 - **＋ Add Agent** — register new agents from the dashboard (auto node-numbering, per-agent accent color, optional summon CLI)

@@ -4,11 +4,11 @@ import { gwState } from "../lib/agents";
 import { obsUri } from "../lib/obsidian";
 
 const NAV = [
+  { id: "workspace", icon: "◆", label: "Workspace" },
   { id: "command", icon: "▦", label: "Command Center" },
   { id: "agents", icon: "◉", label: "Agents" },
   { id: "graph", icon: "✳", label: "Neural Vault" },
   { id: "reports", icon: "▤", label: "Reports" },
-  { id: "projects", icon: "▧", label: "Projects" },
 ];
 
 export function Sidebar({ view, onView, agents = [], agency, vault, theme, onTheme, onOpenAgent }) {

@@ -46,11 +46,7 @@ body {
 .bg-glow {
   background:
     radial-gradient(700px 360px at 85% -5%, color-mix(in srgb, var(--acc) 12%, transparent), transparent 65%),
-    radial-gradient(600px 400px at -5% 100%, rgba(255, 61, 216, .10), transparent 65%),
-    /* dark veil keeps the cosmos subtle so panel text stays readable */
-    linear-gradient(rgba(5, 3, 16, .78), rgba(5, 3, 16, .84)),
-    url("/cosmos-brain.png") center 35% / cover no-repeat,
-    url("/bg-map.png") center center / cover no-repeat;
+    radial-gradient(600px 400px at -5% 100%, rgba(255, 61, 216, .10), transparent 65%);
 }
 /* drifting nebula plasma — two soft clouds slowly orbiting behind everything */
 .bg-glow::before {
@@ -397,8 +393,7 @@ body {
 .graph-wrap {
   position: relative; flex: 1; border: 1px solid var(--line); border-radius: 14px; overflow: hidden;
   background:
-    radial-gradient(ellipse at center, rgba(10, 7, 34, .55) 0%, rgba(5, 3, 16, .88) 75%),
-    url('/cosmos-brain.png') center / cover no-repeat, #050310;
+    radial-gradient(ellipse at center, rgba(10, 7, 34, .55) 0%, rgba(5, 3, 16, .88) 75%), #050310;
 }
 .graph-layers { display: inline-flex; gap: 6px; }
 .lyr {
@@ -444,8 +439,6 @@ body {
     radial-gradient(1px 1px at 8% 88%, rgba(238, 235, 255, .2), transparent 100%),
     radial-gradient(ellipse 60% 90% at 50% 42%, color-mix(in srgb, var(--acc) 6%, transparent), transparent 70%),
     radial-gradient(ellipse 45% 60% at 82% 85%, rgba(140, 91, 255, .06), transparent 70%),
-    linear-gradient(rgba(9, 7, 22, .78), rgba(7, 5, 18, .86)),
-    url('/cosmos-brain.png') center 30% / cover no-repeat,
     linear-gradient(170deg, #0B0918, #070512);
   overflow: hidden; position: relative;
 }
@@ -632,8 +625,99 @@ body {
 .aa-hint { font-size: 10.5px; color: var(--muted); font-family: var(--mono); min-height: 14px; }
 .aa-hint.err { color: var(--red); }
 
+/* ---------------- workspace (the front door) ----------------
+   Hero = the project you continue; everything on it is live data:
+   progress rail (checkbox ratio), status, agent constellation, last decision. */
+.ws-hero {
+  position: relative; overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--ac, var(--acc)) 38%, var(--line));
+  border-radius: 14px; padding: 20px 22px 18px; margin-bottom: 22px;
+  background: linear-gradient(165deg, rgba(19, 16, 49, .72), rgba(11, 9, 26, .82));
+  backdrop-filter: blur(7px); -webkit-backdrop-filter: blur(7px);
+  box-shadow: 0 0 34px color-mix(in srgb, var(--ac, var(--acc)) 14%, transparent);
+}
+.ws-hero::before {
+  content: ""; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, var(--ac, var(--acc)), transparent 70%);
+  box-shadow: 0 0 14px var(--ac, var(--acc));
+}
+.ws-eyebrow { font-family: var(--mono); font-size: 9.5px; letter-spacing: .24em; color: var(--ac, var(--acc)); opacity: .9; margin-bottom: 10px; }
+.ws-hero-row { display: flex; gap: 20px; align-items: flex-start; }
+.ws-hero-main { flex: 1; min-width: 0; }
+.ws-hero-name {
+  font-family: var(--hero); font-weight: 900; font-size: 26px; letter-spacing: .06em;
+  background: linear-gradient(90deg, var(--text) 40%, var(--ac, var(--acc)));
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 0 16px color-mix(in srgb, var(--ac, var(--acc)) 30%, transparent));
+}
+.ws-goal { color: var(--muted); font-size: 12.5px; margin: 5px 0 12px; max-width: 640px; }
+.ws-hero-act { display: flex; flex-direction: column; gap: 8px; align-items: flex-end; flex-shrink: 0; }
+.ws-continue { font-size: 13px; padding: 11px 22px; letter-spacing: .16em; }
+.ws-last { font-family: var(--mono); font-size: 10.5px; color: var(--muted); margin-top: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* progress rail — hero variant carries the one orchestrated motion moment (scan sweep) */
+.ws-prog { position: relative; height: 6px; border-radius: 999px; background: rgba(255, 255, 255, .07); overflow: hidden; margin: 8px 0 7px; }
+.ws-prog i {
+  display: block; height: 100%; border-radius: 999px;
+  background: linear-gradient(90deg, var(--ac, var(--acc)), color-mix(in srgb, var(--ac, var(--acc)) 55%, var(--magenta)));
+  box-shadow: 0 0 10px color-mix(in srgb, var(--ac, var(--acc)) 60%, transparent);
+  transition: width .5s ease;
+}
+.ws-prog-hero { height: 8px; }
+@media (prefers-reduced-motion: no-preference) {
+  .ws-prog-hero::after {
+    content: ""; position: absolute; inset: 0; border-radius: 999px;
+    background: linear-gradient(90deg, transparent 20%, rgba(238, 235, 255, .28), transparent 80%);
+    background-size: 200% 100%; animation: wsScan 3.4s ease-in-out infinite;
+  }
+  @keyframes wsScan { from { background-position: 180% 0; } to { background-position: -80% 0; } }
+}
+
+.ws-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; }
+.ws-card {
+  text-align: left; cursor: pointer; min-width: 0;
+  border: 1px solid var(--line); border-radius: 12px; padding: 13px 14px;
+  background: linear-gradient(165deg, rgba(19, 16, 49, .68), rgba(11, 9, 26, .78));
+  backdrop-filter: blur(7px); -webkit-backdrop-filter: blur(7px);
+  color: var(--text); font: inherit;
+  transition: transform .15s, border-color .15s, box-shadow .15s;
+}
+.ws-card:hover { transform: translateY(-2px); border-color: var(--acc); box-shadow: 0 0 20px color-mix(in srgb, var(--acc) 20%, transparent); }
+.ws-card:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
+.ws-card-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.ws-card-name { font-family: var(--disp); font-weight: 700; font-size: 13.5px; letter-spacing: .04em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ws-card-goal { color: var(--muted); font-size: 11px; margin-top: 3px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.ws-card-meta { display: flex; align-items: center; gap: 10px; font-family: var(--mono); font-size: 9.5px; color: var(--muted); }
+.ws-card-meta span:last-child { margin-left: auto; }
+@media (prefers-reduced-motion: no-preference) {
+  .ws-card, .ws-hero { animation: wsIn .35s cubic-bezier(.2, .65, .3, 1) backwards; }
+  @keyframes wsIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+}
+
+.ws-status {
+  font-family: var(--mono); font-size: 9px; letter-spacing: .1em; text-transform: uppercase;
+  padding: 1px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); flex-shrink: 0;
+}
+.ws-status.st-active { border-color: var(--lime); color: var(--lime); }
+.ws-status.st-done, .ws-status.st-shipped { border-color: var(--cyan); color: var(--cyan); }
+.ws-status.st-blocked { border-color: var(--red); color: var(--red); }
+.ws-agents { display: inline-flex; gap: 3px; }
+.ws-agents i { width: 8px; height: 8px; border-radius: 50%; box-shadow: 0 0 6px currentColor; }
+
+/* project panel (reuses .detail chrome) */
+.ws-detail .detail-meta { display: flex; align-items: center; gap: 8px; }
+.ws-next { font-size: 12.5px; line-height: 1.55; border-left: 2px solid var(--ac, var(--acc)); padding: 6px 10px; background: rgba(255, 255, 255, .02); border-radius: 0 7px 7px 0; }
+.ws-dec {
+  font-size: 11.5px; line-height: 1.5; padding: 7px 9px;
+  border-bottom: 1px solid rgba(36, 30, 78, .6);
+}
+.ws-dec:last-child { border-bottom: none; }
+.ws-hint { font-family: var(--mono); font-size: 10px; color: var(--muted); min-height: 14px; margin-top: 4px; }
+
 /* responsive */
 @media (max-width: 1000px) {
+  .ws-hero-row { flex-direction: column; }
+  .ws-hero-act { flex-direction: row; align-items: center; }
   body { overflow: auto; }
   .shell { flex-direction: column; height: auto; }
   .sidebar { width: 100%; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 10px; }

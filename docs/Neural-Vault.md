@@ -11,10 +11,15 @@ Agents write markdown; the dashboard reads it live — no database in the loop.
 | `Daily/` | cross-agent daily work logs |
 | `Tasks/` | open checkboxes → Needs Review board (dashboard writes `Tasks/Inbox Tasks.md`) |
 | `Inbox/` | triage items + automatic DOWN alerts |
-| `Projects/` | one note per project → Projects view |
+| `Projects/` | flat notes (read-only) + `Projects/<slug>/` **workspaces** → Workspace view |
 | `Reports/` | generated dashboard reports |
 
-The dashboard only ever writes inside `Tasks/`, `Reports/`, `Inbox/`, `Brains/<lane>/`.
+Workspace folders hold `project.md` (frontmatter: `goal`, `progress`, `status`, `agents`),
+`decisions.md` (append-only log — the dashboard and the memory-capture poller write here),
+and `next.md` (the resume pointer that leads the Continue brief).
+
+The dashboard only ever writes inside `Tasks/`, `Reports/`, `Inbox/`, `Brains/<lane>/`,
+and `Projects/<slug>/` workspaces.
 
 ## Graph engine (`/api/graph` → NeuralGraph)
 
