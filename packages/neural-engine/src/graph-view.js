@@ -21,17 +21,17 @@ export function seededRandom(seed) {
 const RENDER_PROFILES = Object.freeze({
   full: Object.freeze({
     tier: "full", layoutIterations: 42, maxHalos: 96, starAreaPerPoint: 6500,
-    labelMinDegree: 3, labelZoom: 1.6, folderLabelZoom: .55,
+    labelMinDegree: 3, labelZoom: 1.6, folderLabelZoom: .55, maxLabels: 48,
     drawNodeCores: true, shadowMode: "all",
   }),
   reduced: Object.freeze({
     tier: "reduced", layoutIterations: 28, maxHalos: 32, starAreaPerPoint: 11000,
-    labelMinDegree: 5, labelZoom: 2, folderLabelZoom: .8,
+    labelMinDegree: 5, labelZoom: 2, folderLabelZoom: .8, maxLabels: 28,
     drawNodeCores: true, shadowMode: "active",
   }),
   "aggregate-ready": Object.freeze({
     tier: "aggregate-ready", layoutIterations: 18, maxHalos: 12, starAreaPerPoint: 18000,
-    labelMinDegree: 8, labelZoom: 2.4, folderLabelZoom: 1,
+    labelMinDegree: 8, labelZoom: 2.4, folderLabelZoom: 1, maxLabels: 16,
     drawNodeCores: false, shadowMode: "active",
   }),
 });
@@ -39,6 +39,30 @@ const RENDER_PROFILES = Object.freeze({
 export function graphRenderProfile(effectTier, nodeCount = 0) {
   const inferred = nodeCount > 1000 ? "aggregate-ready" : nodeCount > 250 ? "reduced" : "full";
   return RENDER_PROFILES[effectTier] || RENDER_PROFILES[inferred];
+}
+
+export function selectLabelNodeIds(nodes = [], profile = RENDER_PROFILES.full) {
+  const maxLabels = Math.max(0, Number(profile.maxLabels) || 0);
+  const structural = nodes
+    .filter(node => node.type === "folder")
+    .sort((a, b) => (b.degree || 0) - (a.degree || 0) || a.id.localeCompare(b.id));
+  const hubs = nodes
+    .filter(node => node.type !== "ghost" && node.type !== "folder" && (node.degree || 0) >= profile.labelMinDegree)
+    .sort((a, b) => (b.degree || 0) - (a.degree || 0) || Number(b.recent) - Number(a.recent) || a.id.localeCompare(b.id));
+  const structuralBudget = Math.min(structural.length, Math.max(1, Math.floor(maxLabels * .4)));
+  const selected = [...structural.slice(0, structuralBudget), ...hubs.slice(0, maxLabels - structuralBudget)];
+  const selectedIds = new Set(selected.map(node => node.id));
+  for (const node of [...structural, ...hubs]) {
+    if (selectedIds.size >= maxLabels) break;
+    selectedIds.add(node.id);
+  }
+  return selectedIds;
+}
+
+export function labelBudgetForWidth(profile, width) {
+  const configured = Math.max(0, Number(profile?.maxLabels) || 0);
+  if (!configured) return 0;
+  return Math.min(configured, Math.max(8, Math.floor(Math.max(0, Number(width) || 0) / 42)));
 }
 
 export function resolveMotionState(requested, systemReduced) {
@@ -71,19 +95,27 @@ function clusterName(node) {
   return (node.folder || "(root)").split("/")[0];
 }
 
-function clusterCenter(name, width, height, identity) {
-  const random = seededRandom(hashString(`${identity}|cluster|${name}`));
-  const angle = random() * Math.PI * 2;
-  const radius = Math.min(width, height) * (0.18 + random() * 0.16);
-  return { x: Math.cos(angle) * radius, y: Math.sin(angle) * radius };
+function clusterCenters(names, width, height, identity) {
+  const ordered = [...new Set(names)].sort();
+  const rotation = seededRandom(hashString(`${identity}|cluster-ring`))() * Math.PI * 2;
+  const radiusX = width * .34, radiusY = height * .32;
+  return new Map(ordered.map((name, index) => {
+    if (name === "(root)") return [name, { x: 0, y: 0 }];
+    const ringIndex = ordered.filter(value => value !== "(root)").indexOf(name);
+    const ringCount = ordered.length - Number(ordered.includes("(root)"));
+    const angle = rotation + (ringIndex / Math.max(1, ringCount)) * Math.PI * 2;
+    const stagger = ringIndex % 2 ? .82 : 1;
+    return [name, { x: Math.cos(angle) * radiusX * stagger, y: Math.sin(angle) * radiusY * stagger }];
+  }));
 }
 
 export function layoutGraph(data = {}, { width = 800, height = 600, iterations = 48 } = {}) {
   const identity = data.metadata?.datasetIdentity || datasetIdentity(data);
+  const clusterMap = clusterCenters((data.nodes || []).map(clusterName), width, height, identity);
   const nodes = (data.nodes || []).map(node => {
     const random = seededRandom(hashString(`${identity}|node|${node.id}`));
-    const center = clusterCenter(clusterName(node), width, height, identity);
-    const spread = Math.min(width, height) * 0.12;
+    const center = clusterMap.get(clusterName(node)) || { x: 0, y: 0 };
+    const spread = Math.min(width, height) * 0.16;
     return {
       ...node,
       x: center.x + (random() - 0.5) * spread,
@@ -94,7 +126,7 @@ export function layoutGraph(data = {}, { width = 800, height = 600, iterations =
   }).sort((a, b) => a.id.localeCompare(b.id));
   const byId = new Map(nodes.map(node => [node.id, node]));
   const edges = (data.edges || []).map(edge => ({ a: byId.get(edge.source ?? edge.s), b: byId.get(edge.target ?? edge.t), type: edge.type || "link" })).filter(edge => edge.a && edge.b);
-  const centers = new Map(nodes.map(node => [clusterName(node), clusterCenter(clusterName(node), width, height, identity)]));
+  const centers = clusterMap;
   const steps = Math.max(0, Math.min(120, Number(iterations) || 0));
 
   for (let step = 0; step < steps; step += 1) {

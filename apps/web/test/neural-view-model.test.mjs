@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {
   breadcrumbFor, changedNodeIds, datasetIdentity, layersForMode,
   graphRenderProfile, labelForNodeId, layoutGraph, nextNodeId, nodeSemantics,
-  projectGraph, resolveMotionState,
+  labelBudgetForWidth, projectGraph, resolveMotionState, selectLabelNodeIds,
 } from "../../../packages/neural-engine/src/graph-view.js";
 
 const DATA = {
@@ -86,11 +86,35 @@ test("effect tiers monotonically reduce label and decorative render work", () =>
   assert.ok(full.starAreaPerPoint < reduced.starAreaPerPoint && reduced.starAreaPerPoint < aggregate.starAreaPerPoint);
   assert.ok(full.labelMinDegree < reduced.labelMinDegree && reduced.labelMinDegree < aggregate.labelMinDegree);
   assert.ok(full.labelZoom < reduced.labelZoom && reduced.labelZoom < aggregate.labelZoom);
+  assert.ok(full.maxLabels > reduced.maxLabels && reduced.maxLabels > aggregate.maxLabels);
   assert.equal(full.drawNodeCores, true);
   assert.equal(aggregate.drawNodeCores, false);
   assert.equal(full.shadowMode, "all");
   assert.equal(reduced.shadowMode, "active");
   assert.equal(graphRenderProfile(undefined, 500).tier, "reduced");
+});
+
+test("label selection is deterministic, bounded, and prioritizes meaningful hubs", () => {
+  const nodes = Array.from({ length: 80 }, (_, index) => ({
+    id: `Folder-${index % 8}/Note-${index}.md`, label: `Note ${index}`,
+    folder: `Folder-${index % 8}`, type: index < 8 ? "folder" : "note", degree: index % 13,
+  }));
+  const profile = { ...graphRenderProfile("reduced"), maxLabels: 12 };
+  const first = selectLabelNodeIds(nodes, profile);
+  const reversed = selectLabelNodeIds([...nodes].reverse(), profile);
+  assert.equal(first.size, 12);
+  assert.deepEqual([...first], [...reversed]);
+  assert.ok(first.has("Folder-7/Note-7.md"), "the strongest structural cluster remains discoverable");
+  assert.ok(first.has("Folder-0/Note-64.md"), "high-degree hub is labeled");
+  assert.ok([...first].filter(id => Number(id.match(/Note-(\d+)/)?.[1]) < 8).length <= 5, "folders cannot consume the whole label budget");
+});
+
+test("label budget contracts on narrow canvases without hiding every landmark", () => {
+  const profile = graphRenderProfile("reduced");
+  assert.equal(labelBudgetForWidth(profile, 1400), 28);
+  assert.equal(labelBudgetForWidth(profile, 840), 20);
+  assert.equal(labelBudgetForWidth(profile, 390), 9);
+  assert.equal(labelBudgetForWidth({ ...profile, maxLabels: 0 }, 390), 0);
 });
 
 test("system reduced motion blocks Resume until the OS preference clears", () => {

@@ -2,7 +2,11 @@
 
 Tanggal: 2026-07-12  
 Pembaruan skill command: 2026-07-13
-Status: aktif setelah audit implementasi Plan B
+Status: Stage A–F terlaksana dan diverifikasi pada 2026-07-13
+
+Bukti rilis: [`docs/RELEASE-QA-REPORT.md`](./RELEASE-QA-REPORT.md)
+
+> Catatan status: bagian “Yang belum terlaksana secara memadai” di bawah adalah baseline audit yang melahirkan roadmap ini. Hasil eksekusi dan batasan aktual dicatat dalam laporan QA, bukan dihapus agar keputusan tetap dapat diaudit.
 
 ## Keputusan
 

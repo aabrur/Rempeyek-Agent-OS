@@ -3,7 +3,7 @@
    API: const g = NeuralGraph(canvas, {onOpen});
         g.setData({nodes,edges,stats}); g.setQuery(q);
         g.setLayers({link,ghost,tag,folder}); g.reheat(); g.destroy() */
-import { datasetIdentity, graphRenderProfile, hashString, layoutGraph, nextNodeId, nodeSemantics, seededRandom } from "./graph-view.js";
+import { datasetIdentity, graphRenderProfile, hashString, labelBudgetForWidth, layoutGraph, nextNodeId, nodeSemantics, seededRandom, selectLabelNodeIds } from "./graph-view.js";
 export {
   breadcrumbFor, changedNodeIds, graphRenderProfile, labelForNodeId, layersForMode,
   nodeSemantics, projectGraph, resolveMotionState,
@@ -64,7 +64,7 @@ export function NeuralGraph(canvas, opts = {}) {
   let motion = motionRequested && !motionQuery.matches;
   let mode = "cosmos";
   let renderProfile = graphRenderProfile("full");
-  let nodes = [], allEdges = [], edges = [], folderColor = new Map();
+  let nodes = [], allEdges = [], edges = [], folderColor = new Map(), autoLabelIds = new Set();
   let layers = { link: true, ghost: true, tag: true, folder: true };
   let waves = []; // selection shockwave only; never automatic
   let datasetKey = "empty", selected = null, positionCache = new Map();
@@ -137,6 +137,7 @@ export function NeuralGraph(canvas, opts = {}) {
       .slice(0, renderProfile.maxHalos)
       .map(node => node.id));
     for (const node of nodes) node.renderHalo = renderedHalos.has(node.id);
+    autoLabelIds = selectLabelNodeIds(nodes, { ...renderProfile, maxLabels: labelBudgetForWidth(renderProfile, W) });
     const idx = new Map(nodes.map((n, i) => [n.id, i]));
     allEdges = (data.edges || [])
       .map(e => ({ ...e, s: e.source ?? e.s, t: e.target ?? e.t }))
@@ -303,6 +304,7 @@ export function NeuralGraph(canvas, opts = {}) {
     }
     ctx.setLineDash([]);
 
+    const labelBoxes = [];
     for (const n of nodes) {
       if (n.hidden) continue;
       const s = toScreen(n);
@@ -351,15 +353,22 @@ export function NeuralGraph(canvas, opts = {}) {
       }
 
       const showLabel = n === hover || n === selected || match
-        || (cam.z > .9 && (n.degree ?? n.deg ?? 0) >= renderProfile.labelMinDegree)
+        || (cam.z > .9 && autoLabelIds.has(n.id))
         || cam.z > renderProfile.labelZoom
-        || (n.type === "folder" && cam.z > renderProfile.folderLabelZoom);
+        || (n.type === "folder" && cam.z > Math.max(1.35, renderProfile.folderLabelZoom));
       if (showLabel && !dim) {
         ctx.font = `${n.type === "folder" ? "600 " : ""}${Math.max(10, 10.5 * Math.min(cam.z, 1.4))}px Cascadia Mono, monospace`;
         ctx.fillStyle = n === activeNode ? foreground.hoverLabel : n.type === "folder" ? foreground.folderLabel : foreground.label;
         ctx.textAlign = "center";
         const lbl = n.type === "folder" ? n.label.toUpperCase() : n.label;
-        ctx.fillText(lbl.length > 26 ? lbl.slice(0, 25) + "…" : lbl, s.x, s.y + r + 12);
+        const text = lbl.length > 26 ? lbl.slice(0, 25) + "…" : lbl;
+        const textWidth = ctx.measureText(text).width;
+        const box = { left: s.x - textWidth / 2 - 3, right: s.x + textWidth / 2 + 3, top: s.y + r + 2, bottom: s.y + r + 16 };
+        const overlaps = labelBoxes.some(other => box.left < other.right && box.right > other.left && box.top < other.bottom && box.bottom > other.top);
+        if (!overlaps || n === activeNode || match) {
+          ctx.fillText(text, s.x, s.y + r + 12);
+          if (n !== activeNode && !match) labelBoxes.push(box);
+        }
       }
       ctx.globalAlpha = 1;
     }
