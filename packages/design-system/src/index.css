@@ -411,8 +411,12 @@ body {
   background:
     radial-gradient(ellipse at center, rgba(10, 7, 34, .55) 0%, rgba(5, 3, 16, .88) 75%), #050310;
 }
-.graph-layers { display: inline-flex; gap: 6px; }
-.graph-modes { display: inline-flex; gap: 6px; flex-wrap: wrap; }
+.graph-layers, .graph-modes {
+  display: inline-flex; align-items: center; gap: 6px; min-width: 0; padding: 4px;
+  border: 1px solid color-mix(in srgb, var(--line) 75%, transparent); border-radius: 999px;
+  background: color-mix(in srgb, var(--bg) 35%, transparent);
+}
+.graph-modes { flex-wrap: wrap; }
 .graph-error, .graph-focus-bar {
   display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 12px;
   border: 1px solid var(--line); border-radius: 8px; background: var(--panel); font: 11px var(--mono);
@@ -805,15 +809,17 @@ body {
   border-radius: var(--surface-radius); background: var(--surface-fill); box-shadow: var(--surface-shadow);
   backdrop-filter: blur(var(--surface-blur)); -webkit-backdrop-filter: blur(var(--surface-blur));
 }
+.lyr:disabled { cursor: not-allowed; opacity: .55; box-shadow: none; }
 @media (max-width: 1180px) {
   .graph-bar { grid-template-columns: minmax(140px, .7fr) minmax(180px, 1fr) auto; }
   .graph-layers, .graph-modes { grid-column: span 1; }
   .graph-open { justify-self: end; }
 }
 @media (max-width: 860px) {
-  .graph-bar { display: flex; align-items: stretch; }
-  .graph-heading, .graph-search { flex: 1 1 220px; }
-  .graph-layers, .graph-modes { overflow-x: auto; padding-bottom: 2px; }
+  .graph-bar { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: stretch; }
+  .graph-heading, .graph-search { min-width: 0; }
+  .graph-layers, .graph-modes { grid-column: 1 / -1; justify-content: flex-start; flex-wrap: wrap; border-radius: 10px; }
+  .graph-open { grid-column: 1 / -1; justify-self: start; }
   .graph-workspace { grid-template-columns: 1fr; overflow: auto; }
   .graph-wrap { min-height: 55vh; }
   .graph-inspector { overflow: visible; }
@@ -915,6 +921,11 @@ body {
   .topo-log { max-height: 140px; }
 }
 @media (max-width: 768px) {
+  .graph-bar { grid-template-columns: minmax(0, 1fr); }
+  .graph-bar > * { grid-column: 1; }
+  .graph-layers, .graph-modes { width: 100%; }
+  .graph-open { justify-self: stretch; text-align: center; }
+  .graph-focus-bar { align-items: flex-start; flex-direction: column; }
   .continuity-hero { padding: 20px 18px; gap: 20px; }
   .continuity-map { grid-template-columns: 1fr; min-height: 0; gap: 12px; }
   .continuity-map::before, .continuity-core::after { display: none; }
@@ -928,6 +939,12 @@ body {
   .project-memory { max-height: none; }
 }
 @media (max-width: 390px) {
+  .graph-bar { padding: 8px; }
+  .graph-title { font-size: 15px; }
+  .graph-layers, .graph-modes { display: grid; grid-template-columns: 1fr 1fr; border-radius: 9px; }
+  .graph-layers .lyr, .graph-modes .lyr { width: 100%; min-width: 0; padding-inline: 6px; font-size: 8.5px; }
+  .graph-wrap { min-height: 62vh; }
+  .graph-hint { display: none; }
   .continuity-hero { padding: 18px 14px; }
   .continuity-actions { align-items: stretch; flex-direction: column; }
   .continuity-actions :is(.btn,.continuity-link) { width: 100%; }

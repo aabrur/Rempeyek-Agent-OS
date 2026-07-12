@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { breadcrumbFor, changedNodeIds, layersForMode, NeuralGraph, projectGraph } from "@rempeyek/neural-engine";
+import {
+  breadcrumbFor, changedNodeIds, labelForNodeId, layersForMode, NeuralGraph,
+  projectGraph, resolveMotionState,
+} from "@rempeyek/neural-engine";
 import { api } from "../api";
 import { obsUri } from "../lib/obsidian";
 
@@ -17,7 +20,8 @@ export function NeuralGraphCanvas({ active, theme }) {
   const [query, setQuery] = useState("");
   const [mode, setMode] = useState("cosmos");
   const [layers, setLayers] = useState(() => layersForMode("cosmos"));
-  const [motion, setMotion] = useState(() => !window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+  const [systemReducedMotion, setSystemReducedMotion] = useState(() => window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+  const [motionRequested, setMotionRequested] = useState(() => !window.matchMedia("(prefers-reduced-motion: reduce)").matches);
   const [data, setData] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
   const [focusId, setFocusId] = useState(null);
@@ -26,6 +30,8 @@ export function NeuralGraphCanvas({ active, theme }) {
 
   const projection = useMemo(() => projectGraph(data || {}, { mode, layers, focusId }), [data, mode, layers, focusId]);
   const selected = useMemo(() => (data?.nodes || []).find(node => node.id === selectedId) || null, [data, selectedId]);
+  const focusLabel = useMemo(() => labelForNodeId(data?.nodes || [], focusId), [data, focusId]);
+  const motionState = useMemo(() => resolveMotionState(motionRequested, systemReducedMotion), [motionRequested, systemReducedMotion]);
   const breadcrumbs = breadcrumbFor(selected);
 
   useEffect(() => {
@@ -36,6 +42,17 @@ export function NeuralGraphCanvas({ active, theme }) {
       onEscape: () => setFocusId(null),
     });
     return () => { graphRef.current?.destroy(); graphRef.current = null; };
+  }, []);
+
+  useEffect(() => {
+    const media = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const syncPreference = event => {
+      setSystemReducedMotion(event.matches);
+      if (event.matches) setMotionRequested(false);
+    };
+    syncPreference(media);
+    media.addEventListener?.("change", syncPreference);
+    return () => media.removeEventListener?.("change", syncPreference);
   }, []);
 
   useEffect(() => {
@@ -61,7 +78,7 @@ export function NeuralGraphCanvas({ active, theme }) {
   }, [focusId, projection, selectedId]);
   useEffect(() => { graphRef.current?.setQuery(query); }, [query]);
   useEffect(() => { graphRef.current?.setMode(mode); }, [mode]);
-  useEffect(() => { graphRef.current?.setMotion(motion); }, [motion]);
+  useEffect(() => { graphRef.current?.setMotion(motionState.enabled); }, [motionState.enabled]);
   useEffect(() => { if (active) graphRef.current?.reheat(); }, [active, theme]);
 
   const chooseMode = next => { setMode(next); setLayers(layersForMode(next)); setFocusId(null); };
@@ -90,14 +107,16 @@ export function NeuralGraphCanvas({ active, theme }) {
         <div className="graph-modes" aria-label="Graph appearance">
           <button className={`lyr ${mode === "parity" ? "on" : ""}`} aria-pressed={mode === "parity"} onClick={() => chooseMode("parity")}>OBSIDIAN PARITY</button>
           <button className={`lyr ${mode === "cosmos" ? "on" : ""}`} aria-pressed={mode === "cosmos"} onClick={() => chooseMode("cosmos")}>COSMOS</button>
-          <button className={`lyr ${motion ? "on" : ""}`} aria-pressed={motion} onClick={() => setMotion(value => !value)}>{motion ? "PAUSE" : "RESUME"}</button>
+          <button className={`lyr ${motionState.enabled ? "on" : ""}`} aria-pressed={motionState.enabled}
+            disabled={motionState.disabled} title={motionState.disabled ? "Motion is disabled by your operating system preference" : undefined}
+            onClick={() => setMotionRequested(value => !value)}>{motionState.label}</button>
           <button className={`lyr ${tableOpen ? "on" : ""}`} aria-expanded={tableOpen} onClick={() => setTableOpen(value => !value)}>TABLE</button>
         </div>
         <a className="graph-open" href={obsUri("INDEX.md")}>OPEN VAULT</a>
       </header>
 
       {error && <div className="graph-error" role="alert">Vault graph unavailable: {error}</div>}
-      {focusId && <div className="graph-focus-bar" role="status">Neighborhood focus: {selected?.label || focusId} · {projection.counts.nodes} nodes <button onClick={() => setFocusId(null)}>Clear focus</button></div>}
+      {focusId && <div className="graph-focus-bar" role="status">Neighborhood focus: {focusLabel} · {projection.counts.nodes} nodes <button onClick={() => setFocusId(null)}>Clear focus</button></div>}
 
       <div className="graph-workspace">
         <section className="graph-stage" aria-label="Interactive Vault graph">

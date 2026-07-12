@@ -2,7 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   breadcrumbFor, changedNodeIds, datasetIdentity, layersForMode,
-  layoutGraph, nextNodeId, nodeSemantics, projectGraph,
+  graphRenderProfile, labelForNodeId, layoutGraph, nextNodeId, nodeSemantics,
+  projectGraph, resolveMotionState,
 } from "../../../packages/neural-engine/src/graph-view.js";
 
 const DATA = {
@@ -74,4 +75,31 @@ test("visual semantics derive only from degree, recency, ghost state, and snapsh
   assert.deepEqual(nodeSemantics(DATA.nodes[2], {
     generatedAt: "2026-07-13T00:00:00.000Z", changedNodeIds: [], recentDays: 7,
   }), { mass: 2, halo: false, recent: false, unresolved: true, changed: false });
+});
+
+test("effect tiers monotonically reduce label and decorative render work", () => {
+  const full = graphRenderProfile("full", 200);
+  const reduced = graphRenderProfile("reduced", 500);
+  const aggregate = graphRenderProfile("aggregate-ready", 1500);
+  assert.ok(full.layoutIterations > reduced.layoutIterations && reduced.layoutIterations > aggregate.layoutIterations);
+  assert.ok(full.maxHalos > reduced.maxHalos && reduced.maxHalos > aggregate.maxHalos);
+  assert.ok(full.starAreaPerPoint < reduced.starAreaPerPoint && reduced.starAreaPerPoint < aggregate.starAreaPerPoint);
+  assert.ok(full.labelMinDegree < reduced.labelMinDegree && reduced.labelMinDegree < aggregate.labelMinDegree);
+  assert.ok(full.labelZoom < reduced.labelZoom && reduced.labelZoom < aggregate.labelZoom);
+  assert.equal(full.drawNodeCores, true);
+  assert.equal(aggregate.drawNodeCores, false);
+  assert.equal(full.shadowMode, "all");
+  assert.equal(reduced.shadowMode, "active");
+  assert.equal(graphRenderProfile(undefined, 500).tier, "reduced");
+});
+
+test("system reduced motion blocks Resume until the OS preference clears", () => {
+  assert.deepEqual(resolveMotionState(true, true), { enabled: false, disabled: true, label: "SYSTEM MOTION OFF" });
+  assert.deepEqual(resolveMotionState(false, false), { enabled: false, disabled: false, label: "RESUME" });
+  assert.deepEqual(resolveMotionState(true, false), { enabled: true, disabled: false, label: "PAUSE" });
+});
+
+test("neighborhood label is resolved from focus id independently of selection", () => {
+  assert.equal(labelForNodeId(DATA.nodes, "Projects/A.md"), "A");
+  assert.equal(labelForNodeId(DATA.nodes, "missing-id"), "missing-id");
 });

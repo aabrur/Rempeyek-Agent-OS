@@ -17,6 +17,11 @@ positions. Visible effects encode graph facts only:
 Wikilinks are treated as undirected relationships. The renderer deliberately has no
 directional flow particles or automatic random firing.
 
+`metadata.effectTier` is an actual rendering contract, not a decorative label.
+`full`, `reduced`, and `aggregate-ready` profiles progressively lower deterministic
+layout iterations, halo count, ambient-field density, shadow work, node-core work,
+and automatic label density while preserving every projected node and edge.
+
 ```js
 import { NeuralGraph, layersForMode, projectGraph } from "@rempeyek/neural-engine";
 
@@ -40,4 +45,6 @@ graph.destroy();
 **Imperative by design.** The engine owns the Canvas and its RAF lifecycle; React
 feeds it the same projected data used by the accessible table. Animation pauses
 when the tab is hidden and honors `prefers-reduced-motion`. Pointer interaction is
-mirrored by keyboard selection, open, and neighborhood controls.
+mirrored by keyboard selection, open, and neighborhood controls. A live operating
+system reduced-motion change immediately blocks animation; the user must explicitly
+resume after that system preference is cleared.

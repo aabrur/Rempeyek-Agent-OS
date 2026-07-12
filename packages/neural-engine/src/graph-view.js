@@ -18,6 +18,41 @@ export function seededRandom(seed) {
   };
 }
 
+const RENDER_PROFILES = Object.freeze({
+  full: Object.freeze({
+    tier: "full", layoutIterations: 42, maxHalos: 96, starAreaPerPoint: 6500,
+    labelMinDegree: 3, labelZoom: 1.6, folderLabelZoom: .55,
+    drawNodeCores: true, shadowMode: "all",
+  }),
+  reduced: Object.freeze({
+    tier: "reduced", layoutIterations: 28, maxHalos: 32, starAreaPerPoint: 11000,
+    labelMinDegree: 5, labelZoom: 2, folderLabelZoom: .8,
+    drawNodeCores: true, shadowMode: "active",
+  }),
+  "aggregate-ready": Object.freeze({
+    tier: "aggregate-ready", layoutIterations: 18, maxHalos: 12, starAreaPerPoint: 18000,
+    labelMinDegree: 8, labelZoom: 2.4, folderLabelZoom: 1,
+    drawNodeCores: false, shadowMode: "active",
+  }),
+});
+
+export function graphRenderProfile(effectTier, nodeCount = 0) {
+  const inferred = nodeCount > 1000 ? "aggregate-ready" : nodeCount > 250 ? "reduced" : "full";
+  return RENDER_PROFILES[effectTier] || RENDER_PROFILES[inferred];
+}
+
+export function resolveMotionState(requested, systemReduced) {
+  if (systemReduced) return { enabled: false, disabled: true, label: "SYSTEM MOTION OFF" };
+  return requested
+    ? { enabled: true, disabled: false, label: "PAUSE" }
+    : { enabled: false, disabled: false, label: "RESUME" };
+}
+
+export function labelForNodeId(nodes = [], id) {
+  if (!id) return "";
+  return nodes.find(node => node.id === id)?.label || id;
+}
+
 function edgeKey(edge) {
   const source = edge.source ?? edge.s, target = edge.target ?? edge.t;
   return `${source < target ? `${source}|${target}` : `${target}|${source}`}|${edge.type || "link"}`;

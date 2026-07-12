@@ -35,13 +35,13 @@ counts, and the accessible table are all projections of the same API dataset.
 
 ## Verification
 
-- `npm test`: **51 passed, 0 failed**.
+- `npm test`: **54 passed, 0 failed**.
 - `npm run build`: production Vite build succeeded.
 - `git diff --check`: passed.
 - `rg "Math\\.random" packages/neural-engine`: no matches.
 - Fixture benchmark (1,000 notes, 1,978 edges, 18 deterministic iterations):
-  **122.61 ms layout + 10.80 ms projection = 133.41 ms total** during the full
-  suite. A separate warm run measured 55.97 ms total. The assertion budget is
+  **103.97 ms layout + 10.87 ms projection = 114.84 ms total** in a recorded
+  full-suite review run. Separate warm runs measured 65.22–72.00 ms total. The assertion budget is
   1,500 ms to remain stable on slower developer machines.
 - Read-only validation against the current real Vault snapshot: **266 notes, 356
   nodes, 557 edges, `effectTier: reduced`**, with layout + projection measured at
@@ -54,12 +54,30 @@ worker, parser cache, WebGL, and new dependencies are deferred: the measured rea
 Vault update and the 1,000-node fixture do not demonstrate that parsing/layout is
 the bottleneck. Adding that complexity now would not be evidence-based.
 
+## Review Follow-up
+
+- React now subscribes to live `prefers-reduced-motion` changes. When the operating
+  system blocks motion, both UI and renderer stop, selection waves are cleared, and
+  the disabled control reads `SYSTEM MOTION OFF`. When the preference clears, motion
+  remains paused until the user explicitly chooses `RESUME`.
+- `metadata.effectTier` now selects a pure, tested render profile. `reduced` and
+  `aggregate-ready` progressively lower layout iterations, halo limits, star-field
+  density, shadow work, node-core work, and automatic label density without removing
+  nodes or edges.
+- The graph toolbar now preserves isolated layer/mode groups and wraps at 860 px,
+  collapses to one column at 768 px, and uses two-column control groups at 390 px.
+- The neighborhood banner resolves its label from `focusId`; changing the inspector
+  selection can no longer rename an active neighborhood.
+
 ## Honest Constraints / Follow-up
 
-- The automated benchmark measures deterministic layout/projection update time,
-  not browser GPU frame timing. The repository has no browser performance harness;
-  interactive frame profiling should be captured manually on target hardware if
-  graph size approaches 1,000+ visible nodes.
+- The automated benchmark measures deterministic layout/projection update time in
+  Node. It cannot measure Canvas draw calls, RAF cadence, GPU/compositor time, or
+  input latency. The repository contains no Playwright/Chromium performance harness,
+  and adding/downloading a browser dependency would violate this stage's no-new-
+  dependency constraint. Interactive frame profiling therefore remains a named
+  evidence gap and should be captured manually on target hardware if the graph
+  approaches 1,000+ visible nodes.
 - Obsidian Parity means the same note/wikilink/ghost truth and explicit overlays;
   it does not claim pixel-identical reproduction of Obsidian's proprietary force
   layout.

@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { performance } from "node:perf_hooks";
-import { layoutGraph, projectGraph } from "../../../packages/neural-engine/src/graph-view.js";
+import { graphRenderProfile, layoutGraph, projectGraph } from "../../../packages/neural-engine/src/graph-view.js";
 
 test("1,000-node deterministic layout and projection stay within an interactive update budget", () => {
   const nodes = Array.from({ length: 1000 }, (_, index) => ({
@@ -15,7 +15,8 @@ test("1,000-node deterministic layout and projection stay within an interactive 
   }
 
   const started = performance.now();
-  const laidOut = layoutGraph({ nodes, edges }, { width: 1400, height: 900, iterations: 18 });
+  const profile = graphRenderProfile("aggregate-ready", nodes.length);
+  const laidOut = layoutGraph({ nodes, edges }, { width: 1400, height: 900, iterations: profile.layoutIterations });
   const layoutMs = performance.now() - started;
   const projectedAt = performance.now();
   const view = projectGraph({ nodes: laidOut, edges }, { mode: "cosmos" });
