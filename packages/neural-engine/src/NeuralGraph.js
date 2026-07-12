@@ -3,6 +3,9 @@
    API: const g = NeuralGraph(canvas, {onOpen});
         g.setData({nodes,edges,stats}); g.setQuery(q);
         g.setLayers({link,ghost,tag,folder}); g.reheat(); g.destroy() */
+import { datasetIdentity, hashString, layoutGraph, nextNodeId, nodeSemantics, seededRandom } from "./graph-view.js";
+export { breadcrumbFor, changedNodeIds, layersForMode, nodeSemantics, projectGraph } from "./graph-view.js";
+
 export function resolveGraphPalette(readToken = (_name, fallback) => fallback) {
   const effectEnabled = (name, fallback = true) => !["0", "false", "off", "none", "no"].includes(String(readToken(name, fallback ? "1" : "0")).trim().toLowerCase());
   const nodes = {
@@ -56,12 +59,10 @@ export function NeuralGraph(canvas, opts = {}) {
   const motionQuery = matchMedia("(prefers-reduced-motion: reduce)");
   let motion = !motionQuery.matches;
   let mode = "cosmos";
-  let effectTier = "full";
-
   let nodes = [], allEdges = [], edges = [], folderColor = new Map();
   let layers = { link: true, ghost: true, tag: true, folder: true };
-  let particles = [];
-  let waves = [], lastAuto = 0;   // shockwaves: neural firing rings, auto + on click
+  let waves = []; // selection shockwave only; never automatic
+  let datasetKey = "empty", selected = null, positionCache = new Map();
   let cam = { x: 0, y: 0, z: 1 };
   let alpha = 0;
   let hover = null, dragNode = null, panning = false, query = "";
@@ -107,20 +108,19 @@ export function NeuralGraph(canvas, opts = {}) {
 
   function setData(data) {
     refreshTheme();
-    effectTier = data.metadata?.effectTier || "full";
     folderColor = new Map();
-    const old = new Map(nodes.map(n => [n.id, n]));
     const W = canvas.clientWidth || 800, H = canvas.clientHeight || 600;
-    nodes = data.nodes.map(n => {
-      const prev = old.get(n.id);
-      return {
-        ...n,
-        x: prev ? prev.x : (Math.random() - 0.5) * W * 0.9,
-        y: prev ? prev.y : (Math.random() - 0.5) * H * 0.9,
-        vx: 0, vy: 0,
-        r: nodeRadius(n),
-        c: null, // assigned after folder colors settle (notes first for stable palette order)
-      };
+    const selectedId = selected?.id;
+    const nextDatasetKey = data.metadata?.datasetIdentity || datasetIdentity(data);
+    if (nextDatasetKey !== datasetKey) positionCache = new Map();
+    datasetKey = nextDatasetKey;
+    const semanticContext = { ...data.metadata, changedNodeIds: new Set(data.metadata?.changedNodeIds || []) };
+    nodes = layoutGraph(data, { width: W, height: H, iterations: data.nodes.length > 1000 ? 18 : 42 }).map(n => {
+      const semantic = nodeSemantics(n, semanticContext);
+      const cached = positionCache.get(n.id);
+      const positioned = cached ? { ...n, x: cached.x, y: cached.y } : n;
+      positionCache.set(n.id, { x: positioned.x, y: positioned.y });
+      return { ...positioned, ...semantic, vx: 0, vy: 0, r: nodeRadius(n), c: null };
     });
     // color notes first so folder palette order is driven by real content folders
     for (const n of nodes) if (n.type === "note") n.c = nodeColor(n);
@@ -130,8 +130,9 @@ export function NeuralGraph(canvas, opts = {}) {
       .map(e => ({ ...e, s: e.source ?? e.s, t: e.target ?? e.t }))
       .filter(e => idx.has(e.s) && idx.has(e.t))
       .map(e => ({ a: nodes[idx.get(e.s)], b: nodes[idx.get(e.t)], type: e.type || "link" }));
+    selected = selectedId ? nodes.find(node => node.id === selectedId) || null : null;
     applyLayers();
-    alpha = 1;
+    alpha = 0;
     kick();
   }
 
@@ -140,17 +141,10 @@ export function NeuralGraph(canvas, opts = {}) {
     // a node hides when its own layer is off (notes always show)
     for (const n of nodes) n.hidden = (n.type === "ghost" && !layers.ghost) ||
       (n.type === "tag" && !layers.tag) || (n.type === "folder" && !layers.folder);
-    const linkEdges = edges.filter(e => e.type === "link" && !e.a.hidden && !e.b.hidden);
-    const want = !motion || mode === "parity" || effectTier !== "full" ? 0 : Math.min(80, linkEdges.length);
-    particles = Array.from({ length: want }, () => ({
-      e: linkEdges[(Math.random() * linkEdges.length) | 0],
-      t: Math.random(), sp: 0.002 + Math.random() * 0.004,
-    }));
   }
   function setLayers(on) {
     layers = { ...layers, ...on };
     applyLayers();
-    alpha = Math.max(alpha, 0.4);
     kick();
   }
 
@@ -170,7 +164,10 @@ export function NeuralGraph(canvas, opts = {}) {
         if (b.hidden) continue;
         let dx = a.x - b.x, dy = a.y - b.y;
         let d2 = dx * dx + dy * dy;
-        if (d2 < 1) { d2 = 1; dx = Math.random() - 0.5; dy = Math.random() - 0.5; }
+        if (d2 < 1) {
+          const sign = hashString(`${a.id}|${b.id}`) % 2 ? 1 : -1;
+          d2 = 1; dx = .5 * sign; dy = -.5 * sign;
+        }
         if (d2 > 250000) continue;
         const f = 1500 / d2;
         const d = Math.sqrt(d2);
@@ -191,6 +188,7 @@ export function NeuralGraph(canvas, opts = {}) {
       n.vx -= n.x * 0.0015; n.vy -= n.y * 0.0015;
       if (n !== dragNode) { n.x += n.vx * alpha; n.y += n.vy * alpha; }
       n.vx *= 0.86; n.vy *= 0.86;
+      positionCache.set(n.id, { x: n.x, y: n.y });
     }
     alpha = Math.max(0, alpha - 0.0035);
   }
@@ -210,10 +208,11 @@ export function NeuralGraph(canvas, opts = {}) {
     c.width = w; c.height = h;
     const x = c.getContext("2d");
     const n = Math.round((w * h) / 6500);
+    const random = seededRandom(hashString(`${datasetKey}|field|${w}|${h}`));
     for (let i = 0; i < n; i++) {
-      const r = Math.random();
+      const r = random();
       x.fillStyle = r > 0.94 ? `rgba(${starRgb},.8)` : r > 0.85 ? `rgba(${starRgb},.55)` : `rgba(${starRgb},.28)`;
-      x.beginPath(); x.arc(Math.random() * w, Math.random() * h, r > 0.9 ? 1.2 : 0.6, 0, 7); x.fill();
+      x.beginPath(); x.arc(random() * w, random() * h, r > 0.9 ? 1.2 : 0.6, 0, 7); x.fill();
     }
     return c;
   }
@@ -222,12 +221,6 @@ export function NeuralGraph(canvas, opts = {}) {
       x: canvas.clientWidth / 2 + (n.x + cam.x) * cam.z,
       y: canvas.clientHeight / 2 + (n.y + cam.y) * cam.z,
     };
-  }
-  function bez(A, B, curve, t) {
-    const mx = (A.x + B.x) / 2 - (B.y - A.y) * curve;
-    const my = (A.y + B.y) / 2 + (B.x - A.x) * curve;
-    const u = 1 - t;
-    return { x: u * u * A.x + 2 * u * t * mx + t * t * B.x, y: u * u * A.y + 2 * u * t * my + t * t * B.y };
   }
   function draw() {
     resize();
@@ -238,14 +231,15 @@ export function NeuralGraph(canvas, opts = {}) {
 
     const q = query.toLowerCase();
     const neighbors = new Set();
-    if (hover) { neighbors.add(hover); for (const e of edges) { if (e.a === hover) neighbors.add(e.b); if (e.b === hover) neighbors.add(e.a); } }
+    const activeNode = hover || selected;
+    if (activeNode) { neighbors.add(activeNode); for (const e of edges) { if (e.a === activeNode) neighbors.add(e.b); if (e.b === activeNode) neighbors.add(e.a); } }
 
     const now = performance.now();
 
     // plasma halos under the strongest hubs — breathing glow that follows real degree
     if (effects.halo) for (const n of nodes) {
       const degree = n.degree ?? n.deg ?? 0;
-      if (mode !== "cosmos" || effectTier !== "full" || n.hidden || degree < 8 || n.type === "ghost") continue;
+      if (mode !== "cosmos" || n.hidden || (!n.halo && !n.recent) || n.unresolved) continue;
       const s = toScreen(n);
       const breathe = !motion ? 1 : 1 + 0.10 * Math.sin(now / 1100 + degree * 1.7);
       const R = (30 + degree * 3.2) * cam.z * breathe;
@@ -257,15 +251,7 @@ export function NeuralGraph(canvas, opts = {}) {
       ctx.beginPath(); ctx.arc(s.x, s.y, R, 0, 7); ctx.fill();
     }
 
-    // neural firing: a random hub emits a shockwave every few seconds; clicks fire one too
-    if (effects.glow && motion && mode === "cosmos" && effectTier === "full" && now - lastAuto > 3400) {
-      const hubs = nodes.filter(n => !n.hidden && (n.degree ?? n.deg ?? 0) >= 8 && n.type !== "ghost");
-      if (hubs.length) {
-        const n = hubs[(Math.random() * hubs.length) | 0];
-        waves.push({ n, r: 0, max: 70 + (n.degree ?? n.deg ?? 0) * 4, born: now });
-      }
-      lastAuto = now;
-    }
+    // Waves are created only by an explicit selection; never automatic firing.
     for (let i = waves.length - 1; i >= 0; i--) {
       const wv = waves[i];
       wv.r += Math.max(1.1, wv.max * 0.022);
@@ -305,31 +291,14 @@ export function NeuralGraph(canvas, opts = {}) {
     }
     ctx.setLineDash([]);
 
-    // signal particles drifting along real wikilink edges
-    if (particles.length && !hover) {
-      for (const p of particles) {
-        p.t += p.sp;
-        if (p.t > 1) { p.t = 0; }
-        const A = toScreen(p.e.a), B = toScreen(p.e.b);
-        const pt = bez(A, B, EDGE.link.curve, p.t);
-        if (pt.x < 0 || pt.y < 0 || pt.x > w || pt.y > h) continue;
-        ctx.fillStyle = foreground.particle;
-        ctx.globalAlpha = .9;
-        if (effects.shadow) { ctx.shadowColor = foreground.particleGlow; ctx.shadowBlur = 6; }
-        ctx.beginPath(); ctx.arc(pt.x, pt.y, 1.3, 0, 7); ctx.fill();
-        ctx.shadowBlur = 0;
-        ctx.globalAlpha = 1;
-      }
-    }
-
     for (const n of nodes) {
       if (n.hidden) continue;
       const s = toScreen(n);
       if (s.x < -30 || s.y < -30 || s.x > w + 30 || s.y > h + 30) continue;
       const match = q && (n.label.toLowerCase().includes(q) || (n.folder || "").toLowerCase().includes(q));
-      const dim = (q && !match) || (hover && !neighbors.has(n));
-      const r = n.r * cam.z * (n === hover ? 1.35 : 1);
-      ctx.globalAlpha = dim ? 0.13 : (n.type === "ghost" ? 0.55 : 1);
+      const dim = (q && !match) || (activeNode && !neighbors.has(n));
+      const r = n.r * cam.z * (n === activeNode ? 1.35 : 1);
+      ctx.globalAlpha = dim ? 0.13 : (n.type === "ghost" ? 0.38 : 1);
       if (effects.shadow) {
         ctx.shadowColor = n.c;
         ctx.shadowBlur = mode === "parity" || dim ? 0 : (n === hover || match ? 26 : (n.degree ?? n.deg ?? 0) >= 8 ? 18 : 10);
@@ -343,6 +312,11 @@ export function NeuralGraph(canvas, opts = {}) {
         ctx.fillStyle = n.c;
         const d = Math.max(r, 2.2);
         ctx.beginPath(); ctx.moveTo(s.x, s.y - d); ctx.lineTo(s.x + d, s.y); ctx.lineTo(s.x, s.y + d); ctx.lineTo(s.x - d, s.y); ctx.closePath(); ctx.fill();
+      } else if (n.unresolved) {
+        ctx.strokeStyle = n.c; ctx.lineWidth = 1;
+        ctx.setLineDash([2, 3]);
+        ctx.beginPath(); ctx.arc(s.x, s.y, Math.max(r, 2.4), 0, 7); ctx.stroke();
+        ctx.setLineDash([]);
       } else {
         ctx.fillStyle = n.c;
         ctx.beginPath(); ctx.arc(s.x, s.y, Math.max(r, 1.5), 0, 7); ctx.fill();
@@ -354,10 +328,19 @@ export function NeuralGraph(canvas, opts = {}) {
       }
       ctx.shadowBlur = 0;
 
+      if (!dim && (n === selected || n.changed)) {
+        ctx.strokeStyle = n === selected ? foreground.hoverLabel : n.c;
+        ctx.globalAlpha = n === selected ? 1 : .7;
+        ctx.lineWidth = n === selected ? 1.8 : 1;
+        ctx.setLineDash(n.changed && n !== selected ? [3, 3] : []);
+        ctx.beginPath(); ctx.arc(s.x, s.y, r + (n === selected ? 6 : 4), 0, 7); ctx.stroke();
+        ctx.setLineDash([]); ctx.globalAlpha = 1;
+      }
+
       const showLabel = n === hover || match || (cam.z > 0.9 && (n.degree ?? n.deg ?? 0) >= 3) || cam.z > 1.6 || (n.type === "folder" && cam.z > 0.55);
       if (showLabel && !dim) {
         ctx.font = `${n.type === "folder" ? "600 " : ""}${Math.max(10, 10.5 * Math.min(cam.z, 1.4))}px Cascadia Mono, monospace`;
-        ctx.fillStyle = n === hover ? foreground.hoverLabel : n.type === "folder" ? foreground.folderLabel : foreground.label;
+        ctx.fillStyle = n === activeNode ? foreground.hoverLabel : n.type === "folder" ? foreground.folderLabel : foreground.label;
         ctx.textAlign = "center";
         const lbl = n.type === "folder" ? n.label.toUpperCase() : n.label;
         ctx.fillText(lbl.length > 26 ? lbl.slice(0, 25) + "…" : lbl, s.x, s.y + r + 12);
@@ -374,9 +357,7 @@ export function NeuralGraph(canvas, opts = {}) {
     if (alpha > 0.005 && motion) tick();
     else if (alpha > 0.005) { for (let i = 0; i < 24; i++) tick(); }
     draw();
-    // particles + waves keep the cosmos alive; stop only when the canvas is hidden (other view active)
-    const animate = alpha > 0.005 || hover || dragNode || waves.length > 0 ||
-      (particles.length && canvas.clientWidth > 0 && !document.hidden);
+    const animate = !document.hidden && (alpha > 0.005 || dragNode || (motion && waves.length > 0));
     raf = animate ? requestAnimationFrame(loop) : null;
   }
   function kick() { if (!raf) raf = requestAnimationFrame(loop); }
@@ -392,6 +373,37 @@ export function NeuralGraph(canvas, opts = {}) {
     return null;
   }
   function pos(e) { const b = canvas.getBoundingClientRect(); return { x: e.clientX - b.left, y: e.clientY - b.top }; }
+
+  function selectNode(node, { shock = true } = {}) {
+    selected = node || null;
+    if (selected && shock && effects.glow && motion && mode === "cosmos") {
+      waves = [{ n: selected, r: 0, max: 60 + (selected.degree ?? selected.deg ?? 0) * 4, born: performance.now() }];
+    }
+    opts.onSelect?.(selected);
+    kick();
+    return selected;
+  }
+
+  function moveSelection(delta) {
+    const id = nextNodeId(nodes.filter(node => !node.hidden), selected?.id, delta);
+    return selectNode(nodes.find(node => node.id === id) || null, { shock: false });
+  }
+
+  function onKeyDown(event) {
+    if (["ArrowRight", "ArrowDown", "ArrowLeft", "ArrowUp", "Home", "End"].includes(event.key)) {
+      event.preventDefault();
+      const visible = nodes.filter(node => !node.hidden).sort((a, b) => a.id.localeCompare(b.id));
+      if (event.key === "Home") selectNode(visible[0] || null, { shock: false });
+      else if (event.key === "End") selectNode(visible.at(-1) || null, { shock: false });
+      else moveSelection(event.key === "ArrowLeft" || event.key === "ArrowUp" ? -1 : 1);
+    } else if (event.key === "Enter" && selected?.type === "note") {
+      event.preventDefault(); opts.onOpen?.(selected);
+    } else if (event.key.toLowerCase() === "f" && selected) {
+      event.preventDefault(); opts.onFocus?.(selected);
+    } else if (event.key === "Escape") {
+      event.preventDefault(); opts.onEscape?.();
+    }
+  }
 
   function onDown(e) {
     const p = pos(e); moved = 0; last = p;
@@ -420,9 +432,7 @@ export function NeuralGraph(canvas, opts = {}) {
   function onUp(e) {
     canvas.classList.remove("grabbing");
     if (dragNode && moved < 5) {
-      if (effects.glow && motion && mode === "cosmos") waves.push({ n: dragNode, r: 0, max: 60 + (dragNode.degree ?? dragNode.deg ?? 0) * 4, born: performance.now() });
-      // only real notes open in Obsidian — ghost/tag/folder nodes have no file behind them
-      if (opts.onOpen && dragNode.type === "note") opts.onOpen(dragNode);
+      selectNode(dragNode);
     }
     dragNode = null; panning = false;
     kick();
@@ -440,6 +450,9 @@ export function NeuralGraph(canvas, opts = {}) {
   canvas.addEventListener("pointermove", onMove);
   canvas.addEventListener("pointerup", onUp);
   canvas.addEventListener("wheel", onWheel, { passive: false });
+  canvas.addEventListener("keydown", onKeyDown);
+  const onDoubleClick = () => { if (selected?.type === "note") opts.onOpen?.(selected); };
+  canvas.addEventListener("dblclick", onDoubleClick);
   const ro = new ResizeObserver(() => { kick(); });
   ro.observe(canvas);
   const onVis = () => kick();
@@ -448,11 +461,11 @@ export function NeuralGraph(canvas, opts = {}) {
   motionQuery.addEventListener?.("change", onMotionPreference);
 
   return {
-    setData, legend, setLayers,
+    setData, legend, setLayers, select: id => selectNode(nodes.find(node => node.id === id) || null, { shock: false }), moveSelection,
     setMode(next) { mode = next === "parity" ? "parity" : "cosmos"; applyLayers(); kick(); },
-    setMotion(next) { motion = Boolean(next) && !motionQuery.matches; applyLayers(); kick(); },
+    setMotion(next) { motion = Boolean(next) && !motionQuery.matches; if (!motion) waves = []; applyLayers(); kick(); },
     setQuery(q) { query = q || ""; kick(); },
-    reheat() { refreshTheme(); alpha = Math.max(alpha, 0.5); kick(); },
-    destroy() { ro.disconnect(); document.removeEventListener("visibilitychange", onVis); motionQuery.removeEventListener?.("change", onMotionPreference); if (raf) cancelAnimationFrame(raf); canvas.removeEventListener("pointerdown", onDown); canvas.removeEventListener("pointermove", onMove); canvas.removeEventListener("pointerup", onUp); canvas.removeEventListener("wheel", onWheel); },
+    reheat() { refreshTheme(); kick(); },
+    destroy() { ro.disconnect(); document.removeEventListener("visibilitychange", onVis); motionQuery.removeEventListener?.("change", onMotionPreference); if (raf) cancelAnimationFrame(raf); canvas.removeEventListener("pointerdown", onDown); canvas.removeEventListener("pointermove", onMove); canvas.removeEventListener("pointerup", onUp); canvas.removeEventListener("wheel", onWheel); canvas.removeEventListener("keydown", onKeyDown); canvas.removeEventListener("dblclick", onDoubleClick); },
   };
 }
