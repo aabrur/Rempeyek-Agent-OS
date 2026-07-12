@@ -9,6 +9,7 @@ const net = require("net");
 const os = require("os");
 const { spawn, execFile, spawnSync } = require("child_process");
 const crypto = require("crypto");
+const { createAccessPolicy } = require("./lib/access-policy.cjs");
 
 /* Monorepo layout: this file lives in apps/web/, but runtime data (vault, config,
    telemetry, scripts, .env) stays at the repo ROOT so agent CLIs and bridges keep working. */
@@ -27,6 +28,7 @@ const PORT = process.env.PORT || 4321;
 const VAULT = process.env.VAULT_PATH || path.join(ROOT, "Obsidian Vault");
 const CONFIG_PATH = process.env.AGENTS_CONFIG || path.join(ROOT, "agents.config.json");
 const TOKEN = process.env.DASH_TOKEN || "";
+const ACCESS_POLICY = createAccessPolicy(process.env);
 /* PUBLIC = static source (images + runtime-uploaded avatars, never wiped by a build).
    DIST   = the built React app (`npm run build`). Requests resolve DIST first, then
    PUBLIC, then fall back to index.html — /avatars always comes from PUBLIC, because
@@ -1358,7 +1360,9 @@ function json(res, code, obj) {
 
 const MIME = { ".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".svg": "image/svg+xml", ".png": "image/png", ".jpg": "image/jpeg", ".webp": "image/webp", ".md": "text/markdown; charset=utf-8" };
 
-const server = http.createServer((req, res) => {
+function requestHandler(req, res) {
+  const access = ACCESS_POLICY.authorize(req);
+  if (!access.allowed) return json(res, access.status, { error: access.error });
   const url = (req.url || "/").split("?")[0];
 
   if (url.startsWith("/api/")) {
@@ -1480,7 +1484,10 @@ const server = http.createServer((req, res) => {
     res.writeHead(200, { "Content-Type": MIME[path.extname(file)] || "application/octet-stream" });
     res.end(fs.readFileSync(file));
   } catch { res.writeHead(500, { "Content-Type": "text/plain" }); res.end("error"); }
-});
+}
+
+function createServer() { return http.createServer(requestHandler); }
+const server = createServer();
 
 /* R1+R3: shutdown & crash handlers — SIGINT/SIGTERM/SIGHUP + uncaughtException are not covered by
    process.on("exit") (the event loop is dead at 'exit', so async taskkill never runs). Here the loop is still alive. */
@@ -1497,13 +1504,14 @@ process.on("uncaughtException", e => { console.error("[uncaughtException]", (e &
 process.on("unhandledRejection", e => { console.error("[unhandledRejection]", (e && e.stack) || e); });
 process.on("exit", () => { for (const id of procs.keys()) killOwned(id); });
 
-server.on("error", e => {
-  if (e.code === "EADDRINUSE") { console.error(`\n  Port ${PORT} is already in use. Run on another port: set PORT=4322 then npm run dev\n`); }
-  else console.error("[server]", (e && e.stack) || e);
-  process.exit(1);
-});
+if (require.main === module) {
+  server.on("error", e => {
+    if (e.code === "EADDRINUSE") { console.error(`\n  Port ${PORT} is already in use. Run on another port: set PORT=4322 then npm run dev\n`); }
+    else console.error("[server]", (e && e.stack) || e);
+    process.exit(1);
+  });
 
-server.listen(PORT, () => {
+  server.listen(PORT, process.env.DASH_HOST || "127.0.0.1", () => {
   console.log(`\n  Agentic OS running at  http://localhost:${PORT}`);
   console.log(`  Vault data source:     ${VAULT}`);
   console.log(`  Agent config:          ${CONFIG_PATH}`);
@@ -1516,7 +1524,10 @@ server.listen(PORT, () => {
   setInterval(runDailyBridge, 3600000);  // R#2: then hourly (it existed before but was never invoked)
   setTimeout(captureMemory, 8000);       // project memory: telemetry task_done → decisions.md
   setInterval(captureMemory, 120000);    // watermarked, so re-runs never duplicate entries
-});
+  });
+}
+
+module.exports = { createServer };
 
 /* R#2: run scripts/hermes-daily-bridge.cjs (sync telemetry + vault daily note) */
 function runDailyBridge() {

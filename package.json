@@ -8,6 +8,7 @@
     "packages/*"
   ],
   "scripts": {
+    "test": "node --test apps/web/test/*.test.mjs",
     "dev": "npm run build && node apps/web/server.js",
     "start": "node apps/web/server.js",
     "build": "npm run build --workspace @rempeyek/web",

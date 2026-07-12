@@ -1,25 +1,23 @@
 import { THEMES } from "@rempeyek/theme-engine";
 
-/** Swatch grid — 13 themes. The active one is named underneath. */
 export function ThemePicker({ theme, onPick }) {
   const active = THEMES.find(t => t.id === theme);
   return (
     <>
-      <div className="side-label">THEME</div>
-      <div className="theme-pick">
+      <div className="side-label" id="theme-picker-label">APPEARANCE</div>
+      <div className="theme-pick" role="radiogroup" aria-labelledby="theme-picker-label">
         {THEMES.map(t => (
-          <button
-            key={t.id}
+          <button type="button" key={t.id}
             className={`theme-sw ${t.id === theme ? "on" : ""}`.trim()}
             style={{ "--sw": t.sw, "--sw-bg": t.bg }}
-            title={t.name}
-            aria-label={`Theme: ${t.name}`}
-            aria-pressed={t.id === theme}
-            onClick={() => onPick(t.id)}
-          />
+            title={`${t.name} — ${t.description}`} role="radio"
+            aria-label={`${t.name}: ${t.description}`} aria-checked={t.id === theme}
+            onClick={() => onPick(t.id)}>
+            <span className="theme-sw-label">{t.name}</span>
+          </button>
         ))}
       </div>
-      <div className="theme-name">{active?.name || theme}</div>
+      <div className="theme-name" aria-live="polite">{active?.name || theme}</div>
     </>
   );
 }
