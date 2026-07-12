@@ -25,6 +25,16 @@
   --graph-effect-glow:1; --graph-effect-halo:1; --graph-effect-shadow:1;
   --topology-node-fill:#100e1f; --topology-node-border:#2a2744;
   --topology-label:#f2edff; --topology-muted:#aaa1c5; --topology-filter:url(#topoGlow);
+  /* semantic DOM effects; structural modes replace these as one profile */
+  --dom-status-shadow:0 0 8px currentColor;
+  --dom-rail-fill:rgba(255,255,255,.07);
+  --dom-telemetry-fill:linear-gradient(90deg,var(--acc),var(--magenta)); --dom-telemetry-shadow:0 0 8px var(--acc);
+  --dom-report-fill:linear-gradient(90deg,var(--magenta),var(--violet)); --dom-report-shadow:0 0 8px var(--magenta);
+  --dom-stat-shadow:0 0 14px color-mix(in srgb,var(--acc) 48%,transparent);
+  --dom-progress-fill:linear-gradient(90deg,var(--ac,var(--acc)),color-mix(in srgb,var(--ac,var(--acc)) 55%,var(--magenta)));
+  --dom-progress-shadow:0 0 10px color-mix(in srgb,var(--ac,var(--acc)) 60%,transparent); --dom-progress-scan:block;
+  --dom-swatch-dot-shadow:0 0 7px var(--sw,var(--acc)); --dom-swatch-selected-shadow:0 0 10px color-mix(in srgb,var(--sw) 55%,transparent);
+  --dom-agent-dot-shadow:0 0 6px currentColor; --dom-topology-text-shadow:0 0 10px color-mix(in srgb,var(--lime) 45%,transparent);
 }
 
 /* Warm editorial paper: open space and rules replace luminous boxes. */
@@ -45,6 +55,11 @@
   --graph-edge-highlight:54,107,118; --graph-wave:38,34,29;
   --graph-effect-glow:0; --graph-effect-halo:0; --graph-effect-shadow:0;
   --topology-node-fill:#f7f2ea; --topology-node-border:#95897b; --topology-label:#26221d; --topology-muted:#6f665d; --topology-filter:none;
+  --dom-status-shadow:none; --dom-telemetry-fill:var(--acc); --dom-telemetry-shadow:none;
+  --dom-rail-fill:#ded5c9;
+  --dom-report-fill:var(--magenta); --dom-report-shadow:none; --dom-stat-shadow:none;
+  --dom-progress-fill:var(--ac,var(--acc)); --dom-progress-shadow:none; --dom-progress-scan:none;
+  --dom-swatch-dot-shadow:none; --dom-swatch-selected-shadow:none; --dom-agent-dot-shadow:none; --dom-topology-text-shadow:none;
 }
 
 /* Industrial brutalism: hard geometry, thick rules, compact information. */
@@ -66,6 +81,12 @@
   --graph-edge-highlight:226,61,0; --graph-wave:23,23,23;
   --graph-effect-glow:0; --graph-effect-halo:0; --graph-effect-shadow:0;
   --topology-node-fill:#fff9ed; --topology-node-border:#171717; --topology-label:#111; --topology-muted:#514d46; --topology-filter:none;
+  --dom-status-shadow:1px 1px 0 #171717; --dom-telemetry-fill:var(--acc); --dom-telemetry-shadow:none;
+  --dom-rail-fill:#fff9ed;
+  --dom-report-fill:var(--magenta); --dom-report-shadow:none; --dom-stat-shadow:none;
+  --dom-progress-fill:var(--ac,var(--acc)); --dom-progress-shadow:none; --dom-progress-scan:none;
+  --dom-swatch-dot-shadow:1px 1px 0 #171717; --dom-swatch-selected-shadow:3px 3px 0 #171717;
+  --dom-agent-dot-shadow:1px 1px 0 #171717; --dom-topology-text-shadow:none;
 }
 
 /* Glass: spatial translucent planes, with a solid accessibility fallback. */
@@ -127,6 +148,18 @@
 :root[data-theme] .topology-panel { border-radius:var(--surface-radius); background:var(--graph-panel); }
 :root[data-theme] .topology .top-glow { filter:var(--topology-filter); }
 :root[data-theme] .theme-sw:focus-visible { outline:3px solid var(--acc); outline-offset:3px; }
+:root[data-theme] :is(.dot.working,.dot.waiting,.dot.running,.dot.error,.dot.exited) { box-shadow:var(--dom-status-shadow); }
+:root[data-theme] :is(.tele-bar,.rep-bar,.ws-prog) { background:var(--dom-rail-fill); }
+:root[data-theme] .tele-bar i { background:var(--dom-telemetry-fill); box-shadow:var(--dom-telemetry-shadow); }
+:root[data-theme] .rep-bar i { background:var(--dom-report-fill); box-shadow:var(--dom-report-shadow); }
+:root[data-theme] :is(.tile-val,.rep-stat .v) { text-shadow:var(--dom-stat-shadow); }
+:root[data-theme] .ws-prog i { background:var(--dom-progress-fill); box-shadow:var(--dom-progress-shadow); }
+:root[data-theme] .ws-prog-hero::after { display:var(--dom-progress-scan); }
+:root[data-theme] .theme-sw::after { box-shadow:var(--dom-swatch-dot-shadow); }
+:root[data-theme] .theme-sw.on { box-shadow:var(--dom-swatch-selected-shadow); }
+:root[data-theme] .ws-agents i { box-shadow:var(--dom-agent-dot-shadow); }
+:root[data-theme] .topo-big { color:var(--text); text-shadow:none; }
+:root[data-theme] .topo-big.tb-ok { color:var(--lime); text-shadow:var(--dom-topology-text-shadow); }
 
 /* Minimalist component structure */
 :root[data-theme="minimalist"] :is(.bg-grid,.bg-glow) { display:none; }

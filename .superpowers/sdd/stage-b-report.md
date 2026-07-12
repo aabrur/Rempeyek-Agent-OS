@@ -134,3 +134,24 @@ The final reviewer pass found remaining dark-Cosmos constants inside the Canvas 
 - Final `npm run build`: passed; Vite transformed 54 modules.
 - Final `git diff --check`: passed.
 - Renderer static contract: semantic foreground tokens are present, legacy draw-path color literals are absent, the halo loop is flag-guarded, and two structural modes explicitly disable glow.
+
+## Final DOM effect normalization
+
+The final DOM review found that several legacy design-system selectors still bypassed the structural theme profile. A shared semantic DOM-effect profile now owns:
+
+- status-dot shadows;
+- telemetry and report rail/fill/shadow treatment;
+- stat-number text shadows;
+- workspace progress fill, shadow, and scan visibility;
+- topology uptime/status text treatment;
+- ThemePicker dot and selected-state shadows;
+- project agent-dot shadows.
+
+Minimalist maps these components to solid fills and quiet rules with no box/text shadow or animated scan. Brutalist maps them to solid fills and optional hard one-to-three-pixel offset shadows only—never gradient or blurred glow. Glassmorph and Cyberpunk retain their prior luminous behavior through the default semantic profile. Existing status text, labels, icons, and borders remain unchanged, preserving non-color cues.
+
+### DOM effect verification
+
+- Final `npm test`: 36/36 passed, 0 failures.
+- Final `npm run build`: passed; Vite transformed 54 modules.
+- Final `git diff --check`: passed.
+- Static contract: both light structural modes use solid progress/report/telemetry fills, disable luminous shadows and progress scan, and all reviewer-listed selectors consume semantic DOM-effect tokens.
