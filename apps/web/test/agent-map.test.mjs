@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { buildAgentMap } from "../lib/agent-map.mjs";
+import { agentTopologyRevision, beginTopologyRefresh, buildAgentMap } from "../lib/agent-map.mjs";
 
 const agents = [
   { id: "codex", name: "Codex", enabled: true, actions: ["run"] },
@@ -9,6 +9,37 @@ const agents = [
   { id: "pi", name: "Pi", enabled: true, actions: [] },
   { id: "cline", name: "Cline", enabled: true, actions: [] },
 ];
+
+test("topology revision is order-independent and changes with configured dependencies", () => {
+  const first = agentTopologyRevision([
+    { id: "hermes", dependencies: ["pi", "codex"], proc: { status: "running", mode: "service" } },
+    { id: "codex", dependencies: [] },
+  ]);
+  const reordered = agentTopologyRevision([
+    { id: "codex", dependencies: [] },
+    { id: "hermes", dependencies: ["codex", "pi"], proc: { status: "running", mode: "service" } },
+  ]);
+  const changed = agentTopologyRevision([
+    { id: "codex", dependencies: [] },
+    { id: "hermes", dependencies: ["codex"], proc: { status: "running", mode: "service" } },
+  ]);
+
+  assert.equal(first, reordered);
+  assert.notEqual(first, changed);
+});
+
+test("beginning a topology refresh clears previous relationships until new evidence arrives", () => {
+  const previous = {
+    nodes: agents,
+    edges: [{ source: "codex", target: "hermes", type: "dependency", provenance: { source: "configuration", id: "old" } }],
+    metadata: { nodeCount: 4, edgeCount: 1, droppedRelations: 0, hasRelationships: true },
+  };
+  const refreshing = beginTopologyRefresh(previous, agents.slice(0, 3));
+
+  assert.deepEqual(refreshing.edges, []);
+  assert.deepEqual(refreshing.nodes, agents.slice(0, 3));
+  assert.deepEqual(refreshing.metadata, { nodeCount: 3, edgeCount: 0, droppedRelations: 0, hasRelationships: false });
+});
 
 test("lays out the same relationship graph deterministically without a radial hub", () => {
   const topology = {
@@ -122,4 +153,30 @@ test("rejects unsupported or provenance-incomplete relationships at the view sea
   });
   assert.equal(map.edges.length, 0);
   assert.equal(map.metadata.droppedRelations, 3);
+});
+
+test("enforces ontology provenance and semantic animation at the view seam", () => {
+  const nodes = agents.slice(0, 3);
+  const edges = [
+    { source: "codex", target: "hermes", type: "dependency", provenance: { source: "task", id: "wrong-source" }, status: "queued", flowing: true },
+    { source: "codex", target: "hermes", type: "task_assignment", provenance: { source: "task", id: "recorded-task" }, status: "recorded", flowing: true },
+    { source: "codex", target: "pi", type: "task_assignment", provenance: { source: "task", id: "queued-task" }, status: "queued", flowing: true },
+    { source: "hermes", target: "pi", type: "spawned_subagent", provenance: { source: "subagent", id: "spawn" }, status: "running", flowing: true },
+    { source: "pi", target: "hermes", type: "communication", provenance: { source: "communication", id: "not-flowing" }, status: "running", flowing: false },
+    { source: "pi", target: "codex", type: "communication", provenance: { source: "communication", id: "live-message" }, status: "running", flowing: true },
+    { source: "hermes", target: "codex", type: "communication", provenance: { source: "unknown", id: "unknown-source" }, status: "running", flowing: true },
+  ];
+
+  const live = buildAgentMap({ nodes, edges }, { reducedMotion: false });
+  const reduced = buildAgentMap({ nodes, edges }, { reducedMotion: true });
+
+  assert.deepEqual(live.edges.map(edge => [edge.provenance.id, edge.animated]), [
+    ["live-message", true],
+    ["not-flowing", false],
+    ["spawn", false],
+    ["recorded-task", false],
+    ["queued-task", true],
+  ]);
+  assert.equal(live.metadata.droppedRelations, 2);
+  assert.equal(reduced.edges.every(edge => edge.animated === false), true);
 });

@@ -21,6 +21,8 @@ No dependency, framework, runtime configuration, Vault file, telemetry record, g
 
 The server builder now carries the verified source record status into every accepted edge. Dependency status is `configured`; task, subagent, and communication status comes from the source record or falls back to `recorded`. `flowing` remains true only for queued/running task or communication records.
 
+The view seam independently enforces the fixed ontology mapping: `dependency → configuration`, `task_assignment → task`, `spawned_subagent → subagent`, and `communication → communication`. A known type with the wrong or unknown provenance source is rejected and counted rather than rendered.
+
 ## Deterministic relation-aware layout
 
 `buildAgentMap()` is the deep pure module used by the UI and tests. Its interface accepts one topology DTO plus viewport/motion preferences and returns positioned nodes, routed edges, components, semantic legend data, inspectable rows, metadata, and the honest empty state.
@@ -43,6 +45,8 @@ When `hasRelationships` is false:
 - the footer explicitly states that there is no hub and no implied connection.
 
 The map shows a neutral loading message while `/api/agent-topology` is being checked. If refresh fails, it fails closed to current agent records with zero edges rather than retaining or inventing stale relationships.
+
+The topology revision key sorts both agents and each agent's dependency IDs. Adding or removing a configured dependency therefore triggers a refetch even when process status and presentation fields are unchanged. Beginning any refetch immediately replaces the prior topology with the current nodes and zero edges; previous relationship evidence stays hidden until the new response is accepted.
 
 ## Provenance and interaction
 
@@ -67,7 +71,7 @@ Node states are derived only from existing runtime fields:
 
 Process mode is shown only when the runtime reports one of `owned`, `terminal`, `service`, or `cli`.
 
-Color is supported by visible status words and distinct marks: running fill, error diamond/X, observe dashed ring, disabled slash, and idle outline. Running heartbeat animation is status-only. Edge particles render only when `edge.flowing === true` and reduced motion is not requested. Direction arrows remain static and informative under reduced motion.
+Color is supported by visible status words and distinct marks: running fill, error diamond/X, observe dashed ring, disabled slash, and idle outline. Running heartbeat animation is status-only. Edge particles render only for `task_assignment` or `communication` edges when status is `queued`/`running`, `edge.flowing === true`, and reduced motion is not requested. Direction arrows remain static and informative under reduced motion.
 
 ## Accessibility
 
@@ -102,6 +106,9 @@ Vertical red/green slices covered:
 6. Cyclic relation layout timed out → visited-once traversal that terminates deterministically.
 7. Missing source-record status on topology edges → truthful status propagation in integration fixtures.
 8. Unsupported/incomplete relationships passed the view seam → a fixed type/provenance allow-list with disclosed rejection count.
+9. Dependency-only configuration changes reused the old revision key → sorted dependency IDs are now part of the pure topology revision contract.
+10. Known edge types with mismatched provenance and non-semantic `flowing` flags animated → exact ontology mapping and type/status/motion gates now reject or render them statically.
+11. Refresh retained old edges behind the loading state → the tested refresh transition now clears all previous edges before requesting new evidence.
 
 ## Files changed
 
@@ -118,11 +125,11 @@ Vertical red/green slices covered:
 
 ## Verification
 
-- Focused Agent Map/topology tests: 10/10 passed.
-- Full `npm test`: 61/61 passed, 0 failures.
+- Focused Agent Map/topology tests: 13/13 passed.
+- Full `npm test`: 64/64 passed, 0 failures.
 - `npm run build`: passed; Vite transformed 60 modules.
 - `git diff --check`: passed.
-- Graphify code-only incremental update: 7 changed code files re-extracted; query resolves `buildAgentMap()`, `TopologyMap()`, and the topology contract in the same Agent Map community.
+- Graphify code-only incremental update: review changes re-extracted; query resolves `agentTopologyRevision()`, `beginTopologyRefresh()`, `buildAgentMap()`, and `TopologyMap()` in the Agent Map community.
 
 ## Self-review and known concerns
 

@@ -13,7 +13,14 @@ const STATUSES = [
   { status: "idle", label: "Idle" },
 ];
 const MODES = new Set(["owned", "terminal", "service", "cli"]);
-const RELATION_TYPES = new Set(RELATIONS.map(relation => relation.type));
+const PROVENANCE_BY_TYPE = new Map([
+  ["dependency", "configuration"],
+  ["task_assignment", "task"],
+  ["spawned_subagent", "subagent"],
+  ["communication", "communication"],
+]);
+const FLOW_TYPES = new Set(["task_assignment", "communication"]);
+const FLOW_STATUSES = new Set(["queued", "running"]);
 
 function nodeState(node) {
   if (node.enabled === false) return "disabled";
@@ -101,12 +108,37 @@ function edgeId(edge) {
   return `${edge.type}:${edge.source}:${edge.target}:${edge.provenance.source}:${edge.provenance.id}`;
 }
 
+export function agentTopologyRevision(agents = []) {
+  return [...agents]
+    .filter(agent => agent?.id)
+    .sort(byId)
+    .map(agent => [
+      agent.id,
+      agent.name || "",
+      agent.enabled !== false,
+      agent.accent || "",
+      [...(agent.actions || [])].sort().join(","),
+      agent.proc?.status || "",
+      agent.proc?.mode || "",
+      [...(agent.dependencies || [])].filter(id => typeof id === "string").sort().join(","),
+    ].join(":"))
+    .join("|");
+}
+
+export function beginTopologyRefresh(_previousTopology, agents = []) {
+  return {
+    nodes: agents,
+    edges: [],
+    metadata: { nodeCount: agents.length, edgeCount: 0, droppedRelations: 0, hasRelationships: false },
+  };
+}
+
 export function buildAgentMap(topology = {}, { width = 760, height = 480, reducedMotion = false } = {}) {
   const nodes = [...(topology.nodes || [])].filter(node => node?.id).sort(byId);
   const known = new Set(nodes.map(node => node.id));
   const sourceEdges = [...(topology.edges || [])];
   const edges = sourceEdges
-    .filter(edge => RELATION_TYPES.has(edge?.type) && known.has(edge?.source) && known.has(edge?.target) && edge.source !== edge.target && edge.provenance?.id && edge.provenance?.source)
+    .filter(edge => PROVENANCE_BY_TYPE.get(edge?.type) === edge?.provenance?.source && known.has(edge?.source) && known.has(edge?.target) && edge.source !== edge.target && edge.provenance?.id)
     .sort((a, b) => edgeId(a).localeCompare(edgeId(b)));
   const components = connectedComponents(nodes, edges);
   const connected = components.filter(component => component.length > 1);
@@ -154,7 +186,7 @@ export function buildAgentMap(topology = {}, { width = 760, height = 480, reduce
       id: edgeId(edge),
       path: `M${source.x.toFixed(1)},${source.y.toFixed(1)} Q${cx.toFixed(1)},${cy.toFixed(1)} ${target.x.toFixed(1)},${target.y.toFixed(1)}`,
       directional: true,
-      animated: edge.flowing === true && !reducedMotion,
+      animated: edge.flowing === true && FLOW_TYPES.has(edge.type) && FLOW_STATUSES.has(edge.status) && !reducedMotion,
     };
   });
   const nodeNames = new Map(projectedNodes.map(node => [node.id, node.name || node.id]));

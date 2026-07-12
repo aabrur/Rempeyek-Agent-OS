@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Btn } from "@rempeyek/ui";
-import { buildAgentMap } from "../../lib/agent-map.mjs";
+import { agentTopologyRevision, beginTopologyRefresh, buildAgentMap } from "../../lib/agent-map.mjs";
 import { api } from "../api";
 import { agentAccent } from "../lib/agents";
 import { TopoLoad } from "./TopoLoad";
@@ -64,22 +64,22 @@ function EvidenceTable({ map, onSelect }) {
 export function TopologyMap({ state, accent, load, onOpen }) {
   const agents = state.agents || [];
   const reducedMotion = useReducedMotion();
-  const [topology, setTopology] = useState(() => ({ nodes: agents, edges: [], metadata: { hasRelationships: false } }));
+  const [topology, setTopology] = useState(() => beginTopologyRefresh(null, agents));
   const [topologyReady, setTopologyReady] = useState(false);
   const [loadError, setLoadError] = useState("");
   const [selectionId, setSelectionId] = useState("");
   const focusRefs = useRef(new Map());
-  const agentKey = agents.map(agent => `${agent.id}:${agent.name}:${agent.enabled}:${agent.accent}:${(agent.actions || []).join(",")}:${agent.proc?.status}:${agent.proc?.mode}`).join("|");
+  const agentKey = agentTopologyRevision(agents);
 
   useEffect(() => {
     let alive = true;
     setTopologyReady(false);
-    setTopology(current => ({ ...current, nodes: agents }));
+    setTopology(current => beginTopologyRefresh(current, agents));
     api("/api/agent-topology").then(data => {
       if (!alive) return;
       if (data?.error || !Array.isArray(data?.nodes) || !Array.isArray(data?.edges)) {
         setLoadError(data?.error || "Topology response was incomplete.");
-        setTopology({ nodes: agents, edges: [], metadata: { nodeCount: agents.length, edgeCount: 0, droppedRelations: 0, hasRelationships: false } });
+        setTopology(current => beginTopologyRefresh(current, agents));
         setTopologyReady(true);
         return;
       }
