@@ -207,6 +207,39 @@ The **Cosmos Neural** visualization is built only from real Vault data:
 - search, filter, pan, zoom, drag, focus, and Open in Obsidian;
 - an equivalent accessible list/table view.
 
+### Existing Obsidian Graph Parity
+
+The existing Obsidian graph is the minimum functional and topology baseline.
+The Rempeyek renderer must handle the same full Vault graph—not a curated demo
+or a small sample. It preserves:
+
+- every readable Markdown note as a node;
+- every resolved wikilink as an edge;
+- unresolved links as optional ghost nodes;
+- isolated/orphan notes instead of silently dropping them;
+- high-degree radial hubs;
+- dense linked clusters and sparse outer regions;
+- duplicate-basename resolution consistent with the Vault rules;
+- selection, search, pan, zoom, drag, neighborhood focus, and note opening.
+
+Pixel-identical coordinates are not required because force layouts are dynamic,
+but node/edge counts, topology, hub identity, cluster membership, and isolated
+node coverage must match the source data. Any intentional filtering must be
+visible, reversible, and report its effect on counts.
+
+The UI provides two render modes over the same graph dataset:
+
+1. **Obsidian Parity** — restrained monochrome rendering close to the existing
+   Obsidian graph, optimized for auditing completeness and comparing topology.
+2. **Cosmos Neural** — a more expressive rendering with community colors,
+   depth layers, curved neural fibers, focus bloom, recent-activity energy,
+   and semantic particles. It may look more spectacular, but it cannot alter,
+   hide, invent, or merge graph truth unless aggregation is explicitly enabled.
+
+The header always shows visible/total nodes and visible/total edges, active
+filters, unresolved links, orphan count, and aggregation state so visual polish
+never conceals missing data.
+
 Minimalist uses clean lines, Brutalist uses stark nodes and rigid edges,
 Glassmorph uses stationary layered depth, and Cyberpunk uses the richest neural
 fibers, selection shockwaves, controlled volumetric glow, and subtle parallax.
@@ -216,6 +249,12 @@ Effect quality scales automatically: full effects for small graphs, fewer
 particles/halos for medium graphs, and folder/community aggregation for large
 graphs. Hidden views pause RAF. Reduced motion removes traveling particles,
 shockwaves, drift, parallax, and animated reheating while preserving content.
+
+For a Vault at the scale shown in the founder reference, initial presentation
+uses progressive rendering and community-aware spatial indexing. The full graph
+remains searchable immediately; visual aggregation is opt-in or automatic only
+when clearly labelled, and zooming expands aggregated communities without a
+page reload.
 
 ## Agent Map
 
@@ -289,6 +328,9 @@ Test seams:
 - path containment and atomic/append behavior;
 - default/configured Vault resolution and read-only graph scanning;
 - graph edge provenance and performance-tier selection;
+- parity fixtures proving full node/edge/orphan/hub coverage against the source Vault;
+- identical dataset results for Obsidian Parity and Cosmos Neural render modes;
+- large-graph progressive rendering, search, aggregation disclosure, and expansion;
 - Agent Map relationship provenance and honest no-edge state;
 - four-mode token parity and persisted pre-paint selection;
 - React build plus source-level accessibility checks where browser automation is unavailable.
@@ -326,6 +368,10 @@ available until Today and Advanced Operations pass acceptance checks.
 - all four modes preserve content, focus, status semantics, and contrast;
 - Neural Vault resolves the configured/default Obsidian Vault and every rendered
   relationship has file/link/tag/folder provenance;
+- parity mode reports the same note and resolved-link counts as the source scan;
+- Cosmos mode uses the identical graph dataset and never fabricates topology;
+- orphan notes, dense clusters, and high-degree hubs remain discoverable;
+- visible/total counts and every active filter/aggregation state are shown;
 - Agent Map never fabricates a relationship and exposes an equivalent table;
 - hidden views pause animation and reduced motion removes nonessential effects;
 - build and full test suite pass;
