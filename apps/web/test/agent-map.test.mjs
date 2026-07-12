@@ -1,0 +1,125 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+
+import { buildAgentMap } from "../lib/agent-map.mjs";
+
+const agents = [
+  { id: "codex", name: "Codex", enabled: true, actions: ["run"] },
+  { id: "hermes", name: "Hermes", enabled: true, actions: ["run"] },
+  { id: "pi", name: "Pi", enabled: true, actions: [] },
+  { id: "cline", name: "Cline", enabled: true, actions: [] },
+];
+
+test("lays out the same relationship graph deterministically without a radial hub", () => {
+  const topology = {
+    nodes: agents,
+    edges: [
+      { source: "codex", target: "hermes", type: "dependency", provenance: { source: "configuration", id: "hermes:codex" }, flowing: false },
+      { source: "hermes", target: "pi", type: "task_assignment", provenance: { source: "task", id: "task-1" }, flowing: true },
+    ],
+  };
+
+  const first = buildAgentMap(topology);
+  const second = buildAgentMap({ nodes: [...agents].reverse(), edges: [...topology.edges].reverse() });
+
+  assert.deepEqual(first.nodes.map(({ id, x, y }) => ({ id, x, y })), second.nodes.map(({ id, x, y }) => ({ id, x, y })));
+  assert.deepEqual(first.edges.map(({ id, path }) => ({ id, path })), second.edges.map(({ id, path }) => ({ id, path })));
+  assert.equal(first.nodes.some(node => node.id === "core" || node.synthetic), false);
+  assert.equal(new Set(first.nodes.map(node => `${node.x},${node.y}`)).size, agents.length);
+});
+
+test("separates connected components and marks unrelated agents as isolated", () => {
+  const map = buildAgentMap({
+    nodes: agents,
+    edges: [{ source: "codex", target: "hermes", type: "dependency", provenance: { source: "configuration", id: "hermes:codex" } }],
+  });
+
+  const componentByNode = Object.fromEntries(map.nodes.map(node => [node.id, node.componentId]));
+  assert.equal(componentByNode.codex, componentByNode.hermes);
+  assert.notEqual(componentByNode.codex, componentByNode.pi);
+  assert.notEqual(componentByNode.pi, componentByNode.cline);
+  assert.deepEqual(map.nodes.filter(node => node.isolated).map(node => node.id), ["cline", "pi"]);
+});
+
+test("projects an honest zero-edge state with evidence guidance", () => {
+  const map = buildAgentMap({ nodes: agents, edges: [], metadata: { droppedRelations: 2 } });
+
+  assert.equal(map.metadata.hasRelationships, false);
+  assert.equal(map.edges.length, 0);
+  assert.equal(map.nodes.every(node => node.isolated), true);
+  assert.match(map.emptyState.title, /No verified relationships/i);
+  assert.match(map.emptyState.detail, /configuration|task|subagent|communication/i);
+  assert.equal(map.metadata.droppedRelations, 2);
+});
+
+test("projects the complete edge vocabulary and provenance into inspectable rows", () => {
+  const topology = {
+    nodes: agents,
+    edges: [
+      { source: "codex", target: "hermes", type: "dependency", provenance: { source: "configuration", id: "hermes:codex" }, flowing: false },
+      { source: "hermes", target: "pi", type: "task_assignment", provenance: { source: "task", id: "task-1" }, flowing: true },
+      { source: "codex", target: "cline", type: "spawned_subagent", provenance: { source: "subagent", id: "spawn-1" }, flowing: false },
+      { source: "pi", target: "cline", type: "communication", provenance: { source: "communication", id: "message-1" }, flowing: false },
+    ],
+  };
+
+  const map = buildAgentMap(topology);
+  assert.deepEqual(map.legend.relations.map(item => item.type), ["dependency", "task_assignment", "spawned_subagent", "communication"]);
+  assert.deepEqual(map.rows.filter(row => row.kind === "relationship").map(row => ({ type: row.type, provenanceId: row.provenanceId, provenanceSource: row.provenanceSource })), [
+    { type: "communication", provenanceId: "message-1", provenanceSource: "communication" },
+    { type: "dependency", provenanceId: "hermes:codex", provenanceSource: "configuration" },
+    { type: "spawned_subagent", provenanceId: "spawn-1", provenanceSource: "subagent" },
+    { type: "task_assignment", provenanceId: "task-1", provenanceSource: "task" },
+  ]);
+});
+
+test("uses semantic node states and animates only verified live flow when motion is allowed", () => {
+  const nodes = [
+    { id: "running", name: "Running", enabled: true, actions: ["run"], proc: { status: "running", mode: "owned" } },
+    { id: "error", name: "Error", enabled: true, actions: ["run"], proc: { status: "error", mode: "service" } },
+    { id: "observe", name: "Observe", enabled: true, actions: [] },
+    { id: "idle", name: "Idle", enabled: true, actions: ["run"], proc: { status: "stopped", mode: "terminal" } },
+    { id: "disabled", name: "Disabled", enabled: false, actions: ["run"], proc: { status: "running", mode: "cli" } },
+  ];
+  const edges = [{ source: "running", target: "idle", type: "task_assignment", provenance: { source: "task", id: "task-live" }, status: "running", flowing: true }];
+
+  const live = buildAgentMap({ nodes, edges }, { reducedMotion: false });
+  const reduced = buildAgentMap({ nodes, edges }, { reducedMotion: true });
+
+  assert.deepEqual(live.nodes.map(node => [node.id, node.status, node.mode]), [
+    ["disabled", "disabled", "cli"],
+    ["error", "error", "service"],
+    ["idle", "idle", "terminal"],
+    ["observe", "observe", null],
+    ["running", "running", "owned"],
+  ]);
+  assert.equal(live.edges[0].animated, true);
+  assert.equal(reduced.edges[0].animated, false);
+  assert.equal(reduced.edges[0].directional, true);
+  assert.deepEqual(live.legend.statuses.map(item => item.status), ["disabled", "running", "error", "observe", "idle"]);
+});
+
+test("lays out cyclic evidence without requiring an artificial root", () => {
+  const map = buildAgentMap({
+    nodes: agents.slice(0, 2),
+    edges: [
+      { source: "codex", target: "hermes", type: "communication", provenance: { source: "communication", id: "one" } },
+      { source: "hermes", target: "codex", type: "communication", provenance: { source: "communication", id: "two" } },
+    ],
+  });
+  assert.equal(map.nodes.length, 2);
+  assert.equal(new Set(map.nodes.map(node => `${node.x},${node.y}`)).size, 2);
+});
+
+test("rejects unsupported or provenance-incomplete relationships at the view seam", () => {
+  const map = buildAgentMap({
+    nodes: agents.slice(0, 2),
+    edges: [
+      { source: "codex", target: "hermes", type: "heartbeat", provenance: { source: "heartbeat", id: "fake" } },
+      { source: "codex", target: "hermes", type: "communication", provenance: { source: "communication" } },
+    ],
+    metadata: { droppedRelations: 1 },
+  });
+  assert.equal(map.edges.length, 0);
+  assert.equal(map.metadata.droppedRelations, 3);
+});

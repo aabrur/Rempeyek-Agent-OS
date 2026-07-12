@@ -33,6 +33,7 @@ test('includes only provenance-backed edges between configured agents', () => {
     { source: 'pi', target: 'hermes', type: 'communication', provenance: { source: 'communication', id: 'msg-1' } },
   ]);
   assert.equal(topology.edges[2].flowing, true);
+  assert.deepEqual(topology.edges.map((edge) => edge.status), ["configured", "recorded", "running"]);
   assert.equal(topology.metadata.droppedRelations, 2);
 });
 
@@ -44,5 +45,6 @@ test('task edges require explicit source and assignee rather than a fabricated c
   assert.deepEqual(topology.edges.filter((edge) => edge.type === 'task_assignment').map((edge) => [edge.source, edge.target, edge.flowing]), [
     ['hermes', 'codex', true],
   ]);
+  assert.equal(topology.edges.find((edge) => edge.type === 'task_assignment').status, 'queued');
   assert.equal(topology.metadata.droppedRelations, 1);
 });

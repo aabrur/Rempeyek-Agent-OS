@@ -13,7 +13,7 @@ export function CommandCenter({ state, accent, load, agentsById, gw, ops, openAg
 
       <StatTiles stats={state.stats} />
 
-      <SectionRow label="AGENT TOPOLOGY">
+      <SectionRow label="AGENT MAP">
         <Btn variant="primary" onClick={gw.startAll}>▶ START ALL GATEWAYS</Btn>
       </SectionRow>
 

@@ -37,7 +37,7 @@ export function AddAgentModal({ open, onClose, onAdded }) {
     <Overlay open={open} onClose={close} boxClass="aa-box">
       <div className="token-title">＋ REGISTER NEW AGENT</div>
       <div className="token-sub">
-        Add a node to the mesh. It appears in the topology, cards, and sidebar immediately;
+        Add a node to the mesh. It appears in the Agent Map, cards, and sidebar immediately;
         give it a trigger CLI to make it summonable.
       </div>
       <form className="aa-grid" onSubmit={submit}>

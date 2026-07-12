@@ -25,6 +25,8 @@
   --graph-effect-glow:1; --graph-effect-halo:1; --graph-effect-shadow:1;
   --topology-node-fill:#100e1f; --topology-node-border:#2a2744;
   --topology-label:#f2edff; --topology-muted:#aaa1c5; --topology-filter:url(#topoGlow);
+  --topo-edge-dependency:#9d6bff; --topo-edge-task:#f5b85a;
+  --topo-edge-subagent:#46d9ff; --topo-edge-communication:#f45bd8;
   /* semantic DOM effects; structural modes replace these as one profile */
   --dom-status-shadow:0 0 8px currentColor;
   --dom-rail-fill:rgba(255,255,255,.07);
@@ -55,6 +57,8 @@
   --graph-edge-highlight:54,107,118; --graph-wave:38,34,29;
   --graph-effect-glow:0; --graph-effect-halo:0; --graph-effect-shadow:0;
   --topology-node-fill:#f7f2ea; --topology-node-border:#95897b; --topology-label:#26221d; --topology-muted:#6f665d; --topology-filter:none;
+  --topo-edge-dependency:#655f87; --topo-edge-task:#916c2f;
+  --topo-edge-subagent:#366b76; --topo-edge-communication:#865c72;
   --dom-status-shadow:none; --dom-telemetry-fill:var(--acc); --dom-telemetry-shadow:none;
   --dom-rail-fill:#ded5c9;
   --dom-report-fill:var(--magenta); --dom-report-shadow:none; --dom-stat-shadow:none;
@@ -81,6 +85,8 @@
   --graph-edge-highlight:226,61,0; --graph-wave:23,23,23;
   --graph-effect-glow:0; --graph-effect-halo:0; --graph-effect-shadow:0;
   --topology-node-fill:#fff9ed; --topology-node-border:#171717; --topology-label:#111; --topology-muted:#514d46; --topology-filter:none;
+  --topo-edge-dependency:#5535c9; --topo-edge-task:#9a5500;
+  --topo-edge-subagent:#006d77; --topo-edge-communication:#c90076;
   --dom-status-shadow:1px 1px 0 #171717; --dom-telemetry-fill:var(--acc); --dom-telemetry-shadow:none;
   --dom-rail-fill:#fff9ed;
   --dom-report-fill:var(--magenta); --dom-report-shadow:none; --dom-stat-shadow:none;
@@ -108,6 +114,8 @@
   --graph-edge-highlight:125,211,252; --graph-wave:225,238,251;
   --graph-effect-glow:1; --graph-effect-halo:1; --graph-effect-shadow:1;
   --topology-node-fill:#0c1b2f; --topology-node-border:#426482; --topology-label:#f7fbff; --topology-muted:#b3c5d8; --topology-filter:url(#topoGlow);
+  --topo-edge-dependency:#a5b4fc; --topo-edge-task:#fde68a;
+  --topo-edge-subagent:#67e8f9; --topo-edge-communication:#e09bff;
 }
 
 /* Cyberpunk: calm solid cosmos; light is reserved for active/live state. */
@@ -124,6 +132,8 @@
   --graph-edge-highlight:70,217,255; --graph-wave:242,237,255;
   --graph-effect-glow:1; --graph-effect-halo:1; --graph-effect-shadow:1;
   --topology-filter:url(#topoGlow);
+  --topo-edge-dependency:#9d6bff; --topo-edge-task:#f5b85a;
+  --topo-edge-subagent:#46d9ff; --topo-edge-communication:#f45bd8;
 }
 
 /* component token application */
@@ -179,6 +189,8 @@
 :root[data-theme="minimalist"] :is(.topology-panel,.topo-box,.topo-legend) { background:transparent; box-shadow:none; border-color:var(--line); }
 :root[data-theme="minimalist"] .topology :is(.top-glow,.top-node:hover circle) { filter:none; }
 :root[data-theme="minimalist"] .topology .top-node-halo { fill:none; }
+:root[data-theme="minimalist"] :is(.topology-panel .topo-map,.topo-fallback) { background:transparent; box-shadow:none; }
+:root[data-theme="minimalist"] .topo-empty { background:transparent; border-block:1px solid var(--line); }
 
 /* Brutalist component structure */
 :root[data-theme="brutalist"] .sidebar { background:var(--card-hi); border-right:3px solid var(--line); }
@@ -199,6 +211,8 @@
 :root[data-theme="brutalist"] .project-tabs button.active { color:#fff; background:#111; box-shadow:inset 0 -4px var(--acc); }
 :root[data-theme="brutalist"] .topology :is(.top-glow,.top-node:hover circle) { filter:none; }
 :root[data-theme="brutalist"] .topology .top-node-halo { fill:none; }
+:root[data-theme="brutalist"] :is(.topology-panel .topo-map,.topo-fallback) { border:3px solid var(--line); border-radius:0; background:var(--card-hi); box-shadow:4px 4px 0 var(--line); }
+:root[data-theme="brutalist"] .top-node-select { stroke-dasharray:none; }
 
 /* Glass component structure */
 :root[data-theme="glassmorph"] body { background:radial-gradient(circle at 75% 5%,#17395a 0,transparent 38%),radial-gradient(circle at 8% 92%,#252552 0,transparent 36%),var(--bg); }
@@ -208,6 +222,7 @@
 :root[data-theme="glassmorph"] :is(.page-head h1,.ws-hero-name) { filter:none; }
 :root[data-theme="glassmorph"] :is(.ws-hero,.topology-panel,.graph-wrap) { box-shadow:0 28px 80px rgba(0,0,0,.28),inset 0 1px rgba(255,255,255,.1); }
 :root[data-theme="glassmorph"] .continuity-core { background:rgba(125,211,252,.08); box-shadow:inset 0 1px rgba(255,255,255,.09); }
+:root[data-theme="glassmorph"] :is(.topology-panel .topo-map,.topo-fallback) { background:rgba(7,17,31,.58); backdrop-filter:blur(18px); box-shadow:inset 0 1px rgba(255,255,255,.08); }
 
 /* Restrained Cosmos component structure */
 :root[data-theme="cyberpunk"] .sidebar { background:linear-gradient(180deg,rgba(13,10,32,.96),rgba(7,5,19,.98)); }
@@ -216,6 +231,7 @@
 :root[data-theme="cyberpunk"] :is(.nav-item.active,.theme-sw.on,.btn-primary:focus-visible) { text-shadow:0 0 10px color-mix(in srgb,var(--acc) 34%,transparent); }
 :root[data-theme="cyberpunk"] .continuity-core { box-shadow:0 0 28px color-mix(in srgb,var(--ac,var(--acc)) 16%,transparent); }
 :root[data-theme="cyberpunk"] .continuity-node :is(a,button):focus-visible { box-shadow:0 0 16px color-mix(in srgb,var(--acc) 18%,transparent); }
+:root[data-theme="cyberpunk"] .top-node.is-selected .top-node-select { filter:drop-shadow(0 0 6px color-mix(in srgb,var(--acc) 65%,transparent)); }
 
 /* responsive structural gates */
 @media (max-width:1280px) {
