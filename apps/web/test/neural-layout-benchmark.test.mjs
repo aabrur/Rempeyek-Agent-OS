@@ -15,7 +15,12 @@ test("1,000-node deterministic layout and projection stay within an interactive 
   }
 
   const started = performance.now();
-  const profile = graphRenderProfile("aggregate-ready", nodes.length);
+  const profile = graphRenderProfile("reduced", nodes.length);
+  assert.equal(profile.tier, "reduced");
+  assert.equal(profile.layoutIterations, 28);
+  assert.equal(profile.maxHalos, 32);
+  assert.equal(profile.labelMinDegree, 5);
+  assert.equal(profile.shadowMode, "active");
   const laidOut = layoutGraph({ nodes, edges }, { width: 1400, height: 900, iterations: profile.layoutIterations });
   const layoutMs = performance.now() - started;
   const projectedAt = performance.now();

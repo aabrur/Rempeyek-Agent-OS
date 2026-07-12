@@ -39,9 +39,10 @@ counts, and the accessible table are all projections of the same API dataset.
 - `npm run build`: production Vite build succeeded.
 - `git diff --check`: passed.
 - `rg "Math\\.random" packages/neural-engine`: no matches.
-- Fixture benchmark (1,000 notes, 1,978 edges, 18 deterministic iterations):
-  **103.97 ms layout + 10.87 ms projection = 114.84 ms total** in a recorded
-  full-suite review run. Separate warm runs measured 65.22–72.00 ms total. The assertion budget is
+- Fixture benchmark (1,000 notes, 1,978 edges, the real `reduced` profile with
+  28 deterministic iterations and capped halo/label/shadow workload):
+  **121.83 ms layout + 11.42 ms projection = 133.25 ms total** in the recorded
+  full-suite reduced-profile run. The assertion budget is
   1,500 ms to remain stable on slower developer machines.
 - Read-only validation against the current real Vault snapshot: **266 notes, 356
   nodes, 557 edges, `effectTier: reduced`**, with layout + projection measured at
