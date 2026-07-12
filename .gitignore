@@ -36,6 +36,7 @@ agents.config.json
 telemetry/terms/
 
 # Local scratch (graphify pipeline one-offs, personal canvas)
+.worktrees/
 do_semantic*.py
 ast_and_cache.py
 gen_subagents.py
