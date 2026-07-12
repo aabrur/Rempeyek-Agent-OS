@@ -12,6 +12,10 @@ The implementation preserves the Stage B structural theme system, existing API r
 
 ## Data-truth corrections
 
+### Review closure: legacy decision contract
+
+The server adapter now gives entries parsed from the legacy `decisions.md` shape an explicit `context` status. `buildTodayProjection()` uses an allow-list and considers only `unresolved` and `action-required` decisions actionable. Historical decisions remain present on `today.project.decisions` for the Decision context panel, but cannot become `unresolvedDecisions` or `nextAction` without an explicit actionable source. Regression coverage uses the actual legacy string-list adapter shape and separately proves the explicit `action-required` path.
+
 ### Current project authority
 
 The previous hero used `projects[0]`, while `/api/today` independently filters completed/archived projects and selects the most recently active one. The new continuity hero uses only `today.project`, so the hero, next action, task context, decisions, and output cannot refer to different projects.
@@ -68,8 +72,16 @@ This reaches the current next action in one interaction when the DTO supplies it
 - A single-flight guard prevents duplicate decision submission.
 - Approval errors remain visible instead of being erased by the queue refresh.
 - Raw process/gateway scope is no longer displayed in the Today card; consequence, target, and actor remain visible.
+- Initial-load failures and approval-action failures are separate states. A failed approval is rendered beside the queue that owns it, with `Try again` and `Dismiss` recovery. A successful retry/decision or explicit dismissal clears the action error.
 
 ## Project Workspace
+
+The previous 484-line workspace owner has been split along product boundaries rather than generic UI abstractions:
+
+- `TodayContinuity.jsx` owns `/api/today`, approval state, continuity, context, and project cards.
+- `ProjectWorkspace.jsx` owns project detail, tabs, resume dispatch, files, decisions, and activity states.
+- `NewProjectModal.jsx` owns project creation.
+- `Workspace.jsx` is now a 54-line composition and navigation owner.
 
 ### Overview
 
@@ -99,6 +111,7 @@ Shows an honest empty state because the production project detail route does not
 
 - Six tabs use `tablist`, `tab`, `tabpanel`, `aria-selected`, roving `tabIndex`, and Arrow/Home/End navigation.
 - Project focus moves into the opened workspace; smooth scrolling respects `prefers-reduced-motion`.
+- The focus target is a semantic `<section>` labelled by the project workspace heading.
 - Progress rails expose progressbar semantics and numeric values.
 - New-project, decision, and agent assignment controls have associated labels.
 - Approval actions use a named group.
@@ -129,12 +142,17 @@ The implementation used vertical red/green slices:
 4. Project task-ownership test failed because `tasksForProject` did not exist, then passed after scoped selection.
 5. Stable same-priority ordering failed (`z-task` before `a-task`), then passed after comparator correction.
 6. Blocked-task semantics failed with `Next task`, then passed with `Blocked task`.
+7. The real legacy decision-list adapter test failed because history was marked unresolved, then passed after introducing the explicit `context` contract and actionable allow-list.
+8. The explicit `action-required` decision test proves that genuine founder decisions still become the next action when no task is actionable.
 
 ## Files changed
 
 - `apps/web/lib/today-projection.mjs`
 - `apps/web/lib/workspace-view-model.mjs`
 - `apps/web/src/views/Workspace.jsx`
+- `apps/web/src/views/TodayContinuity.jsx`
+- `apps/web/src/views/ProjectWorkspace.jsx`
+- `apps/web/src/views/NewProjectModal.jsx`
 - `apps/web/test/today-projection.test.mjs`
 - `apps/web/test/workspace-view-model.test.mjs`
 - `packages/design-system/src/index.css`
@@ -144,9 +162,9 @@ The implementation used vertical red/green slices:
 
 ## Verification
 
-- Focused Stage C tests: 9/9 passed.
-- Full `npm test`: 42/42 passed, 0 failures.
-- `npm run build`: passed; Vite transformed 55 modules.
+- Focused Today projection tests: 7/7 passed.
+- Full `npm test`: 44/44 passed, 0 failures.
+- `npm run build`: passed; Vite transformed 58 modules.
 - `git diff --check`: passed.
 - Static UI contract: CSS braces balanced, all six tabpanels present, responsive gates present at 1000/768/390, no gateway/PID/schtasks/telemetry plumbing text in `Workspace.jsx`.
 

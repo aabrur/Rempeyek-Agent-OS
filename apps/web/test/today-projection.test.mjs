@@ -1,6 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { createRequire } from "node:module";
 import { buildTodayProjection } from "../lib/today-projection.mjs";
+
+const require = createRequire(import.meta.url);
+const { legacyDecisionContext } = require("../server.js");
 
 test("selects the most recently active project and orders unfinished work deterministically", () => {
   const result = buildTodayProjection([
@@ -55,4 +59,39 @@ test("orders equal-priority tasks by status and stable id", () => {
 
 test("returns an explicit empty state", () => {
   assert.deepEqual(buildTodayProjection([]), { state: "empty", project: null, unfinishedTasks: [], unresolvedDecisions: [], recentArtifacts: [], nextAction: null });
+});
+
+test("preserves real legacy decision history as context without making it actionable", () => {
+  const decisions = legacyDecisionContext("apollo", [
+    "2026-07-10 — Keep the local-first runtime.",
+    "2026-07-11 — Use the Vault as shared memory.",
+  ]);
+  const result = buildTodayProjection([{
+    id: "apollo",
+    status: "active",
+    updatedAt: 2000,
+    tasks: [],
+    decisions,
+  }]);
+
+  assert.deepEqual(decisions.map(decision => decision.status), ["context", "context"]);
+  assert.deepEqual(result.project.decisions, decisions);
+  assert.deepEqual(result.unresolvedDecisions, []);
+  assert.equal(result.nextAction, null);
+});
+
+test("uses only an explicitly actionable decision as the next action", () => {
+  const result = buildTodayProjection([{
+    id: "apollo",
+    status: "active",
+    updatedAt: 2000,
+    tasks: [],
+    decisions: [
+      { id: "history", text: "Past decision", status: "context" },
+      { id: "next-decision", text: "Founder input required", status: "action-required" },
+    ],
+  }]);
+
+  assert.deepEqual(result.unresolvedDecisions.map(decision => decision.id), ["next-decision"]);
+  assert.deepEqual(result.nextAction, { type: "decision", decisionId: "next-decision", label: "Founder input required" });
 });

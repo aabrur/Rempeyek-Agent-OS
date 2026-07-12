@@ -964,6 +964,14 @@ async function buildParityGraph() {
   return data;
 }
 
+function legacyDecisionContext(slug, entries) {
+  return entries.map((text, index) => ({
+    id: `${slug}-decision-${index + 1}`,
+    text,
+    status: "context",
+  }));
+}
+
 function todayProjectData(files) {
   return buildProjects(files).map(project => {
     const text = readDoc(path.join(VAULT, ...project.rel.split("/")));
@@ -974,7 +982,7 @@ function todayProjectData(files) {
       return [{ id: `${project.slug}-task-${index + 1}`, title: match[2].replace(/<!--.*?-->/g, "").trim(), status: match[1].toLowerCase() === "x" ? "completed" : "pending" }];
     });
     const decisions = project.kind === "workspace"
-      ? decisionList(project.slug).map((text, index) => ({ id: `${project.slug}-decision-${index + 1}`, text, status: "unresolved" }))
+      ? legacyDecisionContext(project.slug, decisionList(project.slug))
       : [];
     const prefix = project.kind === "workspace" ? `Projects/${project.slug}/` : "";
     const recentArtifacts = prefix ? files
@@ -1615,7 +1623,7 @@ if (require.main === module) {
   });
 }
 
-module.exports = { createServer };
+module.exports = { createServer, legacyDecisionContext };
 
 /* R#2: run scripts/hermes-daily-bridge.cjs (sync telemetry + vault daily note) */
 function runDailyBridge() {
