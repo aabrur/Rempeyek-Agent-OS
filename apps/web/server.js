@@ -10,6 +10,7 @@ const os = require("os");
 const { spawn, execFile, spawnSync } = require("child_process");
 const crypto = require("crypto");
 const { createAccessPolicy } = require("./lib/access-policy.cjs");
+const { resolveSummonProfile } = require("./lib/summon-profile.cjs");
 
 /* Monorepo layout: this file lives in apps/web/, but runtime data (vault, config,
    telemetry, scripts, .env) stays at the repo ROOT so agent CLIs and bridges keep working. */
@@ -599,15 +600,26 @@ function gwCtl(id, action, cb) {
   child.on("error", err => finish({ error: `failed to run: ${err.message}` }));
   child.on("exit", code => {
     const text = out.trim().slice(0, 4000);
-    const running = detectRunning(text);
-    if (action === "status" || action === "start" || action === "restart") {
-      const prev = gwCache.get(id);                    // R#1: detect running → down transition
-      gwCache.set(id, { running, text, at: Date.now(), exitCode: code });
-      logUptime(id, running);
-      if (prev && prev.running && !running) { alertDown(id, `gateway went down (detected during ${action})`); if (action === "status") maybeWatchdog(id); }
-    } else if (action === "stop") { gwCache.set(id, { running: false, text, at: Date.now(), exitCode: code }); logUptime(id, false); }
-    if (action !== "status") sysEvent(id, code === 0 ? "ok" : "error", `gateway ${action} → ${running ? "running" : "stopped"}${code ? ` (exit ${code})` : ""}`);
-    finish({ ok: code === 0, code, action, running, output: text });
+    const complete = running => {
+      if (action === "status" || action === "start" || action === "restart") {
+        const prev = gwCache.get(id);
+        gwCache.set(id, { running, text, at: Date.now(), exitCode: code });
+        logUptime(id, running);
+        if (prev && prev.running && !running) { alertDown(id, `gateway went down (detected during ${action})`); if (action === "status") maybeWatchdog(id); }
+      } else if (action === "stop") { gwCache.set(id, { running: false, text, at: Date.now(), exitCode: code }); logUptime(id, false); }
+      if (action !== "status") sysEvent(id, code === 0 ? "ok" : "error", `gateway ${action} → ${running ? "running" : "stopped"}${code ? ` (exit ${code})` : ""}`);
+      finish({ ok: code === 0, code, action, running, output: text });
+    };
+    if ((action === "start" || action === "restart") && g.probe?.port) {
+      clearTimeout(timer);
+      let attempts = 20;
+      const check = () => probePort(g.probe.host, g.probe.port, up => {
+        if (up || --attempts === 0) return complete(up);
+        setTimeout(check, 2500);
+      });
+      return check();
+    }
+    complete(detectRunning(text));
   });
 }
 
@@ -706,8 +718,9 @@ function gwTerminal(id, mode, cb) {
   if (!agent.enabled || !g) return cb({ error: agent.note || `gateway '${id}' not ready (enabled:false)` });
   let dir, cmd;
   if (mode === "summon") {
-    if (!g.trigger) return cb({ error: `${agent.name} has no trigger to summon it with` });
-    dir = g.home || loadConfig().workdir; cmd = g.trigger;
+    const profile = resolveSummonProfile(agent);
+    if (!profile.command) return cb({ error: `${agent.name} has no trigger to summon it with` });
+    dir = profile.cwd; cmd = profile.command;
     const cur = summons.get(id);
     if (cur && cur.alive) return cb({ error: `${agent.name} already has a summoned terminal (pid ${cur.pid}) — stop it first` });
     // install gate: if the CLI is not on this machine, don't open a dead terminal —
@@ -1450,6 +1463,7 @@ function requestHandler(req, res) {
           return json(res, 200, { lines: p ? p.log.filter(l => l.i >= since) : [], next: p ? p.seq : 0, ...procInfo(id) });
         }
         if (req.method !== "POST") return json(res, 405, { error: "POST only" });
+        if (action === "status") return gwCtl(id, action, r => json(res, r.error ? 400 : 200, r));
         return withApproval(req, res, action === "terminal" ? "terminal.open" : `process.${action}`, id, () => {
         if (action === "terminal") {
           const mode = new URL(req.url, "http://x").searchParams.get("mode") || "summon";

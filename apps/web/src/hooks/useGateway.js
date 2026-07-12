@@ -1,35 +1,55 @@
 import { useCallback, useState } from "react";
 import { api } from "../api";
 
-/** Gateway actions shared by cards and the detail panel.
-    `busy` is the id+action currently in flight, so buttons can show "…". */
+/** Gateway actions shared by cards and the detail panel. */
 export function useGateway(agents, refresh) {
   const [busy, setBusy] = useState(null);
   const key = (id, act) => `${id}:${act}`;
   const isBusy = (id, act) => busy === key(id, act);
 
+  const approve = useCallback(async (type, target, consequence) => {
+    if (!confirm(`${consequence}\n\nTarget: ${target}\n\nContinue?`)) return null;
+    const requested = await api("/api/approvals", {
+      method: "POST",
+      body: JSON.stringify({ type, target, consequence, actor: "dashboard-user" }),
+    });
+    if (requested.error) { alert(requested.error); return null; }
+    const decided = await api(`/api/approvals/${requested.id}/decision`, {
+      method: "POST",
+      body: JSON.stringify({ decision: "approved", confirmed: true }),
+    });
+    if (decided.error) { alert(decided.error); return null; }
+    return requested.id;
+  }, []);
+
   /** start | stop | stop-term | restart | status | run */
   const runAction = useCallback(async (id, act) => {
-    const agent = agents?.[id];
-    // one confirm before destructive actions on 24/7 native services
-    // (stop-term only closes the summoned terminal, never the service → no confirm)
-    if (["stop", "restart", "run"].includes(act) && agent?.owner === "native-service"
-      && !confirm(`${agent.name} is a 24/7 service. Really '${act}'? This can disrupt the running instance.`)) return;
-
     setBusy(key(id, act));
-    // stop-term = kill-file handshake + verify (+ elevated fallback) → needs longer
-    const r = await api(`/api/proc/${id}/${act}`, { method: "POST", timeoutMs: act === "stop-term" ? 90000 : undefined });
+    const approvalId = act === "status" ? null : await approve(
+      `process.${act}`,
+      id,
+      `${act === "stop-term" ? "Close the summoned terminal for" : `${act} the gateway/process for`} ${agents?.[id]?.name || id}.`,
+    );
+    if (act !== "status" && !approvalId) { setBusy(null); return; }
+    const r = await api(`/api/proc/${id}/${act}`, {
+      method: "POST",
+      timeoutMs: ["start", "restart", "stop-term"].includes(act) ? 90000 : act === "status" ? 40000 : undefined,
+      headers: approvalId ? { "x-approval-id": approvalId } : undefined,
+    });
     setBusy(null);
     if (r.error) alert(r.error);
     else if (act === "status" && r.output) alert(`${id} · status:\n\n${r.output}`);
     setTimeout(refresh, act === "status" ? 200 : 900);
-  }, [agents, refresh]);
+  }, [agents, approve, refresh]);
 
-  /** summon | start | run — opens a (usually elevated) terminal */
+  /** summon | start | run — opens an elevated terminal. */
   const runTerminal = useCallback(async (id, mode) => {
     setBusy(key(id, mode));
-    // summon waits for the UAC answer server-side (up to 45s) — give it room
-    const r = await api(`/api/proc/${id}/terminal?mode=${mode}`, { method: "POST", timeoutMs: 60000 });
+    const approvalId = await approve("terminal.open", id, `Open an elevated ${mode} terminal for ${agents?.[id]?.name || id}.`);
+    if (!approvalId) { setBusy(null); return; }
+    const r = await api(`/api/proc/${id}/terminal?mode=${mode}`, {
+      method: "POST", timeoutMs: 60000, headers: { "x-approval-id": approvalId },
+    });
     setBusy(null);
     if (r.notInstalled) {
       const i = r.install || {};
@@ -40,14 +60,16 @@ export function useGateway(agents, refresh) {
       else alert(msg);
     } else if (r.error) alert(r.error);
     else setTimeout(refresh, 5000);
-  }, [refresh]);
+  }, [agents, approve, refresh]);
 
   const startAll = useCallback(async () => {
-    const r = await api("/api/proc/start-all", { method: "POST" });
-    const errs = Object.entries(r || {}).filter(([, v]) => v?.error).map(([k, v]) => `${k}: ${v.error}`);
+    const approvalId = await approve("process.start-all", "enabled-agents", "Start every enabled gateway that supports start.");
+    if (!approvalId) return;
+    const r = await api("/api/proc/start-all", { method: "POST", headers: { "x-approval-id": approvalId } });
+    const errs = Object.entries(r || {}).filter(([, value]) => value?.error).map(([id, value]) => `${id}: ${value.error}`);
     if (errs.length) alert("Some failed:\n" + errs.join("\n"));
     setTimeout(refresh, 800);
-  }, [refresh]);
+  }, [approve, refresh]);
 
   return { runAction, runTerminal, startAll, isBusy };
 }
