@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { DEFAULT_THEME, THEMES, applyTheme, normalizeTheme, readTheme } from "../../../packages/theme-engine/src/themes.js";
+import { DEFAULT_THEME, THEMES, applyTheme, normalizeTheme, readTheme, themeSelectionFromKey } from "../../../packages/theme-engine/src/themes.js";
 
 test("registry exposes exactly the four approved structural modes", () => {
   assert.deepEqual(THEMES.map(({ id }) => id), ["minimalist", "brutalist", "glassmorph", "cyberpunk"]);
@@ -23,4 +23,18 @@ test("applyTheme applies and persists one canonical ID", () => {
   const result = applyTheme("quantum-glass", root, { setItem: (...args) => writes.push(args) });
   assert.equal(result, "glassmorph"); assert.equal(root.dataset.theme, "glassmorph");
   assert.deepEqual(writes, [["aos-theme", "glassmorph"]]);
+});
+
+test("theme keyboard navigation follows radiogroup order and wraps", () => {
+  assert.equal(themeSelectionFromKey("minimalist", "ArrowRight"), "brutalist");
+  assert.equal(themeSelectionFromKey("minimalist", "ArrowDown"), "brutalist");
+  assert.equal(themeSelectionFromKey("minimalist", "ArrowLeft"), "cyberpunk");
+  assert.equal(themeSelectionFromKey("cyberpunk", "ArrowUp"), "glassmorph");
+});
+
+test("theme keyboard navigation supports Home and End without consuming other keys", () => {
+  assert.equal(themeSelectionFromKey("glassmorph", "Home"), "minimalist");
+  assert.equal(themeSelectionFromKey("minimalist", "End"), "cyberpunk");
+  assert.equal(themeSelectionFromKey("brutalist", "Enter"), null);
+  assert.equal(themeSelectionFromKey("unknown", "ArrowRight"), "minimalist");
 });

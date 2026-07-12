@@ -79,7 +79,7 @@ export function TopologyMap({ state, accent, load, agentsById, onOpen }) {
                 <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
               </filter>
               <radialGradient id="hubCore">
-                <stop offset="0" stopColor="#12324A" /><stop offset="1" stopColor="#14112A" />
+                <stop offset="0" stopColor="var(--graph-note)" /><stop offset="1" stopColor="var(--topology-node-fill)" />
               </radialGradient>
               <radialGradient id="hubHalo">
                 <stop offset="0" stopColor={accent} stopOpacity=".28" />
@@ -117,7 +117,7 @@ export function TopologyMap({ state, accent, load, agentsById, onOpen }) {
                 </g>
               );
             })}
-            {!topology.metadata?.hasRelationships && <text x={CX} y={CY} textAnchor="middle" fill="#8E88BE" fontSize="11">No verified agent relationships yet</text>}
+            {!topology.metadata?.hasRelationships && <text x={CX} y={CY} textAnchor="middle" fill="var(--topology-muted)" fontSize="11">No verified agent relationships yet</text>}
 
             {nodes.map(({ agent, x, y, col, st }) => {
               const run = st.cls === "top-run";
@@ -139,11 +139,11 @@ export function TopologyMap({ state, accent, load, agentsById, onOpen }) {
                   {run && <g className="top-orbit"><circle r="27.5" fill="none" stroke={st.ring} strokeWidth="1.6" strokeDasharray="2 9.5" opacity=".9" /></g>}
                   {run && <circle className="top-pulse" r="24" fill="none" stroke={st.ring} strokeWidth="1.5" opacity=".8" />}
                   <circle r="24" fill="none" stroke={st.ring} strokeWidth="2.4" strokeDasharray={st.cls === "top-obs" ? "4 4" : undefined} filter="url(#topoGlow)" />
-                  <circle r="19" fill="#100E1FE6" stroke="#2A2744" strokeWidth="1" />
+                  <circle r="19" fill="var(--topology-node-fill)" stroke="var(--topology-node-border)" strokeWidth="1" />
                   <text y="6" textAnchor="middle" fontSize="16">{agent.icon || "◈"}</text>
-                  <text y="46" textAnchor="middle" fontSize="11" fill="#EEEBFF" fontFamily="Bahnschrift,sans-serif" fontWeight="600">{agent.name}</text>
+                  <text y="46" textAnchor="middle" fontSize="11" fill="var(--topology-label)" fontFamily="var(--font-heading)" fontWeight="600">{agent.name}</text>
                   <text y="59" textAnchor="middle" fontSize="8.5" fill={st.ring} fontFamily="Cascadia Mono,monospace">{st.label}</text>
-                  <text y="-37" textAnchor="middle" fontSize="8" fill="#8E88BE" fontFamily="Cascadia Mono,monospace">{agent.node || ""}</text>
+                  <text y="-37" textAnchor="middle" fontSize="8" fill="var(--topology-muted)" fontFamily="var(--font-data)">{agent.node || ""}</text>
                 </g>
               );
             })}

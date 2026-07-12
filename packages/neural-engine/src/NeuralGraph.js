@@ -5,8 +5,8 @@
         g.setLayers({link,ghost,tag,folder}); g.reheat(); g.destroy() */
 export function NeuralGraph(canvas, opts = {}) {
   const ctx = canvas.getContext("2d");
-  const PALETTE = ["#8C5BFF", "#4C9BFF", "#00E5FF", "#FFB01F", "#FF3DD8", "#3CFFC8", "#A78BFA", "#FF8A3C", "#F2E34C", "#FF4D6A"];
-  const TAG_COLOR = "#FF3DD8", GHOST_COLOR = "#8E88BE", FOLDER_COLOR = "#7C5CFF";
+  let palette = ["#8C5BFF", "#4C9BFF", "#00E5FF", "#FFB01F", "#FF3DD8", "#3CFFC8", "#A78BFA", "#FF8A3C", "#F2E34C", "#FF4D6A"];
+  let tagColor = "#FF3DD8", ghostColor = "#8E88BE", folderColorToken = "#7C5CFF", starRgb = "210,205,255";
   // per-layer physics + stroke: folders form the short stiff skeleton, links the mid web,
   // tags/ghosts long loose threads — that spread is what makes it read as tissue, not a blob
   const EDGE = {
@@ -30,15 +30,30 @@ export function NeuralGraph(canvas, opts = {}) {
   let raf = null, last = { x: 0, y: 0 }, moved = 0, dpr = 1;
   let stars = null; // offscreen starfield, rebuilt on resize
 
+  function refreshTheme() {
+    const style = getComputedStyle(canvas);
+    const token = (name, fallback) => style.getPropertyValue(name).trim() || fallback;
+    const note = token("--graph-note", "#46D9FF");
+    tagColor = token("--graph-tag", "#FF3DD8");
+    ghostColor = token("--graph-ghost", "#8E88BE");
+    folderColorToken = token("--graph-folder", "#7C5CFF");
+    starRgb = token("--graph-star", "210,205,255");
+    EDGE.link.rgb = token("--graph-link", "90,160,255");
+    palette = [note, token("--violet", "#8C5BFF"), token("--cyan", "#00E5FF"), token("--amber", "#FFB01F"), tagColor, token("--lime", "#3CFFC8"), token("--acc", "#C85CFF"), token("--red", "#FF4D6A")];
+    folderColor = new Map();
+    stars = null;
+    for (const n of nodes) n.c = nodeColor(n);
+  }
+
   function colorOf(folder) {
     const top = (folder || "").split("/")[0];
-    if (!folderColor.has(top)) folderColor.set(top, PALETTE[folderColor.size % PALETTE.length]);
+    if (!folderColor.has(top)) folderColor.set(top, palette[folderColor.size % palette.length]);
     return folderColor.get(top);
   }
   function nodeColor(n) {
-    if (n.type === "tag") return TAG_COLOR;
-    if (n.type === "ghost") return GHOST_COLOR;
-    if (n.type === "folder") return FOLDER_COLOR;
+    if (n.type === "tag") return tagColor;
+    if (n.type === "ghost") return ghostColor;
+    if (n.type === "folder") return folderColorToken;
     return colorOf(n.folder);
   }
   function nodeRadius(n) {
@@ -50,6 +65,7 @@ export function NeuralGraph(canvas, opts = {}) {
   }
 
   function setData(data) {
+    refreshTheme();
     effectTier = data.metadata?.effectTier || "full";
     folderColor = new Map();
     const old = new Map(nodes.map(n => [n.id, n]));
@@ -143,7 +159,7 @@ export function NeuralGraph(canvas, opts = {}) {
     dpr = window.devicePixelRatio || 1;
     const w = canvas.clientWidth, h = canvas.clientHeight;
     if (!w || !h) return;
-    if (canvas.width !== w * dpr || canvas.height !== h * dpr) {
+    if (!stars || canvas.width !== w * dpr || canvas.height !== h * dpr) {
       canvas.width = w * dpr; canvas.height = h * dpr;
       stars = buildStars(w, h);
     }
@@ -155,7 +171,7 @@ export function NeuralGraph(canvas, opts = {}) {
     const n = Math.round((w * h) / 6500);
     for (let i = 0; i < n; i++) {
       const r = Math.random();
-      x.fillStyle = r > 0.94 ? "rgba(140,180,255,.8)" : r > 0.85 ? "rgba(200,180,255,.55)" : "rgba(220,220,255,.28)";
+      x.fillStyle = r > 0.94 ? `rgba(${starRgb},.8)` : r > 0.85 ? `rgba(${starRgb},.55)` : `rgba(${starRgb},.28)`;
       x.beginPath(); x.arc(Math.random() * w, Math.random() * h, r > 0.9 ? 1.2 : 0.6, 0, 7); x.fill();
     }
     return c;
@@ -391,7 +407,7 @@ export function NeuralGraph(canvas, opts = {}) {
     setMode(next) { mode = next === "parity" ? "parity" : "cosmos"; applyLayers(); kick(); },
     setMotion(next) { motion = Boolean(next) && !motionQuery.matches; applyLayers(); kick(); },
     setQuery(q) { query = q || ""; kick(); },
-    reheat() { alpha = Math.max(alpha, 0.5); kick(); },
+    reheat() { refreshTheme(); alpha = Math.max(alpha, 0.5); kick(); },
     destroy() { ro.disconnect(); document.removeEventListener("visibilitychange", onVis); motionQuery.removeEventListener?.("change", onMotionPreference); if (raf) cancelAnimationFrame(raf); canvas.removeEventListener("pointerdown", onDown); canvas.removeEventListener("pointermove", onMove); canvas.removeEventListener("pointerup", onUp); canvas.removeEventListener("wheel", onWheel); },
   };
 }

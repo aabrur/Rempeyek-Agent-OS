@@ -39,3 +39,15 @@ export function accent(root = globalThis.document?.documentElement) {
   if (!root || typeof globalThis.getComputedStyle !== "function") return "#C85CFF";
   return (globalThis.getComputedStyle(root).getPropertyValue("--acc") || "#C85CFF").trim();
 }
+
+/** Resolve radiogroup navigation without coupling keyboard behavior to React. */
+export function themeSelectionFromKey(currentId, key) {
+  const ids = THEMES.map(({ id }) => id);
+  const current = ids.indexOf(normalizeTheme(currentId));
+  if (key === "Home") return ids[0];
+  if (key === "End") return ids.at(-1);
+  const delta = key === "ArrowRight" || key === "ArrowDown" ? 1
+    : key === "ArrowLeft" || key === "ArrowUp" ? -1 : 0;
+  if (!delta) return null;
+  return ids[(current + delta + ids.length) % ids.length];
+}

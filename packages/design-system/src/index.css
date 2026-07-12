@@ -1,5 +1,5 @@
 /* @rempeyek/design-system — the neural command deck stylesheet.
-   The base :root below IS the "Neural Cosmos" theme; the other 12 themes only
+   Base :root values are fallbacks; four structural modes override them and
    re-tune these tokens (see @rempeyek/theme-engine → themes.css).
    Every accent in the app flows from --acc via color-mix().
    Typography: Orbitron (hero display, falls back to Bahnschrift offline) · Cascadia Mono (data) */

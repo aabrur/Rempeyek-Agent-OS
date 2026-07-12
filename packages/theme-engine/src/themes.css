@@ -49,3 +49,162 @@
   :root { --surface-shadow:none; --surface-blur:0px; }
   .theme-sw.on { outline:3px solid Highlight; }
 }
+
+/* === Stage B structural layer ===========================================
+   Existing palette aliases are retained for compatibility. These tokens add
+   semantic purpose, layout structure, and component treatment on top. */
+:root {
+  /* primitives */
+  --theme-sans:"Segoe UI Variable","Segoe UI",system-ui,sans-serif;
+  --theme-serif:Georgia,"Times New Roman",serif;
+  --theme-grotesk:Bahnschrift,"Arial Narrow","Segoe UI",sans-serif;
+  --theme-mono:"Cascadia Mono","Cascadia Code",Consolas,monospace;
+  /* semantic */
+  --font-ui:var(--theme-sans); --font-heading:var(--theme-grotesk); --font-data:var(--theme-mono);
+  --heading-case:uppercase; --heading-tracking:.12em;
+  --surface-fill:var(--card); --surface-border:var(--line);
+  --sidebar-width:232px; --sidebar-padding:18px 14px; --page-x:30px; --page-y:26px;
+  --card-gap:14px; --card-padding:16px; --focus-size:2px; --focus-offset:3px;
+  --graph-canvas:#050310; --graph-panel:#0b0918; --graph-note:#46d9ff;
+  --graph-link:90,160,255; --graph-tag:#f45bd8; --graph-folder:#9d6bff;
+  --graph-ghost:#a39abf; --graph-star:210,205,255;
+  --topology-node-fill:#100e1f; --topology-node-border:#2a2744;
+  --topology-label:#f2edff; --topology-muted:#aaa1c5;
+}
+
+/* Warm editorial paper: open space and rules replace luminous boxes. */
+:root[data-theme="minimalist"] {
+  --acc:#805b3e; --bg:#f4efe6; --panel:#f4efe6; --card:#faf7f1; --card-hi:#eee6da; --line:#c9bdae;
+  --text:#26221d; --muted:#6f665d; --cyan:#366b76; --magenta:#865c72; --violet:#655f87;
+  --lime:#4f704d; --amber:#916c2f; --red:#9b4c49;
+  --font-heading:var(--theme-serif); --font-data:var(--theme-sans); --heading-case:none; --heading-tracking:.01em;
+  --surface-radius:2px; --control-radius:2px; --surface-border-width:0px; --surface-fill:transparent;
+  --sidebar-width:264px; --sidebar-padding:28px 24px; --page-x:clamp(24px,4vw,58px); --page-y:38px;
+  --card-gap:20px; --card-padding:18px 0;
+  --graph-canvas:#eee8de; --graph-panel:#f7f2ea; --graph-note:#4c6670;
+  --graph-link:83,96,102; --graph-tag:#76596b; --graph-folder:#665f7c; --graph-ghost:#9a9188; --graph-star:72,67,62;
+  --topology-node-fill:#f7f2ea; --topology-node-border:#95897b; --topology-label:#26221d; --topology-muted:#6f665d;
+}
+
+/* Industrial brutalism: hard geometry, thick rules, compact information. */
+:root[data-theme="brutalist"] {
+  --font-ui:Arial,Helvetica,sans-serif; --font-heading:"Arial Black",Bahnschrift,sans-serif;
+  --heading-tracking:-.025em; --surface-fill:#fffdf8;
+  --sidebar-width:218px; --sidebar-padding:16px 12px; --page-x:28px; --page-y:24px;
+  --card-gap:12px; --card-padding:14px;
+  --graph-canvas:#fff9ed; --graph-panel:#ffe358; --graph-note:#111;
+  --graph-link:23,23,23; --graph-tag:#c90076; --graph-folder:#5535c9; --graph-ghost:#68615a; --graph-star:23,23,23;
+  --topology-node-fill:#fff9ed; --topology-node-border:#171717; --topology-label:#111; --topology-muted:#514d46;
+}
+
+/* Glass: spatial translucent planes, with a solid accessibility fallback. */
+:root[data-theme="glassmorph"] {
+  --font-heading:"Segoe UI Variable Display","Segoe UI",sans-serif; --heading-case:none; --heading-tracking:.035em;
+  --surface-fill:rgba(21,42,68,.64);
+  --sidebar-width:250px; --sidebar-padding:22px 16px; --page-x:34px; --page-y:30px;
+  --card-gap:16px; --card-padding:18px;
+  --graph-canvas:#07111f; --graph-panel:rgba(12,27,47,.8); --graph-note:#7dd3fc;
+  --graph-link:125,211,252; --graph-tag:#e09bff; --graph-folder:#a5b4fc; --graph-ghost:#9fb5cb; --graph-star:205,232,255;
+  --topology-node-fill:#0c1b2f; --topology-node-border:#426482; --topology-label:#f7fbff; --topology-muted:#b3c5d8;
+}
+
+/* Cyberpunk: calm solid cosmos; light is reserved for active/live state. */
+:root[data-theme="cyberpunk"] {
+  --surface-fill:rgba(20,16,46,.86); --graph-canvas:#050310; --graph-panel:#0b0918;
+}
+
+/* component token application */
+:root[data-theme] body { font-family:var(--font-ui); }
+:root[data-theme] :is(.page-head h1,.brand-name,.graph-title,.ws-hero-name,.agent-name,.tile-val,.topo-big) {
+  font-family:var(--font-heading); letter-spacing:var(--heading-tracking); text-transform:var(--heading-case);
+}
+:root[data-theme] :is(.side-label,.brand-sub,.section-label,.tile-top,.graph-stats,.topo-h,.detail-meta,.theme-name) { font-family:var(--font-data); }
+:root[data-theme] .sidebar { width:var(--sidebar-width); padding:var(--sidebar-padding); }
+:root[data-theme] .main { padding:var(--page-y) var(--page-x) 60px; }
+:root[data-theme] :is(.tiles,.agent-row,.two-col,.ws-grid,.today-context,.report-grid) { gap:var(--card-gap); }
+:root[data-theme] :is(.tile,.panel,.agent-card,.ws-card,.gw-menu,.token-box,.detail,.aa-box,.today-panel,.approval-queue) {
+  border-color:var(--surface-border); background:var(--surface-fill);
+}
+:root[data-theme] :is(button,a,input,select,textarea,[tabindex]):focus-visible {
+  outline:var(--focus-size) solid var(--acc); outline-offset:var(--focus-offset);
+}
+:root[data-theme] .graph-wrap { background:var(--graph-canvas); border-radius:var(--surface-radius); }
+:root[data-theme] .topology-panel { border-radius:var(--surface-radius); background:var(--graph-panel); }
+:root[data-theme] .theme-sw:focus-visible { outline:3px solid var(--acc); outline-offset:3px; }
+
+/* Minimalist component structure */
+:root[data-theme="minimalist"] :is(.bg-grid,.bg-glow) { display:none; }
+:root[data-theme="minimalist"] .sidebar { background:var(--bg); border-right:1px solid var(--line); }
+:root[data-theme="minimalist"] .brand { border-bottom:1px solid var(--line); }
+:root[data-theme="minimalist"] .brand-mark { border:0; clip-path:none; box-shadow:none; width:28px; }
+:root[data-theme="minimalist"] .nav-item { border:0; border-bottom:1px solid transparent; border-radius:0; padding:11px 2px; font-family:var(--font-ui); letter-spacing:0; }
+:root[data-theme="minimalist"] .nav-item:is(:hover,.active) { background:none; color:var(--text); border-bottom-color:var(--text); text-shadow:none; }
+:root[data-theme="minimalist"] :is(.page-head h1,.ws-hero-name) { background:none; filter:none; -webkit-text-fill-color:currentColor; color:var(--text); }
+:root[data-theme="minimalist"] :is(.tile,.panel,.agent-card,.ws-card,.today-panel) { border-top:1px solid var(--line); border-bottom:0; padding:var(--card-padding); }
+:root[data-theme="minimalist"] :is(.tile::before,.ws-hero::before,.topology-panel::before) { display:none; }
+:root[data-theme="minimalist"] :is(.tile-val,.section-label,.brand-mark) { text-shadow:none; box-shadow:none; }
+:root[data-theme="minimalist"] .ws-hero { border:0; border-left:3px solid var(--acc); border-radius:0; padding:8px 0 8px 24px; background:transparent; box-shadow:none; }
+:root[data-theme="minimalist"] :is(.topology-panel,.topo-box,.topo-legend) { background:transparent; box-shadow:none; border-color:var(--line); }
+
+/* Brutalist component structure */
+:root[data-theme="brutalist"] .sidebar { background:var(--card-hi); border-right:3px solid var(--line); }
+:root[data-theme="brutalist"] .brand { border-bottom:3px solid var(--line); }
+:root[data-theme="brutalist"] .brand-mark { color:var(--text); border:3px solid var(--line); clip-path:none; box-shadow:3px 3px 0 var(--acc); }
+:root[data-theme="brutalist"] .nav-item { border:2px solid transparent; padding:8px; font-family:var(--font-heading); letter-spacing:-.02em; }
+:root[data-theme="brutalist"] .nav-item:is(:hover,.active) { color:#fff; background:#111; border-color:#111; text-shadow:none; }
+:root[data-theme="brutalist"] :is(.page-head h1,.ws-hero-name) { background:none; filter:none; -webkit-text-fill-color:currentColor; color:var(--text); }
+:root[data-theme="brutalist"] .page-head { border-bottom:4px solid var(--line); padding-bottom:12px; }
+:root[data-theme="brutalist"] :is(.tile,.panel,.agent-card,.ws-card,.ws-hero,.topo-box,.topo-legend,.topology-panel,.graph-wrap) { backdrop-filter:none; background:var(--surface-fill); }
+:root[data-theme="brutalist"] :is(.tile::before,.ws-hero::before,.topology-panel::before) { background:var(--line); box-shadow:none; }
+:root[data-theme="brutalist"] :is(.tile-val,.section-label,.brand-mark,.rep-stat .v) { text-shadow:none; }
+:root[data-theme="brutalist"] :is(.btn,.lyr,.chip) { box-shadow:2px 2px 0 var(--line); font-family:var(--font-heading); }
+:root[data-theme="brutalist"] :is(.btn,.lyr,.chip):active { box-shadow:none; transform:translate(2px,2px); }
+
+/* Glass component structure */
+:root[data-theme="glassmorph"] body { background:radial-gradient(circle at 75% 5%,#17395a 0,transparent 38%),radial-gradient(circle at 8% 92%,#252552 0,transparent 36%),var(--bg); }
+:root[data-theme="glassmorph"] .sidebar { background:rgba(8,22,39,.74); border-right:1px solid rgba(189,224,255,.28); backdrop-filter:blur(24px); }
+:root[data-theme="glassmorph"] .nav-item { border-radius:14px; }
+:root[data-theme="glassmorph"] .nav-item.active { background:rgba(125,211,252,.13); border:1px solid rgba(189,224,255,.28); border-left-color:var(--acc); text-shadow:none; }
+:root[data-theme="glassmorph"] :is(.page-head h1,.ws-hero-name) { filter:none; }
+:root[data-theme="glassmorph"] :is(.ws-hero,.topology-panel,.graph-wrap) { box-shadow:0 28px 80px rgba(0,0,0,.28),inset 0 1px rgba(255,255,255,.1); }
+
+/* Restrained Cosmos component structure */
+:root[data-theme="cyberpunk"] .sidebar { background:linear-gradient(180deg,rgba(13,10,32,.96),rgba(7,5,19,.98)); }
+:root[data-theme="cyberpunk"] :is(.page-head h1,.ws-hero-name) { filter:none; }
+:root[data-theme="cyberpunk"] :is(.panel,.tile,.agent-card,.ws-card,.topo-box,.topo-legend) { background:var(--surface-fill); backdrop-filter:blur(4px); }
+:root[data-theme="cyberpunk"] :is(.nav-item.active,.theme-sw.on,.btn-primary:focus-visible) { text-shadow:0 0 10px color-mix(in srgb,var(--acc) 34%,transparent); }
+
+/* responsive structural gates */
+@media (max-width:1280px) {
+  :root[data-theme] { --sidebar-width:216px; --page-x:22px; --page-y:22px; --card-gap:12px; }
+  :root[data-theme] .topo-grid { grid-template-columns:180px minmax(360px,1fr) 210px; }
+}
+@media (max-width:768px) {
+  :root[data-theme] { --page-x:16px; --page-y:18px; }
+  :root[data-theme] .sidebar { position:sticky; top:0; z-index:80; padding:10px 12px; border-right:0; border-bottom:1px solid var(--line); }
+  :root[data-theme] .brand { padding:0 8px 0 0; border-bottom:0; }
+  :root[data-theme] #nav { flex-wrap:nowrap; overflow-x:auto; max-width:100%; }
+  :root[data-theme] .nav-item { flex:0 0 auto; width:auto; white-space:nowrap; }
+  :root[data-theme] .theme-pick { margin-left:auto; grid-template-columns:repeat(4,34px); gap:5px; padding:0; }
+  :root[data-theme] .theme-sw-label,:root[data-theme] .theme-name { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
+  :root[data-theme] :is(.graph-bar,.approval-head,.section-row) { align-items:flex-start; }
+  :root[data-theme] .graph-search { width:min(100%,260px); }
+}
+@media (max-width:390px) {
+  :root[data-theme] { --page-x:12px; --page-y:14px; --card-gap:10px; }
+  :root[data-theme] .sidebar { display:grid; grid-template-columns:auto 1fr; }
+  :root[data-theme] .brand-sub,:root[data-theme] .brand-mark { display:none; }
+  :root[data-theme] #nav { grid-column:1 / -1; order:3; }
+  :root[data-theme] .nav-item { padding:8px 9px; font-size:11px; }
+  :root[data-theme] .theme-pick { grid-template-columns:repeat(4,28px); }
+  :root[data-theme] :is(.task-form,.detail-head,.approval-actions,.rep-head-stats) { flex-direction:column; align-items:stretch; }
+  :root[data-theme] .detail-actions { margin-left:0; }
+}
+@media (prefers-reduced-transparency:reduce) {
+  :root[data-theme="glassmorph"] { --panel:#0c1b2f; --card:#152a44; --card-hi:#274669; --surface-fill:#152a44; --surface-blur:0px; }
+}
+@media (prefers-reduced-motion:reduce) {
+  :root[data-theme] * { scroll-behavior:auto; }
+  :root[data-theme] :is(.theme-sw,.nav-item,.btn,.ws-card) { transition:none; }
+}
+@media (prefers-contrast:more) { :root { --surface-shadow:none; --focus-size:3px; } }
