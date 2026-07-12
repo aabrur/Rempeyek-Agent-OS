@@ -3,6 +3,26 @@
    API: const g = NeuralGraph(canvas, {onOpen});
         g.setData({nodes,edges,stats}); g.setQuery(q);
         g.setLayers({link,ghost,tag,folder}); g.reheat(); g.destroy() */
+export function resolveGraphPalette(readToken = (_name, fallback) => fallback) {
+  const nodes = {
+    note: readToken("--graph-note", "#46D9FF"),
+    tag: readToken("--graph-tag", "#FF3DD8"),
+    ghost: readToken("--graph-ghost", "#8E88BE"),
+    folder: readToken("--graph-folder", "#7C5CFF"),
+  };
+  return {
+    nodes,
+    edges: {
+      link: readToken("--graph-edge-link", "90,160,255"),
+      ghost: readToken("--graph-edge-ghost", "160,140,255"),
+      tag: readToken("--graph-edge-tag", "255,61,216"),
+      folder: readToken("--graph-edge-folder", "124,92,255"),
+    },
+    starRgb: readToken("--graph-star", "210,205,255"),
+    folderPalette: [nodes.note, readToken("--violet", "#8C5BFF"), readToken("--cyan", "#00E5FF"), readToken("--amber", "#FFB01F"), nodes.tag, readToken("--lime", "#3CFFC8"), readToken("--acc", "#C85CFF"), readToken("--red", "#FF4D6A")],
+  };
+}
+
 export function NeuralGraph(canvas, opts = {}) {
   const ctx = canvas.getContext("2d");
   let palette = ["#8C5BFF", "#4C9BFF", "#00E5FF", "#FFB01F", "#FF3DD8", "#3CFFC8", "#A78BFA", "#FF8A3C", "#F2E34C", "#FF4D6A"];
@@ -33,13 +53,13 @@ export function NeuralGraph(canvas, opts = {}) {
   function refreshTheme() {
     const style = getComputedStyle(canvas);
     const token = (name, fallback) => style.getPropertyValue(name).trim() || fallback;
-    const note = token("--graph-note", "#46D9FF");
-    tagColor = token("--graph-tag", "#FF3DD8");
-    ghostColor = token("--graph-ghost", "#8E88BE");
-    folderColorToken = token("--graph-folder", "#7C5CFF");
-    starRgb = token("--graph-star", "210,205,255");
-    EDGE.link.rgb = token("--graph-link", "90,160,255");
-    palette = [note, token("--violet", "#8C5BFF"), token("--cyan", "#00E5FF"), token("--amber", "#FFB01F"), tagColor, token("--lime", "#3CFFC8"), token("--acc", "#C85CFF"), token("--red", "#FF4D6A")];
+    const resolved = resolveGraphPalette(token);
+    tagColor = resolved.nodes.tag;
+    ghostColor = resolved.nodes.ghost;
+    folderColorToken = resolved.nodes.folder;
+    starRgb = resolved.starRgb;
+    palette = resolved.folderPalette;
+    for (const type of Object.keys(EDGE)) EDGE[type].rgb = resolved.edges[type];
     folderColor = new Map();
     stars = null;
     for (const n of nodes) n.c = nodeColor(n);

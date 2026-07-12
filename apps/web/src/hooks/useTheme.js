@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { applyTheme, readTheme, accent } from "@rempeyek/theme-engine";
+import { activateTheme, readTheme } from "@rempeyek/theme-engine";
 
 /** Theme state + the live accent, so JS-drawn SVG/canvas re-reads --acc on switch. */
 export function useTheme(onChange) {
@@ -7,14 +7,20 @@ export function useTheme(onChange) {
   const [acc, setAcc] = useState("#00E5FF");
 
   useEffect(() => {
-    applyTheme(theme);
+    const activated = activateTheme(theme);
     // read AFTER the attribute lands so the new theme's --acc is what we get
     const id = requestAnimationFrame(() => {
-      setAcc(accent());
+      setAcc(activated.accent);
       onChange?.();
     });
     return () => cancelAnimationFrame(id);
   }, [theme, onChange]);
 
-  return { theme, accent: acc, setTheme: useCallback(id => setTheme(id), []) };
+  const selectTheme = useCallback(id => {
+    const activated = activateTheme(id);
+    setAcc(activated.accent);
+    setTheme(activated.theme);
+  }, []);
+
+  return { theme, accent: acc, setTheme: selectTheme };
 }

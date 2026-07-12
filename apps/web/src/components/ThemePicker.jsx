@@ -14,7 +14,7 @@ export function ThemePicker({ theme, onPick }) {
 
   return (
     <>
-      <div className="side-label" id="theme-picker-label">APPEARANCE</div>
+      <div className="side-label">APPEARANCE</div>
       <div className="theme-pick" role="radiogroup" aria-label="Appearance theme">
         {THEMES.map((t, index) => (
           <button type="button" key={t.id}

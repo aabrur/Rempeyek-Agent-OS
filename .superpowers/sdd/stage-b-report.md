@@ -92,3 +92,23 @@ Full verification before report/commit:
 ## Remaining browser verification
 
 The Node harness verifies theme registry, persistence, normalization, and keyboard selection logic. It does not render CSS or React focus movement. Browser screenshot review is still required at 1440×900, 1280×800, 768×1024, and 390×844, including grayscale comparison and `prefers-reduced-transparency`. This is a release-verification concern, not evidence to claim pixel-perfect Stage A reference fidelity.
+
+## Review fixes
+
+Follow-up review identified cascade and renderer synchronization ambiguity. The corrective patch makes the following contracts authoritative:
+
+- Responsive rules now cascade in explicit order: `1280px` → `1000px` → `768px` → `390px`. At every collapsed width (`<=1000px`), the sidebar is explicitly `width: 100%` and topology is explicitly one column, so the broader 1280px rule cannot restore a narrow sidebar or three-column topology.
+- `activateTheme()` applies the canonical `data-theme` value before reading the computed accent. The theme-selection callback calls it synchronously before React publishes the new theme state, guaranteeing that Canvas `reheat()` observes the new CSS variables rather than the previous theme.
+- `resolveGraphPalette()` is a pure contract that resolves node colors and separate `link`, `ghost`, `tag`, and `folder` edge colors. The Canvas applies all four values on initial data and every theme reheat.
+- SVG glow is class/token controlled. Only flowing edges and active rings receive the semantic `top-glow` class. Minimalist and Brutalist resolve the filter to `none`, suppress hover drop-shadows, and remove the outer node halo. Glassmorph and Cyberpunk retain active-state glow.
+- Duplicate early theme blocks were removed. `themes.css` now has one token block per canonical theme and one shared accessibility/focus owner; the duplicate ThemePicker focus rule was removed from the base design stylesheet.
+- Minimalist preview metadata now matches the implemented warm-paper theme (`#805B3E` on `#F4EFE6`).
+
+### Review-fix tests
+
+- TDD red state: focused tests failed because `activateTheme` and `resolveGraphPalette` did not yet exist.
+- Focused green state: 9/9 passed.
+- Final `npm test`: 35/35 passed, 0 failures.
+- Final `npm run build`: passed; Vite transformed 54 modules.
+- Final `git diff --check`: passed.
+- Static CSS contract: 93 balanced blocks, authoritative responsive order, and four distinct edge-token roles.

@@ -607,7 +607,6 @@ body {
 }
 .theme-sw:hover { border-color: var(--sw); transform: translateY(-1px); }
 .theme-sw.on { border-color: var(--sw); box-shadow: 0 0 10px color-mix(in srgb, var(--sw) 55%, transparent); }
-.theme-sw:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
 .theme-sw-label { display: block; padding: 19px 5px 4px; color: var(--text); font: 7px/1.1 var(--mono); text-transform: uppercase; letter-spacing: .04em; }
 .theme-name {
   font-family: var(--mono); font-size: 9px; letter-spacing: .14em; color: var(--acc);

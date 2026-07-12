@@ -109,11 +109,11 @@ export function TopologyMap({ state, accent, load, agentsById, onOpen }) {
               return (
                 <g key={`${edge.type}-${edge.provenance.source}-${edge.provenance.id}`}>
                   <path
-                    className={edge.flowing ? "top-link-run" : "top-link"} d={d} fill="none"
+                    className={`${edge.flowing ? "top-link-run" : "top-link"}${edge.flowing ? " top-glow" : ""}`} d={d} fill="none"
                     stroke={agentAccent(a.agent)} strokeWidth={edge.flowing ? 2 : 1.1}
-                    opacity={edge.flowing ? .95 : .55} filter="url(#topoGlow)"
+                    opacity={edge.flowing ? .95 : .55}
                   />
-                  {edge.flowing && <circle className="top-flow-dot" r="2.6" fill={agentAccent(b.agent)} opacity=".95" filter="url(#topoGlow)"><animateMotion dur={`${2.2 + i * 0.2}s`} repeatCount="indefinite" path={d} /></circle>}
+                  {edge.flowing && <circle className="top-flow-dot top-glow" r="2.6" fill={agentAccent(b.agent)} opacity=".95"><animateMotion dur={`${2.2 + i * 0.2}s`} repeatCount="indefinite" path={d} /></circle>}
                 </g>
               );
             })}
@@ -133,12 +133,12 @@ export function TopologyMap({ state, accent, load, agentsById, onOpen }) {
                   onClick={() => onOpen(agent.id)}
                   onKeyDown={event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onOpen(agent.id); } }}
                 >
-                  <circle r="52" fill={`url(#ng-${agent.id})`} />
+                  <circle className="top-node-halo" r="52" fill={`url(#ng-${agent.id})`} />
                   {run && <circle className="top-shock" r="26" fill="none" stroke={st.ring} strokeWidth="1.2" />}
                   <circle r="31" fill="none" stroke={col} strokeWidth="1" opacity=".28" />
                   {run && <g className="top-orbit"><circle r="27.5" fill="none" stroke={st.ring} strokeWidth="1.6" strokeDasharray="2 9.5" opacity=".9" /></g>}
                   {run && <circle className="top-pulse" r="24" fill="none" stroke={st.ring} strokeWidth="1.5" opacity=".8" />}
-                  <circle r="24" fill="none" stroke={st.ring} strokeWidth="2.4" strokeDasharray={st.cls === "top-obs" ? "4 4" : undefined} filter="url(#topoGlow)" />
+                  <circle className={run ? "top-glow" : undefined} r="24" fill="none" stroke={st.ring} strokeWidth="2.4" strokeDasharray={st.cls === "top-obs" ? "4 4" : undefined} />
                   <circle r="19" fill="var(--topology-node-fill)" stroke="var(--topology-node-border)" strokeWidth="1" />
                   <text y="6" textAnchor="middle" fontSize="16">{agent.icon || "◈"}</text>
                   <text y="46" textAnchor="middle" fontSize="11" fill="var(--topology-label)" fontFamily="var(--font-heading)" fontWeight="600">{agent.name}</text>

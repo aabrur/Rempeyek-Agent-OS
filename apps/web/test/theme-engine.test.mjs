@@ -1,9 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { DEFAULT_THEME, THEMES, applyTheme, normalizeTheme, readTheme, themeSelectionFromKey } from "../../../packages/theme-engine/src/themes.js";
+import { DEFAULT_THEME, THEMES, activateTheme, applyTheme, normalizeTheme, readTheme, themeSelectionFromKey } from "../../../packages/theme-engine/src/themes.js";
 
 test("registry exposes exactly the four approved structural modes", () => {
   assert.deepEqual(THEMES.map(({ id }) => id), ["minimalist", "brutalist", "glassmorph", "cyberpunk"]);
+  assert.deepEqual(THEMES.find(({ id }) => id === "minimalist"), {
+    id: "minimalist", name: "Minimalist", description: "Calm, quiet, and content-first", sw: "#805B3E", bg: "#F4EFE6",
+  });
 });
 test("unknown and malformed persisted values fail safely", () => {
   assert.equal(normalizeTheme(undefined), DEFAULT_THEME);
@@ -23,6 +26,15 @@ test("applyTheme applies and persists one canonical ID", () => {
   const result = applyTheme("quantum-glass", root, { setItem: (...args) => writes.push(args) });
   assert.equal(result, "glassmorph"); assert.equal(root.dataset.theme, "glassmorph");
   assert.deepEqual(writes, [["aos-theme", "glassmorph"]]);
+});
+
+test("theme activation applies the canonical attribute before reading its accent", () => {
+  const root = { dataset: {} };
+  const activated = activateTheme("minimalist", root, { setItem() {} }, currentRoot => {
+    assert.equal(currentRoot.dataset.theme, "minimalist");
+    return "#805B3E";
+  });
+  assert.deepEqual(activated, { theme: "minimalist", accent: "#805B3E" });
 });
 
 test("theme keyboard navigation follows radiogroup order and wraps", () => {
