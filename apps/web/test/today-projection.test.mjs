@@ -31,6 +31,28 @@ test("accepts numeric filesystem timestamps when selecting the current project",
   assert.equal(result.project.id, "newer");
 });
 
+test("preserves recent output from the production project projection", () => {
+  const result = buildTodayProjection([{
+    id: "apollo", status: "active", updatedAt: 2000,
+    recentArtifacts: [{ path: "Projects/apollo/output.md", updatedAt: 1900 }],
+  }]);
+  assert.deepEqual(result.recentArtifacts, [
+    { path: "Projects/apollo/output.md", updatedAt: 1900 },
+  ]);
+});
+
+test("orders equal-priority tasks by status and stable id", () => {
+  const result = buildTodayProjection([{
+    id: "apollo", status: "active", updatedAt: 2000,
+    tasks: [
+      { id: "a-task", title: "A", status: "pending", priority: 1 },
+      { id: "z-task", title: "Z", status: "pending", priority: 1 },
+      { id: "blocked", title: "Blocked", status: "blocked", priority: 1 },
+    ],
+  }]);
+  assert.deepEqual(result.unfinishedTasks.map(task => task.id), ["a-task", "z-task", "blocked"]);
+});
+
 test("returns an explicit empty state", () => {
   assert.deepEqual(buildTodayProjection([]), { state: "empty", project: null, unfinishedTasks: [], unresolvedDecisions: [], recentArtifacts: [], nextAction: null });
 });

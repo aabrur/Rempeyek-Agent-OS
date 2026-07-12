@@ -64,21 +64,29 @@ export function PageHead({ title, children }) {
 }
 
 /** Full-screen overlay (token login, add-agent). Click the backdrop to close. */
-export function Overlay({ open, onClose, boxClass = "", children }) {
+export function Overlay({ open, onClose, boxClass = "", labelledBy, label, children }) {
   const boxRef = useRef(null);
   const returnFocusRef = useRef(null);
   useEffect(() => {
     if (!open) return undefined;
     returnFocusRef.current = document.activeElement;
     boxRef.current?.focus();
-    const onKeyDown = event => { if (event.key === "Escape" && onClose) onClose(); };
+    const onKeyDown = event => {
+      if (event.key === "Escape" && onClose) { onClose(); return; }
+      if (event.key !== "Tab" || !boxRef.current) return;
+      const focusable = [...boxRef.current.querySelectorAll('a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])')];
+      if (!focusable.length) { event.preventDefault(); boxRef.current.focus(); return; }
+      const first = focusable[0], last = focusable.at(-1), active = document.activeElement;
+      if (event.shiftKey && (active === first || !boxRef.current.contains(active))) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && active === last) { event.preventDefault(); first.focus(); }
+    };
     document.addEventListener("keydown", onKeyDown);
     return () => { document.removeEventListener("keydown", onKeyDown); returnFocusRef.current?.focus?.(); };
   }, [open]);
   if (!open) return null;
   return (
     <div className="token-ov" onClick={e => { if (e.target === e.currentTarget && onClose) onClose(); }}>
-      <div ref={boxRef} role="dialog" aria-modal="true" tabIndex={-1} className={`token-box ${boxClass}`.trim()}>{children}</div>
+      <div ref={boxRef} role="dialog" aria-modal="true" aria-labelledby={labelledBy} aria-label={label} tabIndex={-1} className={`token-box ${boxClass}`.trim()}>{children}</div>
     </div>
   );
 }
