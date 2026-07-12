@@ -4,6 +4,7 @@
         g.setData({nodes,edges,stats}); g.setQuery(q);
         g.setLayers({link,ghost,tag,folder}); g.reheat(); g.destroy() */
 export function resolveGraphPalette(readToken = (_name, fallback) => fallback) {
+  const effectEnabled = (name, fallback = true) => !["0", "false", "off", "none", "no"].includes(String(readToken(name, fallback ? "1" : "0")).trim().toLowerCase());
   const nodes = {
     note: readToken("--graph-note", "#46D9FF"),
     tag: readToken("--graph-tag", "#FF3DD8"),
@@ -20,6 +21,22 @@ export function resolveGraphPalette(readToken = (_name, fallback) => fallback) {
     },
     starRgb: readToken("--graph-star", "210,205,255"),
     folderPalette: [nodes.note, readToken("--violet", "#8C5BFF"), readToken("--cyan", "#00E5FF"), readToken("--amber", "#FFB01F"), nodes.tag, readToken("--lime", "#3CFFC8"), readToken("--acc", "#C85CFF"), readToken("--red", "#FF4D6A")],
+    foreground: {
+      label: readToken("--graph-label", "rgba(220,214,255,.75)"),
+      folderLabel: readToken("--graph-label-folder", "rgba(190,175,255,.9)"),
+      hoverLabel: readToken("--graph-label-hover", "#EEEBFF"),
+      meta: readToken("--graph-meta", "#8E88BE"),
+      core: readToken("--graph-core", "rgba(255,255,255,.85)"),
+      particle: readToken("--graph-particle", "#8CC8FF"),
+      particleGlow: readToken("--graph-particle-glow", "#4C9BFF"),
+      edgeHighlight: readToken("--graph-edge-highlight", "0,229,255"),
+      wave: readToken("--graph-wave", "255,255,255"),
+    },
+    effects: {
+      glow: effectEnabled("--graph-effect-glow"),
+      halo: effectEnabled("--graph-effect-halo"),
+      shadow: effectEnabled("--graph-effect-shadow"),
+    },
   };
 }
 
@@ -27,6 +44,7 @@ export function NeuralGraph(canvas, opts = {}) {
   const ctx = canvas.getContext("2d");
   let palette = ["#8C5BFF", "#4C9BFF", "#00E5FF", "#FFB01F", "#FF3DD8", "#3CFFC8", "#A78BFA", "#FF8A3C", "#F2E34C", "#FF4D6A"];
   let tagColor = "#FF3DD8", ghostColor = "#8E88BE", folderColorToken = "#7C5CFF", starRgb = "210,205,255";
+  let foreground = resolveGraphPalette().foreground, effects = resolveGraphPalette().effects;
   // per-layer physics + stroke: folders form the short stiff skeleton, links the mid web,
   // tags/ghosts long loose threads — that spread is what makes it read as tissue, not a blob
   const EDGE = {
@@ -59,9 +77,12 @@ export function NeuralGraph(canvas, opts = {}) {
     folderColorToken = resolved.nodes.folder;
     starRgb = resolved.starRgb;
     palette = resolved.folderPalette;
+    foreground = resolved.foreground;
+    effects = resolved.effects;
     for (const type of Object.keys(EDGE)) EDGE[type].rgb = resolved.edges[type];
     folderColor = new Map();
     stars = null;
+    if (!effects.glow) waves = [];
     for (const n of nodes) n.c = nodeColor(n);
   }
 
@@ -222,7 +243,7 @@ export function NeuralGraph(canvas, opts = {}) {
     const now = performance.now();
 
     // plasma halos under the strongest hubs — breathing glow that follows real degree
-    for (const n of nodes) {
+    if (effects.halo) for (const n of nodes) {
       const degree = n.degree ?? n.deg ?? 0;
       if (mode !== "cosmos" || effectTier !== "full" || n.hidden || degree < 8 || n.type === "ghost") continue;
       const s = toScreen(n);
@@ -237,7 +258,7 @@ export function NeuralGraph(canvas, opts = {}) {
     }
 
     // neural firing: a random hub emits a shockwave every few seconds; clicks fire one too
-    if (motion && mode === "cosmos" && effectTier === "full" && now - lastAuto > 3400) {
+    if (effects.glow && motion && mode === "cosmos" && effectTier === "full" && now - lastAuto > 3400) {
       const hubs = nodes.filter(n => !n.hidden && (n.degree ?? n.deg ?? 0) >= 8 && n.type !== "ghost");
       if (hubs.length) {
         const n = hubs[(Math.random() * hubs.length) | 0];
@@ -257,10 +278,10 @@ export function NeuralGraph(canvas, opts = {}) {
       ctx.strokeStyle = wv.n.c;
       ctx.globalAlpha = fade;
       ctx.lineWidth = 1.6 * (1 - t) + 0.4;
-      ctx.shadowColor = wv.n.c; ctx.shadowBlur = 12 * (1 - t);
+      if (effects.shadow) { ctx.shadowColor = wv.n.c; ctx.shadowBlur = 12 * (1 - t); }
       ctx.beginPath(); ctx.arc(s.x, s.y, R, 0, 7); ctx.stroke();
       ctx.globalAlpha = fade * 0.7;
-      ctx.strokeStyle = "rgba(255,255,255,.8)";
+      ctx.strokeStyle = `rgba(${foreground.wave},.8)`;
       ctx.lineWidth = 0.6;
       ctx.shadowBlur = 0;
       ctx.beginPath(); ctx.arc(s.x, s.y, R * 0.86, 0, 7); ctx.stroke();
@@ -275,7 +296,7 @@ export function NeuralGraph(canvas, opts = {}) {
       if (Math.max(A.x, B.x) < -40 || Math.max(A.y, B.y) < -40 || Math.min(A.x, B.x) > w + 40 || Math.min(A.y, B.y) > h + 40) continue;
       const hot = hover && (e.a === hover || e.b === hover);
       const dim = hover && !hot;
-      ctx.strokeStyle = hot ? "rgba(0,229,255,.75)" : `rgba(${st.rgb},${dim ? st.a * 0.35 : st.a})`;
+      ctx.strokeStyle = hot ? `rgba(${foreground.edgeHighlight},.75)` : `rgba(${st.rgb},${dim ? st.a * 0.35 : st.a})`;
       ctx.lineWidth = hot ? 1.6 : st.w;
       ctx.setLineDash(st.dash || []);
       const mx = (A.x + B.x) / 2 - (B.y - A.y) * st.curve;
@@ -292,10 +313,12 @@ export function NeuralGraph(canvas, opts = {}) {
         const A = toScreen(p.e.a), B = toScreen(p.e.b);
         const pt = bez(A, B, EDGE.link.curve, p.t);
         if (pt.x < 0 || pt.y < 0 || pt.x > w || pt.y > h) continue;
-        ctx.fillStyle = "rgba(140,200,255,.9)";
-        ctx.shadowColor = "#4C9BFF"; ctx.shadowBlur = 6;
+        ctx.fillStyle = foreground.particle;
+        ctx.globalAlpha = .9;
+        if (effects.shadow) { ctx.shadowColor = foreground.particleGlow; ctx.shadowBlur = 6; }
         ctx.beginPath(); ctx.arc(pt.x, pt.y, 1.3, 0, 7); ctx.fill();
         ctx.shadowBlur = 0;
+        ctx.globalAlpha = 1;
       }
     }
 
@@ -307,8 +330,10 @@ export function NeuralGraph(canvas, opts = {}) {
       const dim = (q && !match) || (hover && !neighbors.has(n));
       const r = n.r * cam.z * (n === hover ? 1.35 : 1);
       ctx.globalAlpha = dim ? 0.13 : (n.type === "ghost" ? 0.55 : 1);
-      ctx.shadowColor = n.c;
-      ctx.shadowBlur = mode === "parity" || dim ? 0 : (n === hover || match ? 26 : (n.degree ?? n.deg ?? 0) >= 8 ? 18 : 10);
+      if (effects.shadow) {
+        ctx.shadowColor = n.c;
+        ctx.shadowBlur = mode === "parity" || dim ? 0 : (n === hover || match ? 26 : (n.degree ?? n.deg ?? 0) >= 8 ? 18 : 10);
+      } else ctx.shadowBlur = 0;
 
       if (n.type === "folder") {
         ctx.strokeStyle = n.c; ctx.lineWidth = 1.4;
@@ -323,7 +348,7 @@ export function NeuralGraph(canvas, opts = {}) {
         ctx.beginPath(); ctx.arc(s.x, s.y, Math.max(r, 1.5), 0, 7); ctx.fill();
         if (!dim && n.type === "note") { // bright core = the "neuron soma" read
           ctx.shadowBlur = 0;
-          ctx.fillStyle = "rgba(255,255,255,.85)";
+          ctx.fillStyle = foreground.core;
           ctx.beginPath(); ctx.arc(s.x, s.y, Math.max(r * 0.38, 0.8), 0, 7); ctx.fill();
         }
       }
@@ -332,7 +357,7 @@ export function NeuralGraph(canvas, opts = {}) {
       const showLabel = n === hover || match || (cam.z > 0.9 && (n.degree ?? n.deg ?? 0) >= 3) || cam.z > 1.6 || (n.type === "folder" && cam.z > 0.55);
       if (showLabel && !dim) {
         ctx.font = `${n.type === "folder" ? "600 " : ""}${Math.max(10, 10.5 * Math.min(cam.z, 1.4))}px Cascadia Mono, monospace`;
-        ctx.fillStyle = n === hover ? "#EEEBFF" : n.type === "folder" ? "rgba(190,175,255,.9)" : "rgba(220,214,255,.75)";
+        ctx.fillStyle = n === hover ? foreground.hoverLabel : n.type === "folder" ? foreground.folderLabel : foreground.label;
         ctx.textAlign = "center";
         const lbl = n.type === "folder" ? n.label.toUpperCase() : n.label;
         ctx.fillText(lbl.length > 26 ? lbl.slice(0, 25) + "…" : lbl, s.x, s.y + r + 12);
@@ -341,7 +366,7 @@ export function NeuralGraph(canvas, opts = {}) {
     }
     if (hover) {
       ctx.font = "10px Cascadia Mono, monospace";
-      ctx.fillStyle = "#8E88BE"; ctx.textAlign = "left";
+      ctx.fillStyle = foreground.meta; ctx.textAlign = "left";
       ctx.fillText(hover.id, 12, h - 28);
     }
   }
@@ -395,7 +420,7 @@ export function NeuralGraph(canvas, opts = {}) {
   function onUp(e) {
     canvas.classList.remove("grabbing");
     if (dragNode && moved < 5) {
-      if (motion && mode === "cosmos") waves.push({ n: dragNode, r: 0, max: 60 + (dragNode.degree ?? dragNode.deg ?? 0) * 4, born: performance.now() });
+      if (effects.glow && motion && mode === "cosmos") waves.push({ n: dragNode, r: 0, max: 60 + (dragNode.degree ?? dragNode.deg ?? 0) * 4, born: performance.now() });
       // only real notes open in Obsidian — ghost/tag/folder nodes have no file behind them
       if (opts.onOpen && dragNode.type === "note") opts.onOpen(dragNode);
     }

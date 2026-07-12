@@ -19,6 +19,10 @@
   --graph-tag:#f45bd8; --graph-folder:#9d6bff;
   --graph-ghost:#a39abf; --graph-star:210,205,255;
   --graph-edge-link:90,160,255; --graph-edge-ghost:160,140,255; --graph-edge-tag:255,61,216; --graph-edge-folder:124,92,255;
+  --graph-label:rgba(220,214,255,.78); --graph-label-folder:rgba(200,188,255,.92); --graph-label-hover:#f2edff; --graph-meta:#a39abf;
+  --graph-core:rgba(255,255,255,.86); --graph-particle:#8cc8ff; --graph-particle-glow:#4c9bff;
+  --graph-edge-highlight:0,229,255; --graph-wave:255,255,255;
+  --graph-effect-glow:1; --graph-effect-halo:1; --graph-effect-shadow:1;
   --topology-node-fill:#100e1f; --topology-node-border:#2a2744;
   --topology-label:#f2edff; --topology-muted:#aaa1c5; --topology-filter:url(#topoGlow);
 }
@@ -36,6 +40,10 @@
   --graph-canvas:#eee8de; --graph-panel:#f7f2ea; --graph-note:#4c6670;
   --graph-tag:#76596b; --graph-folder:#665f7c; --graph-ghost:#9a9188; --graph-star:72,67,62;
   --graph-edge-link:83,96,102; --graph-edge-ghost:145,136,126; --graph-edge-tag:118,89,107; --graph-edge-folder:102,95,124;
+  --graph-label:#4b443c; --graph-label-folder:#3e3933; --graph-label-hover:#1d1a17; --graph-meta:#6f665d;
+  --graph-core:#f4efe6; --graph-particle:#4c6670; --graph-particle-glow:#4c6670;
+  --graph-edge-highlight:54,107,118; --graph-wave:38,34,29;
+  --graph-effect-glow:0; --graph-effect-halo:0; --graph-effect-shadow:0;
   --topology-node-fill:#f7f2ea; --topology-node-border:#95897b; --topology-label:#26221d; --topology-muted:#6f665d; --topology-filter:none;
 }
 
@@ -53,6 +61,10 @@
   --graph-canvas:#fff9ed; --graph-panel:#ffe358; --graph-note:#111;
   --graph-tag:#c90076; --graph-folder:#5535c9; --graph-ghost:#68615a; --graph-star:23,23,23;
   --graph-edge-link:23,23,23; --graph-edge-ghost:81,77,70; --graph-edge-tag:201,0,118; --graph-edge-folder:85,53,201;
+  --graph-label:#2e2a26; --graph-label-folder:#111; --graph-label-hover:#111; --graph-meta:#514d46;
+  --graph-core:#fff9ed; --graph-particle:#171717; --graph-particle-glow:#171717;
+  --graph-edge-highlight:226,61,0; --graph-wave:23,23,23;
+  --graph-effect-glow:0; --graph-effect-halo:0; --graph-effect-shadow:0;
   --topology-node-fill:#fff9ed; --topology-node-border:#171717; --topology-label:#111; --topology-muted:#514d46; --topology-filter:none;
 }
 
@@ -70,6 +82,10 @@
   --graph-canvas:#07111f; --graph-panel:rgba(12,27,47,.8); --graph-note:#7dd3fc;
   --graph-tag:#e09bff; --graph-folder:#a5b4fc; --graph-ghost:#9fb5cb; --graph-star:205,232,255;
   --graph-edge-link:125,211,252; --graph-edge-ghost:159,181,203; --graph-edge-tag:224,155,255; --graph-edge-folder:165,180,252;
+  --graph-label:rgba(225,238,251,.82); --graph-label-folder:#dbeafe; --graph-label-hover:#fff; --graph-meta:#b3c5d8;
+  --graph-core:rgba(255,255,255,.88); --graph-particle:#a5dcff; --graph-particle-glow:#7dd3fc;
+  --graph-edge-highlight:125,211,252; --graph-wave:225,238,251;
+  --graph-effect-glow:1; --graph-effect-halo:1; --graph-effect-shadow:1;
   --topology-node-fill:#0c1b2f; --topology-node-border:#426482; --topology-label:#f7fbff; --topology-muted:#b3c5d8; --topology-filter:url(#topoGlow);
 }
 
@@ -82,6 +98,10 @@
   --surface-shadow:0 15px 45px rgba(3,2,14,.36),inset 0 1px rgba(255,255,255,.035);
   --graph-canvas:#050310; --graph-panel:#0b0918;
   --graph-edge-link:90,160,255; --graph-edge-ghost:160,140,255; --graph-edge-tag:244,91,216; --graph-edge-folder:157,107,255;
+  --graph-label:rgba(226,218,255,.8); --graph-label-folder:#d8caff; --graph-label-hover:#f7f2ff; --graph-meta:#aaa1c5;
+  --graph-core:rgba(255,255,255,.86); --graph-particle:#8cc8ff; --graph-particle-glow:#4c9bff;
+  --graph-edge-highlight:70,217,255; --graph-wave:242,237,255;
+  --graph-effect-glow:1; --graph-effect-halo:1; --graph-effect-shadow:1;
   --topology-filter:url(#topoGlow);
 }
 

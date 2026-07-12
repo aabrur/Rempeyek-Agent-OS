@@ -56,6 +56,8 @@ The keyboard contract was implemented TDD-first. The new test was observed faili
 
 - `apps/web/src/components/ThemePicker.jsx`
 - `apps/web/src/components/TopologyMap.jsx`
+- `apps/web/src/hooks/useTheme.js`
+- `apps/web/test/neural-theme.test.mjs`
 - `apps/web/test/theme-engine.test.mjs`
 - `packages/design-system/src/index.css`
 - `packages/neural-engine/src/NeuralGraph.js`
@@ -112,3 +114,23 @@ Follow-up review identified cascade and renderer synchronization ambiguity. The 
 - Final `npm run build`: passed; Vite transformed 54 modules.
 - Final `git diff --check`: passed.
 - Static CSS contract: 93 balanced blocks, authoritative responsive order, and four distinct edge-token roles.
+
+## Final Canvas theme review
+
+The final reviewer pass found remaining dark-Cosmos constants inside the Canvas draw path. The renderer contract was extended without changing graph data or physics:
+
+- `resolveGraphPalette()` now resolves semantic label, folder-label, hover-label, metadata, node-core, particle, particle-glow, edge-highlight, and wave colors.
+- The same resolver returns explicit `glow`, `halo`, and `shadow` effect flags.
+- Minimalist and Brutalist set all three flags to false. Their draw path skips radial hub gradients and neural waves, never applies a positive `shadowBlur`, and uses readable light-surface foreground tokens.
+- Glassmorph and Cyberpunk opt into restrained semantic effects while retaining the existing `effectTier` performance guard.
+- Hard-coded Cosmos label, highlight, particle, core, and metadata colors were removed from `draw()`.
+- A pure light-theme test proves dark foreground resolution and false effect flags; default effect behavior remains covered as enabled.
+
+### Final Canvas verification
+
+- TDD red state: light-theme foreground/effect assertions failed because the resolver did not expose those contracts.
+- Focused green state: 2/2 Canvas theme tests passed.
+- Final `npm test`: 36/36 passed, 0 failures.
+- Final `npm run build`: passed; Vite transformed 54 modules.
+- Final `git diff --check`: passed.
+- Renderer static contract: semantic foreground tokens are present, legacy draw-path color literals are absent, the halo loop is flag-guarded, and two structural modes explicitly disable glow.

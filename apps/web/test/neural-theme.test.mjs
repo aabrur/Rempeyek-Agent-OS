@@ -14,4 +14,20 @@ test("graph palette resolves every node and edge layer from semantic tokens", ()
   assert.deepEqual(palette.edges, { link: "1,2,3", ghost: "4,5,6", tag: "7,8,9", folder: "10,11,12" });
   assert.equal(palette.starRgb, "13,14,15");
   assert.ok(palette.folderPalette.includes("#111111"));
+  assert.deepEqual(palette.effects, { glow: true, halo: true, shadow: true });
+});
+
+test("light graph palette resolves readable foreground and disables decorative effects", () => {
+  const values = {
+    "--graph-label": "#26221d", "--graph-label-folder": "#4c443c", "--graph-label-hover": "#111111",
+    "--graph-meta": "#6f665d", "--graph-core": "#f4efe6", "--graph-particle": "#4c6670",
+    "--graph-particle-glow": "#4c6670", "--graph-edge-highlight": "54,107,118", "--graph-wave": "38,34,29",
+    "--graph-effect-glow": "0", "--graph-effect-halo": "false", "--graph-effect-shadow": "off",
+  };
+  const palette = resolveGraphPalette((name, fallback) => values[name] || fallback);
+  assert.deepEqual(palette.foreground, {
+    label: "#26221d", folderLabel: "#4c443c", hoverLabel: "#111111", meta: "#6f665d", core: "#f4efe6",
+    particle: "#4c6670", particleGlow: "#4c6670", edgeHighlight: "54,107,118", wave: "38,34,29",
+  });
+  assert.deepEqual(palette.effects, { glow: false, halo: false, shadow: false });
 });
