@@ -29,6 +29,100 @@ function StatusChip({ status }) {
   return <span className={`ws-status st-${status || "active"}`}>{status || "active"}</span>;
 }
 
+function useTodayWorkspace() {
+  const [today, setToday] = useState(null);
+  const [approvals, setApprovals] = useState([]);
+  const [error, setError] = useState("");
+  const load = async () => {
+    const [next, queue] = await Promise.all([api("/api/today"), api("/api/approvals")]);
+    setError(next.error || queue.error || "");
+    if (!next.error) setToday(next);
+    if (!queue.error) setApprovals(queue.approvals || []);
+  };
+  useEffect(() => {
+    load();
+    const timer = setInterval(load, 15000);
+    return () => clearInterval(timer);
+  }, []);
+  const decide = async (approval, decision) => {
+    const verb = decision === "approved" ? "approve" : "reject";
+    if (!window.confirm(`${verb.toUpperCase()} this request?\n\nConsequence: ${approval.consequence}\nScope: ${approval.type} → ${approval.target}`)) return;
+    const result = await api(`/api/approvals/${approval.id}/decision`, {
+      method: "POST",
+      body: JSON.stringify({ decision, confirmed: true }),
+    });
+    if (result.error) setError(result.error);
+    await load();
+  };
+  return { today, approvals, error, reload: load, decide };
+}
+
+function TodayContext({ today }) {
+  if (!today || today.state === "empty") return null;
+  const tasks = today.unfinishedTasks || [];
+  const decisions = today.unresolvedDecisions || [];
+  const artifacts = today.recentArtifacts || [];
+  return (
+    <section className="today-context" aria-labelledby="today-context-title">
+      <h2 id="today-context-title" className="sr-only">Current project context</h2>
+      <article className="today-panel today-next">
+        <div className="today-label">NEXT USEFUL ACTION</div>
+        <strong>{today.nextAction?.label || "Review the project and choose the next concrete step."}</strong>
+        <span>{today.nextAction?.type === "task" ? "Ready task" : "Decision needed"}</span>
+      </article>
+      <article className="today-panel">
+        <h3>Unfinished tasks <span className="cnt">{tasks.length}</span></h3>
+        <ul className="today-list">
+          {tasks.slice(0, 5).map((task, index) => <li key={task.id || index}><StatusChip status={task.status} /><span>{task.title}</span></li>)}
+          {!tasks.length && <li className="muted">No unfinished tasks.</li>}
+        </ul>
+      </article>
+      <article className="today-panel">
+        <h3>Unresolved decisions <span className="cnt">{decisions.length}</span></h3>
+        <ul className="today-list">
+          {decisions.slice(0, 4).map((decision, index) => <li key={decision.id || index}><span>{decision.text || decision.label || String(decision)}</span></li>)}
+          {!decisions.length && <li className="muted">No decisions waiting.</li>}
+        </ul>
+      </article>
+      <article className="today-panel">
+        <h3>Recent artifacts <span className="cnt">{artifacts.length}</span></h3>
+        <ul className="today-list">
+          {artifacts.slice(0, 5).map((artifact, index) => {
+            const notePath = artifact.path || artifact.rel || artifact.target;
+            return <li key={notePath || index}>{notePath ? <a href={obsUri(notePath)}>{artifact.label || notePath.split("/").pop()}</a> : <span>{artifact.label || "Project artifact"}</span>}</li>;
+          })}
+          {!artifacts.length && <li className="muted">No recent artifacts.</li>}
+        </ul>
+      </article>
+    </section>
+  );
+}
+
+function ApprovalQueue({ approvals, onDecision }) {
+  const pending = approvals.filter(item => item.status === "pending");
+  return (
+    <section className="approval-queue" aria-labelledby="approval-title">
+      <div className="approval-head">
+        <div><div className="today-label">CONTROLLED ORCHESTRATION</div><h2 id="approval-title">Approval queue</h2></div>
+        <Chip>{pending.length} pending</Chip>
+      </div>
+      {!pending.length ? <p className="muted">No operation is waiting for your approval.</p> : pending.map(item => (
+        <article className="approval-item" key={item.id}>
+          <div className="approval-copy">
+            <strong>{item.consequence}</strong>
+            <span><b>Scope</b> {item.type} → {item.target}</span>
+            <span><b>Requested by</b> {item.actor}</span>
+          </div>
+          <div className="approval-actions" aria-label={`Decision for ${item.type} on ${item.target}`}>
+            <Btn onClick={() => onDecision(item, "rejected")}>Reject</Btn>
+            <Btn variant="primary" onClick={() => onDecision(item, "approved")}>Approve for 15 min</Btn>
+          </div>
+        </article>
+      ))}
+    </section>
+  );
+}
+
 function AgentDots({ names, agentsById }) {
   if (!names?.length) return null;
   return (
@@ -85,18 +179,22 @@ function DispatchRow({ detail, agents }) {
 
 function ProjectPanel({ slug, agents, agentsById, onClose, refresh }) {
   const [detail, setDetail] = useState(null);
+  const [error, setError] = useState("");
   const [text, setText] = useState("");
   const [copied, setCopied] = useState(false);
   const ref = useRef(null);
 
   const load = async () => {
+    setError("");
     const d = await api(`/api/project/${slug}`);
-    if (!d.error) setDetail(d);
+    if (d.error) setError(d.error);
+    else setDetail(d);
   };
   useEffect(() => { setDetail(null); load(); }, [slug]);
   useEffect(() => { ref.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }); }, [detail?.slug]);
 
-  if (!detail) return <div className="skeleton-block" style={{ height: 180 }} ref={ref} />;
+  if (error) return <div className="empty ws-load-error" role="alert" ref={ref}>Project details could not be loaded: {error}. <Btn onClick={load}>Try again</Btn></div>;
+  if (!detail) return <div className="skeleton-block" style={{ height: 180 }} role="status" aria-label="Loading project details" ref={ref} />;
 
   const ac = agentAccent(detail.agents?.[0] && (agentsById[detail.agents[0]] || detail.agents[0]));
   const logDecision = async () => {
@@ -213,6 +311,7 @@ function NewProjectModal({ open, onClose, onCreated }) {
 export function WorkspaceView({ projects = [], agents = [], agentsById = {}, refresh }) {
   const [open, setOpen] = useState(null);       // slug of the open panel
   const [creating, setCreating] = useState(false);
+  const { today, approvals, error: todayError, reload: reloadToday, decide } = useTodayWorkspace();
 
   const hero = projects[0];
   const rest = useMemo(() => projects.slice(1), [projects]);
@@ -225,9 +324,14 @@ export function WorkspaceView({ projects = [], agents = [], agentsById = {}, ref
 
   return (
     <section className="view active">
-      <PageHead title="WORKSPACE">
-        Continue where you left off — every agent, one project brain. Lives in <code>Projects/</code>.
+      <PageHead title="TODAY">
+        Continue meaningful work without rebuilding context. Project memory remains in <code>Projects/</code>.
       </PageHead>
+
+      {todayError && <div className="today-error" role="alert">Live context is temporarily unavailable. <Btn onClick={reloadToday}>Try again</Btn></div>}
+
+      <TodayContext today={today} />
+      <ApprovalQueue approvals={approvals} onDecision={decide} />
 
       {!projects.length ? (
         <Empty>

@@ -29,6 +29,10 @@ const VAULT = process.env.VAULT_PATH || path.join(ROOT, "Obsidian Vault");
 const CONFIG_PATH = process.env.AGENTS_CONFIG || path.join(ROOT, "agents.config.json");
 const TOKEN = process.env.DASH_TOKEN || "";
 const ACCESS_POLICY = createAccessPolicy(process.env);
+const TODAY_PROJECTION = import("./lib/today-projection.mjs");
+const APPROVAL_QUEUE = import("./lib/approval-queue.mjs").then(({ createApprovalQueue }) => createApprovalQueue());
+const VAULT_GRAPH = import("./lib/vault-graph.mjs");
+const AGENT_TOPOLOGY = import("./lib/agent-topology.mjs");
 /* PUBLIC = static source (images + runtime-uploaded avatars, never wiped by a build).
    DIST   = the built React app (`npm run build`). Requests resolve DIST first, then
    PUBLIC, then fall back to index.html — /avatars always comes from PUBLIC, because
@@ -77,13 +81,11 @@ function saveConfig(cfg) {
 function addAgent(body) {
   const id = String(body.id || "").trim();
   if (!/^[a-z0-9][a-z0-9-]{1,31}$/.test(id)) return { error: "id must be a 2-32 char slug (a-z, 0-9, -)" };
-  const name = String(body.name || "").trim().slice(0, 40);
+  const name = String(body.name || "").replace(/[\x00-\x1f\x7f]+/g, " ").trim().slice(0, 40);
   if (!name) return { error: "name is required" };
   const cfg = loadConfig();
   if (cfg.agents.some(a => a.id === id)) return { error: `agent '${id}' already exists` };
   const accent = /^#[0-9a-fA-F]{6}$/.test(String(body.accent || "")) ? body.accent : undefined;
-  const trigger = String(body.trigger || "").trim().slice(0, 200) || undefined;
-  const home = String(body.home || "").trim().slice(0, 260) || undefined;
   const nodeNums = cfg.agents.map(a => Number((String(a.node || "").match(/(\d+)$/) || [])[1])).filter(n => !Number.isNaN(n));
   const agent = {
     id, name,
@@ -93,8 +95,7 @@ function addAgent(body) {
     lane: name.replace(/[^A-Za-z0-9]/g, ""),
     enabled: true,
     ...(accent ? { accent } : {}),
-    note: `Registered via dashboard ${localISO().slice(0, 10)}.${trigger ? "" : " Observe-only (no trigger CLI configured)."}`,
-    ...(trigger ? { gateway: { home: home || path.join(os.homedir(), "." + id), trigger, actions: [] } } : {}),
+    note: `Registered via dashboard ${localISO().slice(0, 10)}. Observe-only; executable configuration requires a trusted config edit.`,
   };
   cfg.agents.push(agent);
   try { saveConfig(cfg); } catch (e) { return { error: `failed to write config: ${e.message}` }; }
@@ -308,7 +309,7 @@ function projectDetail(slug) {
 }
 
 function createProject(body) {
-  const name = String(body.name || "").trim().slice(0, 60);
+  const name = String(body.name || "").replace(/[\x00-\x1f\x7f]+/g, " ").trim().slice(0, 60);
   if (!name) return { error: "name is required" };
   const slug = slugify(name);
   if (!/^[a-z0-9][a-z0-9-]{1,39}$/.test(slug)) return { error: "name must contain letters or numbers" };
@@ -320,7 +321,7 @@ function createProject(body) {
   try {
     fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(path.join(dir, "project.md"),
-      `---\ntitle: ${name}\nstatus: active\nprogress: 0\ncreated: ${date}\ngoal: ${goal || "(define the goal)"}\n---\n\n# ${name}\n\n${goal ? goal + "\n\n" : ""}## Milestones\n\n- [ ] Define the first milestone\n`, "utf8");
+      `---\ntitle: ${JSON.stringify(name)}\nstatus: active\nprogress: 0\ncreated: ${date}\ngoal: ${JSON.stringify(goal || "(define the goal)")}\n---\n\n# ${name}\n\n${goal ? goal + "\n\n" : ""}## Milestones\n\n- [ ] Define the first milestone\n`, "utf8");
     fs.writeFileSync(path.join(dir, "decisions.md"),
       `# Decisions — ${name}\n\n> Append-only log. ⚡auto entries are captured from agent telemetry.\n\n- **${localISO().slice(0, 16).replace("T", " ")}** · Dashboard — workspace created\n`, "utf8");
     fs.writeFileSync(path.join(dir, "next.md"),
@@ -336,7 +337,7 @@ function addDecision(slug, body) {
   if (p.kind !== "workspace") return { error: "flat note projects have no decision log — create a workspace" };
   const text = String(body.text || "").trim().replace(/[\r\n]+/g, " ").slice(0, 400);
   if (!text) return { error: "decision text is empty" };
-  const who = String(body.agent || "Boss").trim().slice(0, 40) || "Boss";
+  const who = String(body.agent || "Boss").replace(/[\r\n|]+/g, " ").trim().slice(0, 40) || "Boss";
   const line = `- **${localISO().slice(0, 16).replace("T", " ")}** · ${who} — ${text}\n`;
   try {
     const f = path.join(p.dir, "decisions.md");
@@ -937,6 +938,45 @@ function resolveLink(raw, fromRel, byPath, byBase) {
 }
 
 let graphCache = { t: 0, data: null };
+let parityGraphCache = { t: 0, data: null };
+async function buildParityGraph() {
+  if (parityGraphCache.data && Date.now() - parityGraphCache.t < 60000) return parityGraphCache.data;
+  const { buildVaultGraph } = await VAULT_GRAPH;
+  const files = walkVault().map((file) => {
+    try { return { ...file, text: fs.readFileSync(path.join(VAULT, file.rel), "utf8") }; }
+    catch { return null; }
+  }).filter(Boolean);
+  const data = buildVaultGraph({ files });
+  parityGraphCache = { t: Date.now(), data };
+  return data;
+}
+
+function todayProjectData(files) {
+  return buildProjects(files).map(project => {
+    const text = readDoc(path.join(VAULT, ...project.rel.split("/")));
+    const body = parseFM(text).body;
+    const tasks = body.split(/\r?\n/).flatMap((line, index) => {
+      const match = line.match(/^\s*[-*]\s+\[([ xX])\]\s+(.+?)\s*$/);
+      if (!match) return [];
+      return [{ id: `${project.slug}-task-${index + 1}`, title: match[2].replace(/<!--.*?-->/g, "").trim(), status: match[1].toLowerCase() === "x" ? "completed" : "pending" }];
+    });
+    const decisions = project.kind === "workspace"
+      ? decisionList(project.slug).map((text, index) => ({ id: `${project.slug}-decision-${index + 1}`, text, status: "unresolved" }))
+      : [];
+    const prefix = project.kind === "workspace" ? `Projects/${project.slug}/` : "";
+    const recentArtifacts = prefix ? files
+      .filter(file => file.rel.startsWith(prefix) && !new Set(["project.md", "decisions.md", "next.md"]).has(file.rel.slice(prefix.length).toLowerCase()))
+      .sort((a, b) => b.mtime - a.mtime).slice(0, 8)
+      .map(file => ({ path: file.rel, updatedAt: file.mtime })) : [];
+    return { ...project, id: project.slug, tasks, decisions, recentArtifacts };
+  });
+}
+
+async function buildLiveAgentTopology() {
+  const { buildAgentTopology } = await AGENT_TOPOLOGY;
+  const state = buildState();
+  return buildAgentTopology({ agents: state.agents });
+}
 function buildGraph() {
   if (graphCache.data && Date.now() - graphCache.t < 60000) return graphCache.data;
   try {
@@ -1349,6 +1389,7 @@ function safeEq(a, b) {
 }
 function authorized(req) {
   if (!TOKEN) return true;
+  if (process.env.DASH_REMOTE === "1") return safeEq(req.headers["x-dash-token"] || "", TOKEN);
   const remote = req.socket && (req.socket.remoteAddress || req.connection && req.connection.remoteAddress || "");
   if (/^(127\.0\.0\.1|::1|::ffff:127\.0\.0\.1)$/.test(remote)) return true;
   return safeEq(req.headers["x-dash-token"] || "", TOKEN);
@@ -1356,6 +1397,13 @@ function authorized(req) {
 function json(res, code, obj) {
   res.writeHead(code, { "Content-Type": "application/json; charset=utf-8" });
   res.end(JSON.stringify(obj));
+}
+
+function withApproval(req, res, type, target, run) {
+  return APPROVAL_QUEUE.then(queue => {
+    const result = queue.authorize(req.headers["x-approval-id"], { type, target, actor: "dashboard" });
+    return result.allowed ? run() : json(res, 403, { error: "approved action required", reason: result.reason, type, target });
+  }).catch(() => json(res, 503, { error: "approval service unavailable" }));
 }
 
 const MIME = { ".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".svg": "image/svg+xml", ".png": "image/png", ".jpg": "image/jpeg", ".webp": "image/webp", ".md": "text/markdown; charset=utf-8" };
@@ -1368,6 +1416,26 @@ function requestHandler(req, res) {
   if (url.startsWith("/api/")) {
     if (!authorized(req)) return json(res, 401, { error: "invalid/missing token — set the x-dash-token header" });
     try {
+      if (url === "/api/today" && req.method === "GET")
+        return TODAY_PROJECTION.then(({ buildTodayProjection }) => {
+          const files = walkVault();
+          json(res, 200, buildTodayProjection(todayProjectData(files)));
+        })
+          .catch(() => json(res, 503, { state: "unavailable", error: "Today workspace unavailable" }));
+      if (url === "/api/approvals" && req.method === "GET")
+        return APPROVAL_QUEUE.then(queue => json(res, 200, { approvals: queue.list(), audit: queue.audit() }));
+      if (url === "/api/approvals" && req.method === "POST")
+        return readBody(req, res, body => {
+          let data; try { data = JSON.parse(body); } catch { return json(res, 400, { error: "body must be JSON" }); }
+          APPROVAL_QUEUE.then(queue => { try { json(res, 201, queue.request(data)); } catch (error) { json(res, 400, { error: error.message }); } });
+        });
+      const approvalMatch = url.match(/^\/api\/approvals\/([a-f0-9-]+)\/decision$/);
+      if (approvalMatch && req.method === "POST")
+        return readBody(req, res, body => {
+          let data; try { data = JSON.parse(body); } catch { return json(res, 400, { error: "body must be JSON" }); }
+          if (data.confirmed !== true) return json(res, 400, { error: "explicit founder confirmation is required" });
+          APPROVAL_QUEUE.then(queue => { try { json(res, 200, queue.decide(approvalMatch[1], { decision: data.decision, actor: "founder-confirmed-dashboard" })); } catch (error) { json(res, 400, { error: error.message }); } });
+        });
       if (url === "/api/state") return json(res, 200, buildState());
       if (url === "/api/procs") {
         const cfg = loadConfig();
@@ -1382,6 +1450,7 @@ function requestHandler(req, res) {
           return json(res, 200, { lines: p ? p.log.filter(l => l.i >= since) : [], next: p ? p.seq : 0, ...procInfo(id) });
         }
         if (req.method !== "POST") return json(res, 405, { error: "POST only" });
+        return withApproval(req, res, action === "terminal" ? "terminal.open" : `process.${action}`, id, () => {
         if (action === "terminal") {
           const mode = new URL(req.url, "http://x").searchParams.get("mode") || "summon";
           return gwTerminal(id, mode, r => json(res, r.error ? 400 : 200, r));
@@ -1390,16 +1459,19 @@ function requestHandler(req, res) {
         if (action === "run") { const r = gwRun(id); return json(res, r.error ? 400 : 200, r); }
         if (action === "stop") return gwStop(id, r => json(res, r.error ? 400 : 200, r));
         return gwCtl(id, action, r => json(res, r.error ? 400 : 200, r)); // start | restart | status
+        });
       }
       if (url === "/api/proc/start-all" && req.method === "POST") {
-        const list = loadConfig().agents.filter(a => a.enabled && a.gateway && gwActions(a).includes("start"));
-        if (!list.length) return json(res, 200, {});
-        const results = {};
-        let pending = list.length;
-        list.forEach(a => gwCtl(a.id, "start", r => { results[a.id] = r; if (--pending === 0) json(res, 200, results); }));
-        return;
+        return withApproval(req, res, "process.start-all", "enabled-agents", () => {
+          const list = loadConfig().agents.filter(a => a.enabled && a.gateway && gwActions(a).includes("start"));
+          if (!list.length) return json(res, 200, {});
+          const results = {};
+          let pending = list.length;
+          list.forEach(a => gwCtl(a.id, "start", r => { results[a.id] = r; if (--pending === 0) json(res, 200, results); }));
+        });
       }
-      if (url === "/api/graph") return json(res, 200, buildGraph());
+      if (url === "/api/graph" || url === "/api/vault/graph") return buildParityGraph().then(data => json(res, 200, data)).catch(error => json(res, 500, { error: error.message }));
+      if (url === "/api/agent-topology") return buildLiveAgentTopology().then(data => json(res, 200, data)).catch(error => json(res, 500, { error: error.message }));
       if (url === "/api/report") return json(res, 200, buildReport());
       if (url === "/api/report/save" && req.method === "POST") return json(res, 200, saveReport());
       if (url === "/api/task" && req.method === "POST")
@@ -1409,6 +1481,8 @@ function requestHandler(req, res) {
           json(res, r.error ? 400 : 200, r);
         });
       if (url === "/api/projects") return json(res, 200, buildProjects(walkVault()));
+      m = url.match(/^\/api\/projects\/([\w-]+)$/);
+      if (m && req.method === "GET") { const d = projectDetail(m[1]); return json(res, d.error ? 404 : 200, d); }
       if (url === "/api/project" && req.method === "POST")
         return readBody(req, res, body => {
           let d; try { d = JSON.parse(body); } catch { return json(res, 400, { error: "body must be JSON {name,goal?}" }); }

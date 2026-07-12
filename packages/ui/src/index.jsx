@@ -2,6 +2,8 @@
    Pure, stateless, no data fetching. They render the design-system class names,
    so visual fidelity is guaranteed by the stylesheet, not by per-component CSS. */
 
+import { useEffect, useRef } from "react";
+
 export function Btn({ variant = "dim", className = "", children, ...rest }) {
   const v = { primary: "btn-primary", run: "btn-run", stop: "btn-stop", dim: "btn-dim" }[variant] || "btn-dim";
   return <button className={`btn ${v} ${className}`.trim()} {...rest}>{children}</button>;
@@ -63,10 +65,20 @@ export function PageHead({ title, children }) {
 
 /** Full-screen overlay (token login, add-agent). Click the backdrop to close. */
 export function Overlay({ open, onClose, boxClass = "", children }) {
+  const boxRef = useRef(null);
+  const returnFocusRef = useRef(null);
+  useEffect(() => {
+    if (!open) return undefined;
+    returnFocusRef.current = document.activeElement;
+    boxRef.current?.focus();
+    const onKeyDown = event => { if (event.key === "Escape" && onClose) onClose(); };
+    document.addEventListener("keydown", onKeyDown);
+    return () => { document.removeEventListener("keydown", onKeyDown); returnFocusRef.current?.focus?.(); };
+  }, [open]);
   if (!open) return null;
   return (
     <div className="token-ov" onClick={e => { if (e.target === e.currentTarget && onClose) onClose(); }}>
-      <div className={`token-box ${boxClass}`.trim()}>{children}</div>
+      <div ref={boxRef} role="dialog" aria-modal="true" tabIndex={-1} className={`token-box ${boxClass}`.trim()}>{children}</div>
     </div>
   );
 }

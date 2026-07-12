@@ -44,6 +44,7 @@ export default function App() {
 
   return (
     <>
+      <a className="skip-link" href="#main-content">Skip to workspace</a>
       <div className="shell">
         <Sidebar
           view={view}
@@ -56,10 +57,17 @@ export default function App() {
           onOpenAgent={openAgentDetail}
         />
 
-        <main className="main">
+        <main className="main" id="main-content" tabIndex="-1">
           <ConfigBanner configError={state?.configError} stateError={error} />
 
-          {!state ? null : view === "command" ? (
+          {!state ? (
+            <section className="app-state" role="status" aria-live="polite">
+              <div className="skeleton-block" aria-hidden="true" />
+              <h1>{error ? "Workspace unavailable" : "Opening your workspace"}</h1>
+              <p>{error ? "Rempeyek could not reach the local service. Your Vault remains untouched." : "Reading projects, recent activity, and the next useful action…"}</p>
+              {error && <button className="btn btn-primary" onClick={refresh}>Try again</button>}
+            </section>
+          ) : view === "command" ? (
             <CommandCenter
               state={state} accent={accent} load={load} agentsById={agentsById}
               gw={gw} ops={ops} openAgent={openAgent}

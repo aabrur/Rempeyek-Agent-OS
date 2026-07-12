@@ -1,54 +1,32 @@
 # Theme System
 
-Neural Cosmos Edition ships **13 switchable themes**. A theme is a token override —
-no markup or logic changes, only CSS custom properties.
+Rempeyek Agent OS exposes four structural appearance modes over one semantic token contract:
+
+- `minimalist` — calm, content-first surfaces and restrained depth.
+- `brutalist` — hard borders, compact geometry, high contrast, and no decorative blur.
+- `glassmorph` — translucent hierarchy with controlled blur and light.
+- `cyberpunk` — the Neural Cosmos identity with restrained glow and purposeful energy.
+
+Legacy theme IDs remain migration aliases in `packages/theme-engine/src/themes.js`; they are not active product themes.
 
 ## Token model
 
-Single-tier tokens on `:root` in `apps/web/public/style.css`:
-
-| Token | Role |
-|---|---|
-| `--acc` | master accent — every glow, border, gradient, and active state derives from it via `color-mix()` |
-| `--bg` `--panel` `--card` `--card-hi` `--line` | surface stack, darkest → lightest |
-| `--text` `--muted` | foreground pair |
-| `--cyan` `--magenta` `--lime` `--amber` `--violet` `--red` | semantic palette (status dots, chips, chart fills) |
-| `--mono` `--disp` `--hero` | type stack: data / UI / display (Orbitron) |
-
-Component-scoped locals: `--ac` (per-agent accent, set inline) and `--tile-c`
-(per-tile color), both falling back to `--acc`.
-
-## The 13 themes
-
-Base `:root` **is** Neural Cosmos (cyan); every other theme is a
-`:root[data-theme="…"]` block overriding `--acc` + the surface stack:
-
-`rempeyek` (violet, default) · `cosmos` · `ember` · `ghost-protocol` · `quantum-glass` ·
-`dark-matter` · `nebula` · `aurora` · `midnight` · `solaris` · `crimson-rift` ·
-`monochrome` · `nothing-os`
-
-All themes are **dark by design** — the cosmos backdrop and rgba overlay stack assume
-a dark base, which is why Apple Minimal / Adaptive (light) from the original spec are
-intentionally not included.
+Theme values live in `packages/theme-engine/src/themes.css`. Components consume semantic tokens from `packages/design-system/src/index.css`, including surface, foreground, border, focus, radius, shadow, blur, graph, status, and motion values. Per-agent identity uses the local `--ac` token and remains stable between modes.
 
 ## Switching
 
-- `<html data-theme="…">` is set pre-paint by the inline script in `index.html`
-  (reads `localStorage["aos-theme"]`, default `rempeyek`).
-- The sidebar swatch grid is rendered from the `THEMES` registry in `app.js` —
-  **the registry must mirror the CSS blocks** (id, accent swatch, backdrop).
-- On switch: `data-theme` + localStorage update, `markTheme()` relabels, the render
-  dirty-check is reset so the SVG topology re-reads `--acc`, and the vault graph reheats.
+- `apps/web/index.html` validates and migrates the stored value before first paint.
+- `ThemePicker.jsx` exposes the four modes as a labeled radio group.
+- `useTheme.js` persists the canonical ID and refreshes canvas/SVG accent values.
+- Unknown values fall back to `cyberpunk`.
 
-## Adding a theme
+## Accessibility and motion
 
-1. Add a `:root[data-theme="my-theme"]` block in `style.css` — override at minimum
-   `--acc`, `--bg`, `--panel`, `--card`, `--card-hi`, `--line`.
-2. Add `{ id: "my-theme", name: "My Theme", sw: <accent>, bg: <bg> }` to `THEMES` in `app.js`.
-3. Keep it dark; check contrast of `--muted` on `--card`.
+Every mode must retain visible focus, readable foreground contrast, and non-color status labels. `prefers-reduced-motion`, forced colors, and reduced-transparency preferences remove or reduce nonessential effects. Graph content always has a non-canvas table representation.
 
-## Agent accents are identity, not theme
+## Adding or changing a mode
 
-Per-agent colors (`accent` in `agents.config.json`, fallback `ACCENT` map in `app.js`)
-deliberately **do not change** with the theme — an agent keeps its color across every
-theme so the topology stays readable.
+1. Add or update its registry entry in `packages/theme-engine/src/themes.js`.
+2. Define the full semantic override in `packages/theme-engine/src/themes.css`.
+3. Test all four modes; do not add component-specific theme branches.
+4. Verify keyboard focus, contrast, reduced motion, graph readability, and narrow layouts.

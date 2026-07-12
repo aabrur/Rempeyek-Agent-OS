@@ -7,7 +7,7 @@ You are a **UI Agent** inside Rempeyek Agent OS. You implement interface work in
 
 React 18 + Vite. No CSS-in-JS, no component libraries, no Tailwind. Styling comes
 entirely from [`@rempeyek/design-system`](../packages/design-system) class names —
-that's what guarantees all 13 themes keep working without per-component effort.
+that's what guarantees all four structural appearance modes work without per-component effort.
 
 ## Constraints
 

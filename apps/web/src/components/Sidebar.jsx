@@ -4,7 +4,7 @@ import { gwState } from "../lib/agents";
 import { obsUri } from "../lib/obsidian";
 
 const NAV = [
-  { id: "workspace", icon: "◆", label: "Workspace" },
+  { id: "workspace", icon: "◆", label: "Today" },
   { id: "command", icon: "▦", label: "Command Center" },
   { id: "agents", icon: "◉", label: "Agents" },
   { id: "graph", icon: "✳", label: "Neural Vault" },
@@ -14,7 +14,7 @@ const NAV = [
 export function Sidebar({ view, onView, agents = [], agency, vault, theme, onTheme, onOpenAgent }) {
   const clock = useClock();
   return (
-    <aside className="sidebar">
+    <aside className="sidebar" aria-label="Application sidebar">
       <div className="brand">
         <div className="brand-mark">◈</div>
         <div>
@@ -25,11 +25,12 @@ export function Sidebar({ view, onView, agents = [], agency, vault, theme, onThe
         </div>
       </div>
 
-      <nav id="nav">
+      <nav id="nav" aria-label="Primary">
         {NAV.map(n => (
           <button
             key={n.id}
             className={`nav-item ${view === n.id ? "active" : ""}`.trim()}
+            aria-current={view === n.id ? "page" : undefined}
             onClick={() => onView(n.id)}
           >
             <span className="nav-ico">{n.icon}</span> {n.label}
@@ -42,12 +43,12 @@ export function Sidebar({ view, onView, agents = [], agency, vault, theme, onThe
         {agents.map(a => {
           const gw = gwState(a.proc);
           return (
-            <div key={a.id} className="side-agent" onClick={() => onOpenAgent(a.id)}>
+            <button type="button" key={a.id} className="side-agent" onClick={() => onOpenAgent(a.id)} aria-label={`Open ${a.name}, gateway ${gw.label}`}>
               {a.avatar
                 ? <img className="side-avatar" src={a.avatar} alt="" />
                 : <span className={`dot ${gw.cls === "running" ? "running" : "idle"}`} title={`gateway ${gw.label}`} />}
               <span><b>{a.name}</b><br />{a.node}</span>
-            </div>
+            </button>
           );
         })}
       </div>

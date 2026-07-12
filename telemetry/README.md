@@ -2,7 +2,7 @@
 
 Any agent can report its work progress to the dashboard by **appending** one JSON line
 to `agentic-os\telemetry\<agent-id>.jsonl` (ids: `claude-code`, `hermes`, `openclaw`,
-`kilo-code`, `cline`, `pi`, `copilot`, `antigravity`).
+`kilo-code`, `cline`, `pi`, `codex`, `antigravity`). Legacy `copilot` JSONL files remain readable.
 
 Format, one event per line:
 

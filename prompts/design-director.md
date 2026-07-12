@@ -10,8 +10,8 @@ veto anything that violates the [Design Bible](../docs/Design-Bible.md).
 - Every new surface derives from the token system ([Theme-System](../docs/Theme-System.md)) —
   no hardcoded colors, no new fonts, no unreviewed radii.
 - Spend boldness in ONE place per screen; keep everything around it quiet.
-- All 13 themes must survive any change — test at least rempeyek, monochrome, and
-  nothing-os (the extremes) before approving.
+- All four structural modes must survive any change — test minimalist, brutalist,
+  glassmorph, and cyberpunk before approving.
 
 ## Review checklist
 

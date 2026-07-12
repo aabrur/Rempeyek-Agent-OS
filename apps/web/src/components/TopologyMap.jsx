@@ -1,6 +1,7 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { TopoLoad } from "./TopoLoad";
 import { agentAccent, nodeStatus } from "../lib/agents";
+import { api } from "../api";
 
 const W = 760, H = 460, CX = W / 2, CY = H / 2 - 14, RX = 292, RY = 152;
 
@@ -25,6 +26,14 @@ function layout(agents) {
 export function TopologyMap({ state, accent, load, agentsById, onOpen }) {
   const agents = state.agents;
   const nodes = useMemo(() => layout(agents), [agents]);
+  const [topology, setTopology] = useState({ edges: [], metadata: { hasRelationships: false } });
+  useEffect(() => {
+    let alive = true;
+    api("/api/agent-topology").then(data => { if (alive && Array.isArray(data?.edges)) setTopology(data); });
+    return () => { alive = false; };
+  }, [agents]);
+  const positioned = useMemo(() => new Map(nodes.map(node => [node.agent.id, node])), [nodes]);
+  const realEdges = topology.edges.map(edge => ({ ...edge, a: positioned.get(edge.source), b: positioned.get(edge.target) })).filter(edge => edge.a && edge.b);
 
   const n = agents.length;
   const running = agents.filter(a => a.proc?.status === "running").length;
@@ -94,33 +103,21 @@ export function TopologyMap({ state, accent, load, agentsById, onOpen }) {
               })}
             </defs>
 
-            {nodes.map(({ agent, d, col, st, i }) => {
-              const run = st.cls === "top-run";
+            {realEdges.map((edge, i) => {
+              const { a, b } = edge;
+              const d = `M${a.x.toFixed(1)},${a.y.toFixed(1)} Q${CX.toFixed(1)},${CY.toFixed(1)} ${b.x.toFixed(1)},${b.y.toFixed(1)}`;
               return (
-                <g key={`link-${agent.id}`}>
+                <g key={`${edge.type}-${edge.provenance.source}-${edge.provenance.id}`}>
                   <path
-                    className={run ? "top-link-run" : "top-link"} d={d} fill="none"
-                    stroke={`url(#lg-${agent.id})`} strokeWidth={run ? 2 : 1.1}
-                    opacity={run ? .95 : .55} filter="url(#topoGlow)"
+                    className={edge.flowing ? "top-link-run" : "top-link"} d={d} fill="none"
+                    stroke={agentAccent(a.agent)} strokeWidth={edge.flowing ? 2 : 1.1}
+                    opacity={edge.flowing ? .95 : .55} filter="url(#topoGlow)"
                   />
-                  <circle r={run ? 2.6 : 1.7} fill={col} opacity={run ? .95 : .45} filter="url(#topoGlow)">
-                    <animateMotion dur={`${(run ? 2.2 : 5.5) + i * 0.35}s`} repeatCount="indefinite" path={d} />
-                  </circle>
+                  {edge.flowing && <circle className="top-flow-dot" r="2.6" fill={agentAccent(b.agent)} opacity=".95" filter="url(#topoGlow)"><animateMotion dur={`${2.2 + i * 0.2}s`} repeatCount="indefinite" path={d} /></circle>}
                 </g>
               );
             })}
-
-            <g className="top-hub" transform={`translate(${CX},${CY})`}>
-              <circle r="120" fill="url(#hubHalo)" />
-              <circle className="top-shock" r="46" fill="none" stroke={accent} strokeWidth="1.3" />
-              <circle className="top-shock s2" r="46" fill="none" stroke="#8C5BFF" strokeWidth="1.1" />
-              <circle r="56" fill="none" stroke={accent} strokeWidth="1" opacity=".14" />
-              <g className="top-spin"><circle r="48" fill="none" stroke={accent} strokeWidth="1" strokeDasharray="4 9" opacity=".5" /></g>
-              <circle className="top-pulse" r="46" fill="none" stroke={accent} strokeWidth="1" opacity=".5" />
-              <circle r="40" fill="url(#hubCore)" stroke={accent} strokeWidth="1.6" filter="url(#topoGlow)" />
-              <text y="-2" textAnchor="middle" fontSize="18" fill={accent} fontFamily="Bahnschrift,sans-serif" fontWeight="700">◈</text>
-              <text y="16" textAnchor="middle" fontSize="8.5" fill="#8E88BE" fontFamily="Cascadia Mono,monospace">{running}/{n} LIVE</text>
-            </g>
+            {!topology.metadata?.hasRelationships && <text x={CX} y={CY} textAnchor="middle" fill="#8E88BE" fontSize="11">No verified agent relationships yet</text>}
 
             {nodes.map(({ agent, x, y, col, st }) => {
               const run = st.cls === "top-run";
@@ -130,7 +127,11 @@ export function TopologyMap({ state, accent, load, agentsById, onOpen }) {
                   className={`top-node ${st.cls}`}
                   transform={`translate(${x.toFixed(1)},${y.toFixed(1)})`}
                   style={{ cursor: "pointer" }}
+                  role="button"
+                  tabIndex="0"
+                  aria-label={`Open ${agent.name}, status ${st.label}`}
                   onClick={() => onOpen(agent.id)}
+                  onKeyDown={event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onOpen(agent.id); } }}
                 >
                   <circle r="52" fill={`url(#ng-${agent.id})`} />
                   {run && <circle className="top-shock" r="26" fill="none" stroke={st.ring} strokeWidth="1.2" />}
