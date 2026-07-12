@@ -156,25 +156,87 @@ append-only audit entry. Approval never auto-executes an action.
 - Mutations preserve input and show inline errors; no new `alert()` flows.
 - Malformed project data fails per item, not for the entire page.
 
-## Visual System
+## Visual System and Theme Modes
 
-Direction: **Quiet Project Ledger**.
+The structural direction remains **Quiet Project Ledger**: asymmetric
+master/detail composition, one dominant decision per screen, readable local
+fonts, stable semantic states, and primitive → semantic → component tokens.
 
-- asymmetric 12-column master/detail layout;
-- one hero per screen;
-- Project Thread as the only signature visualization;
-- dark-neutral surfaces, restrained indigo action color, stable semantic states;
-- local `Segoe UI Variable`/system fonts; Cascadia Mono only for technical data;
-- primitive → semantic → component tokens;
-- current variables remain migration aliases;
-- no ordinary-panel blur, glow, gradient text, text shadow, or card lift;
-- world map, literal neural image, fake metrics, orbit hub, star fields, and
-  Copilot imagery leave the product UI;
-- 13 legacy themes remain compatible during migration but the visible choice is
-  curated to Rempeyek dark, neutral dark, and high contrast.
+Users can switch between four maintained visual modes without changing the
+information architecture or feature behavior:
 
-Advanced Operations uses a table and attention queue. Topology is collapsed and
-may only display relationships backed by real data.
+1. **Minimalist** — quiet neutral surfaces, generous whitespace, almost no
+   glow, flat ledger rows, strong typography, and a thin Project Thread.
+2. **Brutalist** — hard contrast, squared geometry, visible grid, heavy labels,
+   minimal radius, and immediate state changes without ornamental motion.
+3. **Glassmorph** — translucent layered surfaces and restrained depth. Blur is
+   limited to fixed navigation, overlays, and small stationary hero shells;
+   scrolling lists and large canvas regions never use backdrop blur.
+4. **Cyberpunk** — luxury soft-cyberpunk with controlled violet/cyan energy,
+   neural fibers, luminous active states, and the richest effects. It must not
+   become a gamer HUD, hacker terminal, neon overload, or fake dashboard.
+
+All modes share component structure, spacing, status meanings, focus treatment,
+44px primary targets, and WCAG 2.2 AA. Selection persists per browser and is
+applied before first paint. The current 13 themes remain compatibility aliases
+mapped into these four modes rather than 13 equally maintained products.
+
+Fake metrics, world maps, literal brain artwork, Copilot imagery, decorative
+throughput, and crypto-dashboard charts remain excluded.
+
+## Neural Vault Cosmos
+
+The Neural Vault remains a first-class specialist view. Its installation
+default is:
+
+`C:\Users\abrur\Rempeyek-Agent-Os\Obsidian Vault`
+
+`VAULT_PATH` may still override this for portability. The resolved path is
+visible in Settings and validated before scanning. The application never
+restructures or bulk-modifies the Vault.
+
+The **Cosmos Neural** visualization is built only from real Vault data:
+
+- note nodes from Markdown files;
+- neural fibers from real wikilinks;
+- ghost nodes from unresolved wikilinks;
+- tag constellations from real tags;
+- folder regions from actual hierarchy;
+- halo/intensity from degree and recent meaningful activity;
+- signal particles only along existing links;
+- search, filter, pan, zoom, drag, focus, and Open in Obsidian;
+- an equivalent accessible list/table view.
+
+Minimalist uses clean lines, Brutalist uses stark nodes and rigid edges,
+Glassmorph uses stationary layered depth, and Cyberpunk uses the richest neural
+fibers, selection shockwaves, controlled volumetric glow, and subtle parallax.
+Theme changes affect material and atmosphere, never graph truth.
+
+Effect quality scales automatically: full effects for small graphs, fewer
+particles/halos for medium graphs, and folder/community aggregation for large
+graphs. Hidden views pause RAF. Reduced motion removes traveling particles,
+shockwaves, drift, parallax, and animated reheating while preserving content.
+
+## Agent Map
+
+Advanced Operations retains a visually impressive real-time Agent Map, but it
+must never fabricate a central hub or relationship.
+
+- nodes represent configured agents;
+- rings represent verified process, gateway, probe, terminal, or telemetry state;
+- edges represent real task assignment, spawned-subagent relation, declared
+  dependency, or observed communication event;
+- flowing particles represent a real queued/running task or message;
+- pulse represents a recent verified heartbeat;
+- blocked, approval-waiting, failed, idle, and offline use text/shape plus color;
+- selecting a node opens current work, activity, health, logs, and controls;
+- with no relationship data, render an honest unconnected fleet layout;
+- table/list fallback is always available and becomes default on narrow or
+  reduced-GPU devices.
+
+Cyberpunk mode may use curved energy fibers, shockwaves, depth, and subtle
+parallax. The other modes render the identical data using their own material
+language.
 
 ## Motion
 
@@ -182,10 +244,13 @@ may only display relationships backed by real data.
 - detail transition: 220ms opacity + 12px transform;
 - confirmed Project Thread/progress update: 320ms once;
 - status marker: restrained opacity breath only while truly running;
-- no perpetual ambient animation.
+- Neural Vault particles travel only on real edges;
+- Agent Map flow appears only for real task/message movement;
+- low-cost Cosmos ambience pauses whenever its view is hidden.
 
 Reduced motion removes transforms, pulses, smooth scrolling, animated progress,
-SVG animateMotion, and view-triggered canvas reheating.
+traveling particles, shockwaves, parallax, Cosmos drift, SVG animateMotion, and
+view-triggered canvas reheating.
 
 ## Accessibility
 
@@ -222,6 +287,10 @@ Test seams:
 - selection determinism and meaningful activity;
 - task and approval transition validation;
 - path containment and atomic/append behavior;
+- default/configured Vault resolution and read-only graph scanning;
+- graph edge provenance and performance-tier selection;
+- Agent Map relationship provenance and honest no-edge state;
+- four-mode token parity and persisted pre-paint selection;
 - React build plus source-level accessibility checks where browser automation is unavailable.
 
 Every behavior change follows red-green-refactor. Tests never start gateways,
@@ -236,7 +305,9 @@ touch the real Vault, or write personal config.
 5. Approval records and review flow.
 6. Typed project memory ingestion.
 7. Codex migration.
-8. Quiet Project Ledger visual migration and Advanced Operations.
+8. Four-mode design-system migration and Today visual implementation.
+9. Cosmos Neural Vault with effect tiers and accessibility fallback.
+10. Data-grounded Agent Map and Advanced Operations.
 
 Each slice is independently testable and reversible. Command Center remains
 available until Today and Advanced Operations pass acceptance checks.
@@ -252,6 +323,10 @@ available until Today and Advanced Operations pass acceptance checks.
 - approval and execution are visibly distinct;
 - offline mode cannot mutate;
 - no active UI reference to Copilot CLI remains;
+- all four modes preserve content, focus, status semantics, and contrast;
+- Neural Vault resolves the configured/default Obsidian Vault and every rendered
+  relationship has file/link/tag/folder provenance;
+- Agent Map never fabricates a relationship and exposes an equivalent table;
+- hidden views pause animation and reduced motion removes nonessential effects;
 - build and full test suite pass;
 - no production action touches the real Vault during verification.
-
