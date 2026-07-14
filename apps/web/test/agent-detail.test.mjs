@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   parseTelemetry, isHeartbeat, selectTelemetryWindow, telemetryActivity, coAssignments,
+  triggerExe, laneScaffold,
 } from "../lib/agent-detail.mjs";
 
 test("parseTelemetry skips blank and malformed lines", () => {
@@ -101,6 +102,23 @@ test("coAssignments ignores unknown/retired agents and single-member projects", 
     ].join("\n"),
   }];
   assert.deepEqual(coAssignments(taskFiles, AGENTS), []);
+});
+
+test("triggerExe takes the first token of trigger, falls back to bin, else empty", () => {
+  assert.equal(triggerExe({ trigger: "codex" }), "codex");
+  assert.equal(triggerExe({ trigger: "claude gateway" }), "claude");
+  assert.equal(triggerExe({ bin: "C:\\x\\hermes.exe gateway" }), "C:\\x\\hermes.exe");
+  assert.equal(triggerExe({}), "");
+  assert.equal(triggerExe(null), "");
+});
+
+test("laneScaffold emits the canonical Brains lane shape", () => {
+  const entries = laneScaffold("Codex", { node: "Node-12", icon: "⬜", date: "2026-07-15" });
+  const rels = entries.map(e => e.rel);
+  assert.deepEqual(rels, ["Identity.md", "Memory.md", "Rules.md", "Knowledge/.gitkeep", "Notes/.gitkeep"]);
+  assert.match(entries[0].content, /# ⬜ Codex — Identity/);
+  assert.match(entries[0].content, /Node-12/);
+  assert.equal(entries[3].content, "");   // gitkeeps are empty
 });
 
 test("coAssignments dedupes an agent that appears twice in one project", () => {

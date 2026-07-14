@@ -47,6 +47,50 @@ Plan: `Neural Cosmos: Connect, Complete, Captivate`.
 `packages/theme-engine/src/themes.css`, +3 test files.
 
 ### Next → Stage 2
-Six agent-detail panels for all 8 agents: installed-probe in `/api/state`, honest gateway control for
-observe-only agents, telemetry empty states, vault-lane scaffold, live incremental run log
-(`/api/proc/:id/log?since=N`, currently uncalled).
+Done — see below.
+
+---
+
+## Stage 2 — Six agent-detail panels working for all 8 agents ✅  (2026-07-15)
+
+Made every panel honest for every agent. Failures were data-supply, not missing UI.
+
+### Shipped
+- **Installed-state probe**: `probeInstalled` (`where <trigger>` / existsSync), cached in
+  `installedCache`, refreshed by `pollInstalled` on a 120s interval + at startup. Surfaced as
+  `installed` (+ `hasInstaller`) on `/api/state` agents and `/api/agent/:id/detail`. The dashboard
+  finally knows what's actually on the machine — drives the card, the gateway panel, and Stage 4's
+  catalog.
+- **Honest gateway control**: observe-only agents (`actions:[]`) no longer show the dead-end
+  "Click Status" hint with no Status button. New three-way empty state: not-installed → install
+  guidance; has status → the Status hint; else → "Observe-only — no service gateway to poll."
+- **Live run log**: wired the previously-uncalled `GET /api/proc/:id/log?since=N`. `AgentDetail`
+  tails it every 2s (`live.lines`, cursor-tracked), streaming an owned `run` in real time and
+  uncapping the old 40-line snapshot; falls back to the disk seed when idle.
+- **Vault-lane scaffold**: `scaffoldVaultLane` + pure `laneScaffold` templates create
+  `Brains/<Lane>/{Identity,Memory,Rules}.md` + `Knowledge/` + `Notes/` on register — writing only
+  missing files, never clobbering a real brain.
+- **Installed pill** in the detail header; Sessions/Telemetry honest empty states (Stage 1 already
+  fixed the `info`/heartbeat handling).
+
+### Tests — 83 pass (was 81)
+- `agent-detail.test.mjs` +2: `triggerExe` (trigger→bin fallback→empty), `laneScaffold` canonical shape.
+
+### Verified end-to-end (live server)
+- `/api/state`: all 8 agents `installed:true` on this machine (Boss has the CLIs — honest);
+  false-path logic unit-tested.
+- Codex detail (observe-only): all six panels render — gateway shows the honest observe-only note,
+  Sessions/Subagents/Telemetry honest empties, Brains lane lists Memory/Identity/Rules, run log shows
+  disk-persisted summon lines. Header shows "installed".
+- claude-code detail: 8 real transcript sessions, full gateway actions.
+- `/api/proc/:id/log?since=0` returns `{lines,next,status}` — the live-tail contract.
+- (Browser-pane screenshots time out environment-wide — a tooling quirk; verification via
+  DOM/text/API, which is authoritative for content.)
+
+### Files touched
+`apps/web/server.js`, `apps/web/lib/agent-detail.mjs`, `apps/web/src/components/AgentDetail.jsx`,
+`apps/web/test/agent-detail.test.mjs`.
+
+### Next → Stage 3
+Map neural glow + shockwave, ported from the proven Canvas engine, gated on the existing effect
+tokens + reduced-motion — now that the map has 21 real edges to make expressive.

@@ -93,6 +93,30 @@ function agentNameIndex(agents) {
   return { resolve: raw => index.get(norm(raw)) || null };
 }
 
+/* triggerExe: the bare executable a gateway is summoned/probed by — the first token of `trigger`
+   (or of `bin` as a fallback). Drives the installed-state probe: a path is checked with existsSync,
+   a bare name with `where`. Returns "" when nothing is configured (a dashboard-added agent with no
+   gateway yet) — which the probe reads as "not installed", routing the user to the install flow. */
+export function triggerExe(gateway) {
+  const g = gateway || {};
+  const raw = g.trigger || (g.bin ? String(g.bin) : "");
+  return String(raw).trim().split(/\s+/)[0] || "";
+}
+
+/* laneScaffold: the canonical Brains/<Lane>/ shape from the vault constitution — Identity, Memory,
+   Rules + empty Knowledge/ and Notes/. Returned as entries so the server writes only what's missing
+   (never clobbering a real brain). Pure, so the templates are unit-tested. */
+export function laneScaffold(name, { node = "", icon = "🤖", date = "" } = {}) {
+  const head = (kind) => `---\ntitle: "${name} — ${kind}"\nagent: ${name}\ntype: ${kind.toLowerCase()}\nnode: ${node}\ncreated: ${date}\ncreated_by: dashboard\nstatus: active\n---\n\n# ${icon} ${name} — ${kind}\n\n`;
+  return [
+    { rel: `Identity.md`, content: head("Identity") + `> Who this agent is, its role, and its operational + vault home.\n\n- **Node:** ${node}\n- **Registered:** ${date} (via dashboard)\n- **Vault lane:** \`Brains/${name}/\`\n` },
+    { rel: `Memory.md`, content: head("Memory") + `> Durable facts this agent must carry across sessions. Mirror of its operational brain.\n` },
+    { rel: `Rules.md`, content: head("Rules") + `> Hard rules. Stay in this lane; ask before touching shared folders; skills only from the warehouse.\n` },
+    { rel: `Knowledge/.gitkeep`, content: "" },
+    { rel: `Notes/.gitkeep`, content: "" },
+  ];
+}
+
 const TASK_LINE_RE = /^\s*[-*] \[[ xX]\]\s+(.*)/;
 const WORKSPACE_RE = /Projects\/([a-z0-9][a-z0-9-]*)\//i;
 const RESUME_RE = /Resume project:\s*([^—·\n]+?)\s*(?:[—·]|$)/i;

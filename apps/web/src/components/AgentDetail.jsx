@@ -76,6 +76,7 @@ function Subagents({ activity, isTele }) {
 
 export function AgentDetail({ id, gw, refresh, onClose }) {
   const [d, setD] = useState(null);
+  const [live, setLive] = useState({ lines: [] });
   const { pick, input } = useAvatarUpload(() => { load(); refresh(); });
   const logRef = useRef(null);
 
@@ -88,7 +89,22 @@ export function AgentDetail({ id, gw, refresh, onClose }) {
     return () => clearInterval(t);
   }, [id]);
 
-  useEffect(() => { if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight; }, [d]);
+  // Live run log: tail /api/proc/:id/log?since=cursor every 2s so an owned `run` streams in real time
+  // (the 5s detail poll only carried a 40-line snapshot). Falls back to the disk seed d.log when idle.
+  useEffect(() => {
+    setLive({ lines: [] });
+    let alive = true, cursor = 0;
+    const tick = async () => {
+      if (document.visibilityState !== "visible") return;
+      const r = await api(`/api/proc/${id}/log?since=${cursor}`);
+      if (!alive || !r || !Array.isArray(r.lines)) return;
+      if (r.lines.length) { cursor = r.next; setLive(prev => ({ lines: [...prev.lines, ...r.lines].slice(-500) })); }
+    };
+    const t = setInterval(tick, 2000); tick();
+    return () => { alive = false; clearInterval(t); };
+  }, [id]);
+
+  useEffect(() => { if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight; }, [d, live]);
 
   if (!d) return null;
   if (d.error) return <Empty>{d.error}</Empty>;
@@ -110,6 +126,8 @@ export function AgentDetail({ id, gw, refresh, onClose }) {
           <div className="pill-row" style={{ marginTop: 7 }}>
             <Pill status={d.vaultStatus} />
             <Pill status={st.cls} label={st.label} title={st.tip} />
+            {d.installed === false && <Pill status="error" label="not installed" title={`${d.bin || d.id} not found on this machine`} />}
+            {d.installed === true && <Pill status="idle" label="installed" title="CLI found on this machine" />}
           </div>
         </div>
         <div className="detail-actions"><Btn variant="dim" onClick={onClose}>✕ close</Btn></div>
@@ -134,7 +152,11 @@ export function AgentDetail({ id, gw, refresh, onClose }) {
           {d.note && <div className="gw-note">ℹ {d.note}</div>}
           {d.proc?.statusText
             ? <pre className="logpane" style={{ height: 130 }}>{d.proc.statusText}</pre>
-            : <Empty>Click <b>Status</b> to check the gateway through its own command.</Empty>}
+            : d.installed === false
+              ? <Empty><b>{d.name}</b> CLI <code>{d.bin || d.id}</code> is not installed on this machine.{d.install?.cmd ? <> Install it with <code>{d.install.cmd}</code>, or use <b>＋ Add Agent</b>.</> : <> Add a <code>gateway.install</code> entry, or install its CLI, to summon it.</>}</Empty>
+              : d.actions?.includes("status")
+                ? <Empty>Click <b>Status</b> to check the gateway through its own command.</Empty>
+                : <Empty>Observe-only agent — no service gateway to poll. Its live state comes from telemetry and summoned terminals.</Empty>}
         </div>
 
         <div className="dsec">
@@ -180,11 +202,14 @@ export function AgentDetail({ id, gw, refresh, onClose }) {
         </div>
 
         <div className="dsec" style={{ gridColumn: "1/-1" }}>
-          <h3>Gateway run log (owned, live)</h3>
+          <h3>Gateway run log (owned, live) {live.lines.length > 0 && <span className="cnt" style={{ textTransform: "none", letterSpacing: 0 }}>· streaming</span>}</h3>
           <pre className="logpane" ref={logRef}>
-            {d.log.length
-              ? d.log.map(l => `[${l.t}] ${l.s === "err" ? "⚠ " : ""}${l.line}`).join("\n")
-              : "(nothing yet — appears when you click Run / foreground)"}
+            {(() => {
+              const lines = live.lines.length ? live.lines : d.log;
+              return lines.length
+                ? lines.map(l => `[${l.t}] ${l.s === "err" ? "⚠ " : ""}${l.line}`).join("\n")
+                : "(nothing yet — appears when you click Run / foreground)";
+            })()}
           </pre>
         </div>
       </div>

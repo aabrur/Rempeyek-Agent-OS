@@ -106,8 +106,24 @@ function addAgent(body) {
   };
   cfg.agents.push(agent);
   try { saveConfig(cfg); } catch (e) { return { error: `failed to write config: ${e.message}` }; }
+  scaffoldVaultLane(agent);   // otherwise a dashboard-added agent's Brains/ lane is empty forever
   sysEvent(id, "ok", `agent registered via dashboard (${agent.node})`);
   return { ok: true, agent };
+}
+
+/* scaffoldVaultLane: create Brains/<Lane>/ in the canonical constitution shape (Identity/Memory/
+   Rules + Knowledge/ + Notes/) for a newly-registered agent — writing only files that don't exist,
+   so it never clobbers a real brain. No-op until the ESM helper (templates) has loaded. */
+function scaffoldVaultLane(agent) {
+  if (!agentDetailLib || !agent.lane) return;
+  try {
+    const entries = agentDetailLib.laneScaffold(agent.lane, { node: agent.node, icon: agent.icon, date: localISO().slice(0, 10) });
+    for (const e of entries) {
+      const abs = path.join(VAULT, "Brains", agent.lane, ...e.rel.split("/"));
+      fs.mkdirSync(path.dirname(abs), { recursive: true });
+      if (!fs.existsSync(abs)) fs.writeFileSync(abs, e.content, "utf8");
+    }
+  } catch (err) { console.error("[scaffoldVaultLane]", err.message); }
 }
 
 /* ---------------- vault scan (view: Command Center) ---------------- */
@@ -421,7 +437,7 @@ function buildState() {
       openTasks: { value: tasks.length, label: "Open checkboxes in Tasks/" },
       projects: { value: projects.length, label: "Projects in the workspace" },
     },
-    agents: cfg.agents.map(a => ({ ...a, gateway: undefined, actions: gwActions(a), canSummon: !!(a.gateway && a.gateway.home && a.gateway.trigger), ...agentVaultStatus(files, a), proc: procInfo(a.id), term: termInfo(a.id), avatar: avatarUrl(a.id), uptime: um[a.id] || null })),
+    agents: cfg.agents.map(a => ({ ...a, gateway: undefined, actions: gwActions(a), canSummon: !!(a.gateway && a.gateway.home && a.gateway.trigger), installed: installedState(a.id), hasInstaller: !!(a.gateway && a.gateway.install && a.gateway.install.cmd), ...agentVaultStatus(files, a), proc: procInfo(a.id), term: termInfo(a.id), avatar: avatarUrl(a.id), uptime: um[a.id] || null })),
     review: [
       ...inbox.map(f => ({ title: f.rel.split("/").pop().replace(".md", ""), meta: f.rel, kind: "inbox" })),
       ...tasks.slice(0, 6).map(t => ({ title: t.text, meta: t.source, kind: "task" })),
@@ -909,6 +925,31 @@ function pollAllStatus() {
   }
 }
 
+/* ---------------- installed-state probe ----------------
+   Whether an agent's CLI is actually on THIS machine — a `where <trigger>` (or existsSync for a path
+   trigger). Previously this ran only lazily at summon time, so the dashboard never knew what was
+   installed; now it is cached and refreshed on a slow interval so every card, the gateway panel, and
+   the install catalog can show a truthful Installed / Install state. */
+const installedCache = new Map();   // id -> { installed, at }
+function probeInstalled(agent) {
+  let exe; try { exe = agentDetailLib ? agentDetailLib.triggerExe(agent.gateway) : ""; } catch { exe = ""; }
+  if (!exe) return false;
+  if (/[\\/]/.test(exe)) { try { return fs.existsSync(exe); } catch { return false; } }
+  try { return spawnSync("where.exe", [exe], { windowsHide: true, timeout: 4000 }).status === 0; }
+  catch { return false; }
+}
+function pollInstalled() {
+  let agents; try { agents = loadConfig().agents; } catch { return; }
+  for (const a of agents) {
+    if (a.enabled === false) continue;
+    installedCache.set(a.id, { installed: probeInstalled(a), at: Date.now() });
+  }
+}
+function installedState(id) {
+  const c = installedCache.get(id);
+  return c ? c.installed : null;   // null = not yet probed
+}
+
 /* ---------------- avatar ---------------- */
 function avatarUrl(id) {
   for (const ext of ["png", "jpg", "webp", "svg"])   // svg = temporary placeholder; raster (uploaded) wins first
@@ -1219,6 +1260,7 @@ function agentDetail(id) {
     enabled: agent.enabled, note: agent.note || null, avatar: avatarUrl(id),
     cwd: agent.gateway && agent.gateway.cwd, bin: agent.gateway && agent.gateway.bin, actions: gwActions(agent),
     canSummon: !!(agent.gateway && agent.gateway.home && agent.gateway.trigger),
+    installed: installedState(id), install: (agent.gateway && agent.gateway.install) || null,
     proc: procInfo(id), term: termInfo(id), ...agentVaultStatus(files, agent),
     log: p && p.log.length ? p.log.slice(-40) : readDiskLog(id, 40),   // R#4: fall back to disk after a restart
     laneFiles, telemetry: tele,
@@ -1609,6 +1651,8 @@ if (require.main === module) {
   console.log(TOKEN ? "  Auth: token ACTIVE (x-dash-token)" : "  Auth: no token (local only). For remote access: set DASH_TOKEN.\n");
   setTimeout(pollAllStatus, 3000);       // initial status
   setInterval(pollAllStatus, 45000);     // R4: interval (45s) > gwCtl timeout (30s) + in-flight guard
+  setTimeout(pollInstalled, 1500);       // installed-state probe (where <trigger>) — drives Install/Summon UI
+  setInterval(pollInstalled, 120000);    // installs change rarely → slow refresh keeps spawns cheap
   setTimeout(pollSummons, 3000);         // pick up summoned-terminal pid files from a previous run
   setInterval(pollSummons, 45000);       // keep summoned-terminal liveness fresh
   setTimeout(runDailyBridge, 10000);     // R#2: run the daily bridge once at startup
