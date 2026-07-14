@@ -40,6 +40,9 @@ const AGENT_DETAIL = import("./lib/agent-detail.mjs");
    listen() on this resolving (below). The `|| []` guards keep a first-tick request honest. */
 let agentDetailLib = null;
 AGENT_DETAIL.then(m => { agentDetailLib = m; }).catch(e => console.error("[agent-detail]", e.message));
+const AGENT_CATALOG_MOD = import("./lib/agent-catalog.mjs");
+let catalogLib = null;
+AGENT_CATALOG_MOD.then(m => { catalogLib = m; }).catch(e => console.error("[agent-catalog]", e.message));
 /* PUBLIC = static source (images + runtime-uploaded avatars, never wiped by a build).
    DIST   = the built React app (`npm run build`). Requests resolve DIST first, then
    PUBLIC, then fall back to index.html — /avatars always comes from PUBLIC, because
@@ -83,26 +86,54 @@ function saveConfig(cfg) {
   _cfgCache = { mtime: 0, data: null };   // force reload on next loadConfig()
 }
 
+/* expandHome: a catalog/relative home (".codex") → absolute under the user's home. Absolute paths
+   pass through. Keeps the catalog portable while the persisted config stays concrete. */
+function expandHome(h) {
+  const s = String(h || "").trim();
+  if (!s) return "";
+  if (path.isAbsolute(s) || /^[a-zA-Z]:[\\/]/.test(s)) return s;
+  return path.join(os.homedir(), s.replace(/^~[\\/]?/, ""));
+}
+
 /* /api/agents/add — register a new agent from the dashboard.
-   Minimal shape: id, name; optional icon/role/accent; optional trigger+home → summonable (actions []). */
+   Two shapes:
+     { catalogId }                     → pull id/name/icon/role/trigger/home/install from the curated
+                                          catalog (this is the "+ Add Agent" install path).
+     { id, name, icon?, role?, accent?, trigger?, home? }  → a custom agent. trigger+home are now
+                                          PERSISTED as a gateway (the bug that shipped: they were
+                                          silently dropped). No install.cmd is ever taken from the
+                                          body — auto-install runs only vetted catalog commands. */
 function addAgent(body) {
-  const id = String(body.id || "").trim();
+  const cat = (body.catalogId && catalogLib) ? catalogLib.catalogEntry(body.catalogId) : null;
+  if (body.catalogId && !cat) return { error: `unknown catalog agent '${body.catalogId}'` };
+  const id = String((cat?.id ?? body.id) || "").trim();
   if (!/^[a-z0-9][a-z0-9-]{1,31}$/.test(id)) return { error: "id must be a 2-32 char slug (a-z, 0-9, -)" };
-  const name = String(body.name || "").replace(/[\x00-\x1f\x7f]+/g, " ").trim().slice(0, 40);
+  const name = String((cat?.name ?? body.name) || "").replace(/[\x00-\x1f\x7f]+/g, " ").trim().slice(0, 40);
   if (!name) return { error: "name is required" };
   const cfg = loadConfig();
   if (cfg.agents.some(a => a.id === id)) return { error: `agent '${id}' already exists` };
   const accent = /^#[0-9a-fA-F]{6}$/.test(String(body.accent || "")) ? body.accent : undefined;
   const nodeNums = cfg.agents.map(a => Number((String(a.node || "").match(/(\d+)$/) || [])[1])).filter(n => !Number.isNaN(n));
+
+  // gateway: persist trigger + home (→ summonable) and, from the catalog only, an install block.
+  const trigger = String((cat?.trigger ?? body.trigger) || "").trim().split(/\s+/)[0].slice(0, 60);
+  const home = expandHome(cat?.home ?? body.home);
+  const gateway = {};
+  if (home) gateway.home = home;
+  if (trigger) gateway.trigger = trigger;
+  if (cat?.install) gateway.install = cat.install;   // curated only — never from body
+  gateway.actions = [];                              // dashboard-added agents are observe-only
+
   const agent = {
     id, name,
-    icon: String(body.icon || "🤖").slice(0, 4),
-    role: String(body.role || "Agent").trim().slice(0, 80),
+    icon: String((cat?.icon ?? body.icon) || "🤖").slice(0, 4),
+    role: String((cat?.role ?? body.role) || "Agent").trim().slice(0, 80),
     node: `Node-${(nodeNums.length ? Math.max(...nodeNums) : 0) + 1}`,
     lane: name.replace(/[^A-Za-z0-9]/g, ""),
     enabled: true,
     ...(accent ? { accent } : {}),
-    note: `Registered via dashboard ${localISO().slice(0, 10)}. Observe-only; executable configuration requires a trusted config edit.`,
+    note: `Registered via dashboard ${localISO().slice(0, 10)}.${trigger ? ` Summon with \`${trigger}\`.` : " Observe-only until a gateway trigger is configured."}`,
+    ...((gateway.home || gateway.trigger || gateway.install) ? { gateway } : {}),
   };
   cfg.agents.push(agent);
   try { saveConfig(cfg); } catch (e) { return { error: `failed to write config: ${e.message}` }; }
@@ -1643,8 +1674,8 @@ if (require.main === module) {
     process.exit(1);
   });
 
-  // Gate listen() on the ESM helper module so telemetry windowing is ready before the first poll.
-  AGENT_DETAIL.finally(() => server.listen(PORT, process.env.DASH_HOST || "127.0.0.1", () => {
+  // Gate listen() on the ESM helper modules so telemetry windowing + catalog are ready before the first poll.
+  Promise.allSettled([AGENT_DETAIL, AGENT_CATALOG_MOD]).then(() => server.listen(PORT, process.env.DASH_HOST || "127.0.0.1", () => {
   console.log(`\n  Agentic OS running at  http://localhost:${PORT}`);
   console.log(`  Vault data source:     ${VAULT}`);
   console.log(`  Agent config:          ${CONFIG_PATH}`);
