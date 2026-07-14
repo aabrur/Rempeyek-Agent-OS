@@ -26,7 +26,7 @@
   --topology-node-fill:#100e1f; --topology-node-border:#2a2744;
   --topology-label:#f2edff; --topology-muted:#aaa1c5; --topology-filter:url(#topoGlow);
   --topo-edge-dependency:#9d6bff; --topo-edge-task:#f5b85a;
-  --topo-edge-subagent:#46d9ff; --topo-edge-communication:#f45bd8;
+  --topo-edge-subagent:#46d9ff; --topo-edge-communication:#f45bd8; --topo-edge-co_assignment:#7ef0be;
   /* semantic DOM effects; structural modes replace these as one profile */
   --dom-status-shadow:0 0 8px currentColor;
   --dom-rail-fill:rgba(255,255,255,.07);
@@ -58,7 +58,7 @@
   --graph-effect-glow:0; --graph-effect-halo:0; --graph-effect-shadow:0;
   --topology-node-fill:#f7f2ea; --topology-node-border:#95897b; --topology-label:#26221d; --topology-muted:#6f665d; --topology-filter:none;
   --topo-edge-dependency:#655f87; --topo-edge-task:#916c2f;
-  --topo-edge-subagent:#366b76; --topo-edge-communication:#865c72;
+  --topo-edge-subagent:#366b76; --topo-edge-communication:#865c72; --topo-edge-co_assignment:#4f704d;
   --dom-status-shadow:none; --dom-telemetry-fill:var(--acc); --dom-telemetry-shadow:none;
   --dom-rail-fill:#ded5c9;
   --dom-report-fill:var(--magenta); --dom-report-shadow:none; --dom-stat-shadow:none;
@@ -86,7 +86,7 @@
   --graph-effect-glow:0; --graph-effect-halo:0; --graph-effect-shadow:0;
   --topology-node-fill:#fff9ed; --topology-node-border:#171717; --topology-label:#111; --topology-muted:#514d46; --topology-filter:none;
   --topo-edge-dependency:#5535c9; --topo-edge-task:#9a5500;
-  --topo-edge-subagent:#006d77; --topo-edge-communication:#c90076;
+  --topo-edge-subagent:#006d77; --topo-edge-communication:#c90076; --topo-edge-co_assignment:#437a22;
   --dom-status-shadow:1px 1px 0 #171717; --dom-telemetry-fill:var(--acc); --dom-telemetry-shadow:none;
   --dom-rail-fill:#fff9ed;
   --dom-report-fill:var(--magenta); --dom-report-shadow:none; --dom-stat-shadow:none;
@@ -115,7 +115,7 @@
   --graph-effect-glow:1; --graph-effect-halo:1; --graph-effect-shadow:1;
   --topology-node-fill:#0c1b2f; --topology-node-border:#426482; --topology-label:#f7fbff; --topology-muted:#b3c5d8; --topology-filter:url(#topoGlow);
   --topo-edge-dependency:#a5b4fc; --topo-edge-task:#fde68a;
-  --topo-edge-subagent:#67e8f9; --topo-edge-communication:#e09bff;
+  --topo-edge-subagent:#67e8f9; --topo-edge-communication:#e09bff; --topo-edge-co_assignment:#a7f3d0;
 }
 
 /* Cyberpunk: calm solid cosmos; light is reserved for active/live state. */
@@ -133,7 +133,7 @@
   --graph-effect-glow:1; --graph-effect-halo:1; --graph-effect-shadow:1;
   --topology-filter:url(#topoGlow);
   --topo-edge-dependency:#9d6bff; --topo-edge-task:#f5b85a;
-  --topo-edge-subagent:#46d9ff; --topo-edge-communication:#f45bd8;
+  --topo-edge-subagent:#46d9ff; --topo-edge-communication:#f45bd8; --topo-edge-co_assignment:#7ef0be;
 }
 
 /* component token application */

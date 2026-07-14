@@ -37,6 +37,22 @@ test('includes only provenance-backed edges between configured agents', () => {
   assert.equal(topology.metadata.droppedRelations, 2);
 });
 
+test('co-assignment yields one symmetric edge per pair, canonicalised by sorted id', () => {
+  const topology = buildAgentTopology({ agents, coAssignments: [
+    { a: 'pi', b: 'codex', project: 'skill-hypertaks' },       // reversed order → still codex→pi
+    { a: 'codex', b: 'pi', project: 'skill-hypertaks' },       // duplicate → collapsed
+    { a: 'hermes', b: 'codex', project: 'skill-hypertaks' },
+  ] });
+  const co = topology.edges.filter((edge) => edge.type === 'co_assignment')
+    .sort((a, b) => `${a.source}:${a.target}`.localeCompare(`${b.source}:${b.target}`));
+  assert.deepEqual(co.map((edge) => [edge.source, edge.target]), [['codex', 'hermes'], ['codex', 'pi']]);
+  const hermesEdge = co.find((edge) => edge.target === 'hermes');
+  assert.equal(hermesEdge.provenance.source, 'co_assignment');
+  assert.equal(hermesEdge.provenance.id, 'skill-hypertaks:codex:hermes');
+  assert.equal(hermesEdge.status, 'co-assigned');
+  assert.ok(co.every((edge) => edge.flowing === false), 'co-assignment is not a flow');
+});
+
 test('task edges require explicit source and assignee rather than a fabricated core', () => {
   const topology = buildAgentTopology({ agents, tasks: [
     { id: 'task-1', sourceAgentId: 'hermes', agentId: 'codex', status: 'queued' },

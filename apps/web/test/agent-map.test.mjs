@@ -95,7 +95,7 @@ test("projects the complete edge vocabulary and provenance into inspectable rows
   };
 
   const map = buildAgentMap(topology);
-  assert.deepEqual(map.legend.relations.map(item => item.type), ["dependency", "task_assignment", "spawned_subagent", "communication"]);
+  assert.deepEqual(map.legend.relations.map(item => item.type), ["dependency", "co_assignment", "task_assignment", "spawned_subagent", "communication"]);
   assert.deepEqual(map.rows.filter(row => row.kind === "relationship").map(row => ({ type: row.type, provenanceId: row.provenanceId, provenanceSource: row.provenanceSource })), [
     { type: "communication", provenanceId: "message-1", provenanceSource: "communication" },
     { type: "dependency", provenanceId: "hermes:codex", provenanceSource: "configuration" },

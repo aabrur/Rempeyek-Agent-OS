@@ -1,10 +1,13 @@
 const byId = (a, b) => String(a.id).localeCompare(String(b.id));
 const RELATIONS = [
   { type: "dependency", label: "Dependency", description: "Configured prerequisite" },
+  { type: "co_assignment", label: "Co-assignment", description: "Shared project, from vault tasks" },
   { type: "task_assignment", label: "Task assignment", description: "Verified task routing" },
   { type: "spawned_subagent", label: "Spawned subagent", description: "Verified parent and child agents" },
   { type: "communication", label: "Communication", description: "Verified agent-to-agent message" },
 ];
+// Symmetric relations carry no arrowhead — direction would be a lie.
+const SYMMETRIC = new Set(["co_assignment"]);
 const STATUSES = [
   { status: "disabled", label: "Disabled" },
   { status: "running", label: "Running" },
@@ -15,6 +18,7 @@ const STATUSES = [
 const MODES = new Set(["owned", "terminal", "service", "cli"]);
 const PROVENANCE_BY_TYPE = new Map([
   ["dependency", "configuration"],
+  ["co_assignment", "co_assignment"],
   ["task_assignment", "task"],
   ["spawned_subagent", "subagent"],
   ["communication", "communication"],
@@ -161,12 +165,18 @@ export function buildAgentMap(topology = {}, { width = 760, height = 480, reduce
     if (isolated.length) for (const [id, position] of gridPositions(isolated, { x: padding, y: padding + connectedHeight, width: usableWidth, height: isolatedHeight })) positions.set(id, position);
   }
 
+  const degreeOf = new Map(nodes.map(node => [node.id, 0]));
+  for (const edge of edges) {
+    degreeOf.set(edge.source, (degreeOf.get(edge.source) || 0) + 1);
+    degreeOf.set(edge.target, (degreeOf.get(edge.target) || 0) + 1);
+  }
   const projectedNodes = nodes.map(node => ({
     ...node,
     ...positions.get(node.id),
     status: nodeState(node),
     mode: MODES.has(node.proc?.mode) ? node.proc.mode : null,
     componentId: components.findIndex(component => component.includes(node.id)),
+    degree: degreeOf.get(node.id) || 0,   // Stage 3: neural glow intensity scales with degree
     isolated: !(edges.some(edge => edge.source === node.id || edge.target === node.id)),
   }));
   const positioned = new Map(projectedNodes.map(node => [node.id, node]));
@@ -185,7 +195,7 @@ export function buildAgentMap(topology = {}, { width = 760, height = 480, reduce
       ...edge,
       id: edgeId(edge),
       path: `M${source.x.toFixed(1)},${source.y.toFixed(1)} Q${cx.toFixed(1)},${cy.toFixed(1)} ${target.x.toFixed(1)},${target.y.toFixed(1)}`,
-      directional: true,
+      directional: !SYMMETRIC.has(edge.type),
       animated: edge.flowing === true && FLOW_TYPES.has(edge.type) && FLOW_STATUSES.has(edge.status) && !reducedMotion,
     };
   });

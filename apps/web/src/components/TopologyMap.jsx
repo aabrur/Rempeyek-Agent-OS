@@ -9,6 +9,7 @@ const WIDTH = 760;
 const HEIGHT = 480;
 const RELATION_LABEL = {
   dependency: "Dependency",
+  co_assignment: "Co-assignment",
   task_assignment: "Task assignment",
   spawned_subagent: "Spawned subagent",
   communication: "Communication",
@@ -137,7 +138,7 @@ export function TopologyMap({ state, accent, load, onOpen }) {
             const id = `edge:${edge.id}`;
             const row = rowById.get(id);
             return <g key={edge.id} className={selectionId === id ? "is-selected" : ""}>
-              <path className={`top-edge rel-${edge.type}${edge.animated ? " is-flowing top-glow" : ""}`} d={edge.path} markerEnd={`url(#arrow-${edge.type})`} />
+              <path className={`top-edge rel-${edge.type}${edge.animated ? " is-flowing top-glow" : ""}`} d={edge.path} markerEnd={edge.directional === false ? undefined : `url(#arrow-${edge.type})`} />
               <path ref={node => { if (node) focusRefs.current.set(id, node); }} className="top-edge-hit" d={edge.path} tabIndex="0" role="button" aria-label={`${RELATION_LABEL[edge.type]} from ${row.sourceLabel} to ${row.targetLabel}; status ${row.status}; provenance ${row.provenanceSource} ${row.provenanceId}`} onFocus={() => select(id)} onClick={() => select(id)} onKeyDown={keyHandler(id)} />
               {edge.animated && <circle className={`top-particle rel-${edge.type} top-glow`} r="3"><animateMotion dur={`${2.4 + index * 0.16}s`} repeatCount="indefinite" path={edge.path} /></circle>}
             </g>;

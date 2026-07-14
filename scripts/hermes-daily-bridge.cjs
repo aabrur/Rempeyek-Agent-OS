@@ -31,10 +31,11 @@ function appendJsonl(obj) {
 }
 function ensureDir(p) { fs.mkdirSync(p, { recursive: true }); }
 
-// 1. Write telemetry heartbeat if none in last 30m (optional, harmless duplicate)
+// 1. Write telemetry heartbeat. Typed "heartbeat" so the dashboard treats it as keepalive noise
+//    and never lets it evict or masquerade as real work in the Sessions/Subagents panels.
 const heartbeat = {
   ts: now(),
-  type: 'task_progress',
+  type: 'heartbeat',
   name: 'Heartbeat Hermes',
   detail: 'Daily bridge alive · agentic-os → vault sync',
   progress: 100,

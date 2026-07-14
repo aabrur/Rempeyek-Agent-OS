@@ -1,6 +1,6 @@
 const validId = (value) => typeof value === 'string' && value.length > 0;
 
-export function buildAgentTopology({ agents = [], tasks = [], subagents = [], communications = [] } = {}) {
+export function buildAgentTopology({ agents = [], tasks = [], subagents = [], communications = [], coAssignments = [] } = {}) {
   const nodes = agents.filter((agent) => validId(agent?.id)).map((agent) => ({ ...agent }));
   const known = new Set(nodes.map((node) => node.id));
   const edges = [];
@@ -38,6 +38,16 @@ export function buildAgentTopology({ agents = [], tasks = [], subagents = [], co
     status: task.status || 'recorded',
     flowing: task.status === 'queued' || task.status === 'running',
   });
+  // Co-assignment: a symmetric working relationship (two agents on one project). Canonicalised
+  // to a sorted pair so the same collaboration is one edge, whichever order it is discovered in.
+  for (const rel of coAssignments) {
+    const [source, target] = [rel.a, rel.b].sort();
+    add({
+      source, target, type: 'co_assignment',
+      provenance: { source: 'co_assignment', id: `${rel.project}:${source}:${target}` },
+      status: rel.status || 'co-assigned',
+    });
+  }
 
   return {
     nodes, edges,

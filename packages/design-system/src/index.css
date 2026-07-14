@@ -573,9 +573,11 @@ body {
 .topo-empty span,.topo-empty small { color:var(--muted); font:10px/1.45 var(--mono); }
 .top-edge { fill:none; stroke-width:1.8; opacity:.72; pointer-events:none; vector-effect:non-scaling-stroke; }
 .top-edge.rel-dependency,.top-arrow.rel-dependency,.top-particle.rel-dependency { stroke:var(--topo-edge-dependency,var(--violet)); fill:var(--topo-edge-dependency,var(--violet)); }
+.top-edge.rel-co_assignment,.top-particle.rel-co_assignment { stroke:var(--topo-edge-co_assignment,var(--lime)); fill:var(--topo-edge-co_assignment,var(--lime)); }
 .top-edge.rel-task_assignment,.top-arrow.rel-task_assignment,.top-particle.rel-task_assignment { stroke:var(--topo-edge-task,var(--amber)); fill:var(--topo-edge-task,var(--amber)); }
 .top-edge.rel-spawned_subagent,.top-arrow.rel-spawned_subagent,.top-particle.rel-spawned_subagent { stroke:var(--topo-edge-subagent,var(--cyan)); fill:var(--topo-edge-subagent,var(--cyan)); }
 .top-edge.rel-communication,.top-arrow.rel-communication,.top-particle.rel-communication { stroke:var(--topo-edge-communication,var(--magenta)); fill:var(--topo-edge-communication,var(--magenta)); }
+.top-edge.rel-co_assignment { stroke-width:1.5; opacity:.62; }
 .top-edge.rel-task_assignment { stroke-dasharray:9 5; }
 .top-edge.rel-spawned_subagent { stroke-dasharray:2 5; }
 .top-edge.rel-communication { stroke-dasharray:12 4 2 4; }
@@ -620,6 +622,7 @@ body {
 .topo-legends .topo-legend { margin:0; }
 .relation-line { width:25px !important; height:0 !important; border-radius:0 !important; border-top:2px solid currentColor; background:none !important; }
 .relation-line.rel-dependency { color:var(--topo-edge-dependency,var(--violet)); }
+.relation-line.rel-co_assignment { color:var(--topo-edge-co_assignment,var(--lime)); }
 .relation-line.rel-task_assignment { color:var(--topo-edge-task,var(--amber)); }
 .relation-line.rel-spawned_subagent { color:var(--topo-edge-subagent,var(--cyan)); }
 .relation-line.rel-communication { color:var(--topo-edge-communication,var(--magenta)); }

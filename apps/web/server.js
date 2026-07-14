@@ -34,6 +34,12 @@ const TODAY_PROJECTION = import("./lib/today-projection.mjs");
 const APPROVAL_QUEUE = import("./lib/approval-queue.mjs").then(({ createApprovalQueue }) => createApprovalQueue());
 const VAULT_GRAPH = import("./lib/vault-graph.mjs");
 const AGENT_TOPOLOGY = import("./lib/agent-topology.mjs");
+const AGENT_DETAIL = import("./lib/agent-detail.mjs");
+/* Synchronous handle to the (async-imported) ESM helper module. Populated on the first tick;
+   readTelemetry/telemetryActivity are sync and used by buildState, so the server gates its
+   listen() on this resolving (below). The `|| []` guards keep a first-tick request honest. */
+let agentDetailLib = null;
+AGENT_DETAIL.then(m => { agentDetailLib = m; }).catch(e => console.error("[agent-detail]", e.message));
 /* PUBLIC = static source (images + runtime-uploaded avatars, never wiped by a build).
    DIST   = the built React app (`npm run build`). Requests resolve DIST first, then
    PUBLIC, then fall back to index.html — /avatars always comes from PUBLIC, because
@@ -995,8 +1001,23 @@ function todayProjectData(files) {
 
 async function buildLiveAgentTopology() {
   const { buildAgentTopology } = await AGENT_TOPOLOGY;
+  const { coAssignments } = await AGENT_DETAIL;
   const state = buildState();
-  return buildAgentTopology({ agents: state.agents });
+  // Verified agent↔agent relationships from the vault: two agents on one project (provenance =
+  // the task line). Directed task/subagent/comm edges appear here too once agents report them.
+  const taskFiles = readTaskFiles();
+  const co = coAssignments(taskFiles, state.agents);
+  return buildAgentTopology({ agents: state.agents, coAssignments: co });
+}
+/* readTaskFiles: raw text of every vault Tasks/*.md, for co-assignment discovery. */
+function readTaskFiles() {
+  const out = [];
+  let names = [];
+  try { names = fs.readdirSync(path.join(VAULT, "Tasks")).filter(n => n.endsWith(".md")); } catch {}
+  for (const n of names) {
+    try { out.push({ rel: `Tasks/${n}`, text: fs.readFileSync(path.join(VAULT, "Tasks", n), "utf8") }); } catch {}
+  }
+  return out;
 }
 function buildGraph() {
   if (graphCache.data && Date.now() - graphCache.t < 60000) return graphCache.data;
@@ -1173,41 +1194,14 @@ function claudeActivity() {
   return { sessions, subagents: allAgents.reverse().slice(0, 20) };
 }
 
-/* ------- cross-agent telemetry: agentic-os/telemetry/<id>.jsonl ------- */
+/* ------- cross-agent telemetry: agentic-os/telemetry/<id>.jsonl -------
+   Windowing + activity derivation live in lib/agent-detail.mjs (pure + unit-tested). The window
+   reserves room for real signal so a heartbeat flood can no longer evict subagent/task events. */
 function readTelemetry(id) {
   const file = path.join(TELEMETRY_DIR, `${id}.jsonl`);
-  if (!fs.existsSync(file)) return [];
-  const out = [];
-  for (const line of tailRead(file, 100000).split("\n")) {
-    if (!line.trim()) continue;
-    try { const o = JSON.parse(line); if (o && o.type) out.push(o); } catch {}
-  }
-  return out.slice(-30).reverse();
-}
-
-/* Uniform activity for non-Claude agents: derive sessions + subagents from their own
-   telemetry (not fake data), same shape as claudeActivity() so the UI renders identically. */
-function telemetryActivity(events) {
-  const subagents = [], subSeen = new Set();
-  const sessions = [], taskSeen = new Set();
-  for (const e of events) {   // events: newest-first (readTelemetry)
-    if (e.type === "subagent_start" || e.type === "subagent_done") {
-      const key = e.name || e.detail || "";
-      if (subSeen.has(key)) continue; subSeen.add(key);
-      subagents.push({ type: "subagent", desc: e.name || "(subagent)", detail: e.detail || "",
-        status: e.type === "subagent_done" ? "done" : "running", ts: e.ts || null });
-    } else if (e.type === "task_start" || e.type === "task_progress" || e.type === "task_done") {
-      const key = e.name || "";
-      if (taskSeen.has(key)) continue; taskSeen.add(key);   // latest status per task (newest-first)
-      const ageMin = e.ts ? (Date.now() - Date.parse(e.ts)) / 60000 : 1e9;
-      sessions.push({ id: (e.name || "task").slice(0, 8), project: e.detail || "",
-        lastActivity: e.ts || null,
-        status: e.type === "task_done" ? "idle" : (ageMin < 30 ? "working" : "waiting"),
-        lastPrompt: e.name || null, lastTool: null,
-        toolCount: typeof e.progress === "number" ? e.progress : 0 });
-    }
-  }
-  return { sessions: sessions.slice(0, 8), subagents: subagents.slice(0, 20) };
+  if (!fs.existsSync(file) || !agentDetailLib) return [];
+  const events = agentDetailLib.parseTelemetry(tailRead(file, 100000));
+  return agentDetailLib.selectTelemetryWindow(events, { limit: 30 });   // newest-first
 }
 
 function agentDetail(id) {
@@ -1229,7 +1223,7 @@ function agentDetail(id) {
     log: p && p.log.length ? p.log.slice(-40) : readDiskLog(id, 40),   // R#4: fall back to disk after a restart
     laneFiles, telemetry: tele,
     // uniform activity for all agents: Claude from transcripts, the rest from their own telemetry
-    activity: id === "claude-code" ? claudeActivity() : telemetryActivity(tele),
+    activity: id === "claude-code" ? claudeActivity() : (agentDetailLib ? agentDetailLib.telemetryActivity(tele) : { sessions: [], subagents: [] }),
     source: id === "claude-code" ? "transcript" : "telemetry",
   };
 }
@@ -1607,7 +1601,8 @@ if (require.main === module) {
     process.exit(1);
   });
 
-  server.listen(PORT, process.env.DASH_HOST || "127.0.0.1", () => {
+  // Gate listen() on the ESM helper module so telemetry windowing is ready before the first poll.
+  AGENT_DETAIL.finally(() => server.listen(PORT, process.env.DASH_HOST || "127.0.0.1", () => {
   console.log(`\n  Agentic OS running at  http://localhost:${PORT}`);
   console.log(`  Vault data source:     ${VAULT}`);
   console.log(`  Agent config:          ${CONFIG_PATH}`);
@@ -1620,7 +1615,7 @@ if (require.main === module) {
   setInterval(runDailyBridge, 3600000);  // R#2: then hourly (it existed before but was never invoked)
   setTimeout(captureMemory, 8000);       // project memory: telemetry task_done → decisions.md
   setInterval(captureMemory, 120000);    // watermarked, so re-runs never duplicate entries
-  });
+  }));
 }
 
 module.exports = { createServer, legacyDecisionContext };
