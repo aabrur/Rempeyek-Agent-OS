@@ -517,6 +517,26 @@ body {
 .top-node { transition: opacity .2s; }
 .top-node:hover circle { filter: drop-shadow(0 0 9px currentColor); }
 
+/* --- Stage 3 neural glow + shockwave. All gated on --graph-effect-glow/-halo (0 in the flat
+   themes → invisible with no per-theme branching) and on prefers-reduced-motion. --- */
+.top-halo-layer { pointer-events: none; }
+.top-node-halo {
+  fill: var(--agent-color, var(--acc));
+  opacity: calc(var(--graph-effect-halo, 1) * .17);
+  transform-box: fill-box; transform-origin: center;
+}
+.top-node-ring { filter: var(--topology-filter, none); }
+.top-shock { pointer-events: none; }
+.top-shock .shock-ring { stroke: var(--agent-color, var(--acc)); stroke-width: 2.2; filter: var(--topology-filter, none); }
+.top-shock .shock-ring2 { stroke: rgba(var(--graph-wave, 255,255,255), .85); stroke-width: 1; }
+@media (prefers-reduced-motion: no-preference) {
+  .top-node-halo { animation: haloBreath 3.8s ease-in-out infinite; }
+  @keyframes haloBreath {
+    0%, 100% { transform: scale(.92); opacity: calc(var(--graph-effect-halo, 1) * .12); }
+    50%      { transform: scale(1.12); opacity: calc(var(--graph-effect-halo, 1) * .24); }
+  }
+}
+
 /* HUD grid: side panels flanking the SVG map */
 .topo-grid { display: grid; grid-template-columns: 218px 1fr 248px; gap: 12px; padding: 14px 14px 4px; position: relative; }
 .topo-map { min-width: 0; align-self: center; }

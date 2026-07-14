@@ -92,5 +92,41 @@ Made every panel honest for every agent. Failures were data-supply, not missing 
 `apps/web/test/agent-detail.test.mjs`.
 
 ### Next → Stage 3
-Map neural glow + shockwave, ported from the proven Canvas engine, gated on the existing effect
-tokens + reduced-motion — now that the map has 21 real edges to make expressive.
+Done — see below.
+
+---
+
+## Stage 3 — Map neural glow + shockwave ✅  (2026-07-15)
+
+Ported the Canvas engine's two proven effects to the SVG Agent Map — now that the map has 21 real
+edges and per-node degree to make them expressive. Zero new invention; same laws, gated the same way.
+
+### Shipped
+- **Breathing plasma halos** (`.top-node-halo`): radius `22 + degree*3.2` and intensity scale with
+  real node degree — the Canvas law. Behind the edges, blurred via a shared `#topoHalo` filter,
+  breathing out-of-phase (negative per-degree animation-delay). The 7-agent Skill Hypertaks clique
+  (degree 6 → r41) blooms; isolated claude-code (degree 0 → r22) stays quiet. Overlapping halos read
+  as neural tissue.
+- **Selection shockwave** (`.top-shock`): expanding double-ring, radius `34 + degree*6`, spline-eased
+  fade. Fires ONLY on explicit node selection (Canvas contract), re-fires on re-select via a nonce
+  key. Node-accent outer ring + `--graph-wave` inner ring.
+- **Node-ring glow**: `--topology-filter` applied to `.top-node-ring`.
+- **Gating (protects the design)**: `useEffectsEnabled()` reads `--graph-effect-glow`; halos use
+  `calc(var(--graph-effect-halo,1) * opacity)`; shockwave suppressed when effects off OR reduced-motion;
+  breathing wrapped in `@media (prefers-reduced-motion: no-preference)`. Flat themes stay flat with no
+  component branching.
+
+### Verified
+- Cyberpunk (browser, live): 8 halos, radii `[41.2 ×7, 22.0]` (degree-exact), breathing opacity
+  ~0.23, accent fill; shockwave on select → 2 rings r20→70 (Antigravity degree 6), accent stroke.
+- Flat themes: minimalist (themes.css:58) + brutalist (:86) set `--graph-effect-glow/-halo:0` and
+  `--topology-filter:none` — the exact tokens the CSS gates on → halo opacity `calc(0*…)=0`, shockwave
+  not rendered. Proven at source; positive case confirms the token wiring is live. *(Empirical
+  flat-theme screenshot pending — browser JS classifier was temporarily unavailable.)*
+- Perf: SVG map ≤ 20 nodes; Canvas benchmark (<1500ms @ 1k) untouched → still green. 83 tests pass.
+
+### Files touched
+`apps/web/src/components/TopologyMap.jsx`, `packages/design-system/src/index.css`.
+
+### Next → Stage 4
+Curated install catalog + version notify / one-click update.

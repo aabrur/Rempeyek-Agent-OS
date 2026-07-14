@@ -26,6 +26,24 @@ function useReducedMotion() {
   return reduced;
 }
 
+/* Whether the active theme wants luminous effects. Reads the SAME token the flat themes zero out
+   (--graph-effect-glow: 0 in minimalist/brutalist), so glow + shockwave stay off there with no
+   per-theme branching. Re-reads on the theme toggle (data-theme attribute). */
+function useEffectsEnabled() {
+  const [on, setOn] = useState(true);
+  useEffect(() => {
+    const read = () => {
+      const v = getComputedStyle(document.documentElement).getPropertyValue("--graph-effect-glow").trim();
+      setOn(v !== "0");
+    };
+    read();
+    const obs = new MutationObserver(read);
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+    return () => obs.disconnect();
+  }, []);
+  return on;
+}
+
 function StatusMark({ status }) {
   return <span className={`topo-status-mark status-${status}`} aria-hidden="true" />;
 }
@@ -65,10 +83,12 @@ function EvidenceTable({ map, onSelect }) {
 export function TopologyMap({ state, accent, load, onOpen }) {
   const agents = state.agents || [];
   const reducedMotion = useReducedMotion();
+  const effectsOn = useEffectsEnabled();
   const [topology, setTopology] = useState(() => beginTopologyRefresh(null, agents));
   const [topologyReady, setTopologyReady] = useState(false);
   const [loadError, setLoadError] = useState("");
   const [selectionId, setSelectionId] = useState("");
+  const [shockNonce, setShockNonce] = useState(0);   // bump per selection → SMIL shockwave re-fires
   const focusRefs = useRef(new Map());
   const agentKey = agentTopologyRevision(agents);
 
@@ -99,7 +119,11 @@ export function TopologyMap({ state, accent, load, onOpen }) {
   const upAvg = upList.length ? Math.round(upList.reduce((sum, value) => sum + value, 0) / upList.length) : null;
   const locked = state.auth === "token-locked";
 
-  const select = id => setSelectionId(id);
+  const select = id => { setSelectionId(id); setShockNonce(n => n + 1); };
+  // Shockwave fires only on an explicit node selection — never automatically (the Canvas engine's
+  // contract). Suppressed by flat themes (effectsOn) and reduced-motion.
+  const shockNodeId = selectionId.startsWith("node:") ? selectionId.slice(5) : null;
+  const shockNode = (effectsOn && !reducedMotion && shockNodeId) ? map.nodes.find(n => n.id === shockNodeId && n.status !== "disabled") : null;
   const moveSelection = (currentId, key) => {
     const ids = map.rows.map(row => row.id);
     if (!ids.length) return;
@@ -131,8 +155,21 @@ export function TopologyMap({ state, accent, load, onOpen }) {
         <svg className="topology" viewBox={`0 0 ${WIDTH} ${HEIGHT}`} role="group" aria-label={`Agent Map with ${map.metadata.nodeCount} agents and ${map.metadata.edgeCount} verified relationships`}>
           <defs>
             <filter id="topoGlow" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="3" result="blur" /><feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
+            {/* Neural halo: a soft, wide bloom used behind hubs. Bigger blur than topoGlow. */}
+            <filter id="topoHalo" x="-120%" y="-120%" width="340%" height="340%"><feGaussianBlur stdDeviation="7" /></filter>
             {map.legend.relations.map(item => <marker key={item.type} id={`arrow-${item.type}`} viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" className={`top-arrow rel-${item.type}`} /></marker>)}
           </defs>
+
+          {/* Breathing plasma halos under the hubs — radius + intensity scale with real degree, the
+              same law the Canvas engine uses. Gated by --graph-effect-halo (0 in flat themes) and
+              reduced-motion (CSS). Rendered under the edges so nodes and lines sit on top. */}
+          <g className="top-halo-layer" filter="url(#topoHalo)" aria-hidden="true">
+            {map.nodes.map(node => (
+              <circle key={node.id} className="top-node-halo"
+                cx={node.x.toFixed(1)} cy={node.y.toFixed(1)} r={(22 + (node.degree || 0) * 3.2).toFixed(1)}
+                style={{ "--agent-color": agentAccent(node), animationDelay: `${(-((node.degree || 0) * 0.37)).toFixed(2)}s` }} />
+            ))}
+          </g>
 
           {map.edges.map((edge, index) => {
             const id = `edge:${edge.id}`;
@@ -160,6 +197,22 @@ export function TopologyMap({ state, accent, load, onOpen }) {
               <text className="top-node-state" y="59" textAnchor="middle">{node.status}{node.mode ? ` · ${node.mode}` : ""}</text>
             </g>;
           })}
+
+          {/* Selection shockwave — expanding double-ring, radius scaled by degree. Keyed by the
+              selection nonce so re-selecting the same node re-fires the SMIL animation. */}
+          {shockNode && (() => {
+            const max = 34 + (shockNode.degree || 0) * 6;
+            return <g key={shockNonce} className="top-shock" transform={`translate(${shockNode.x.toFixed(1)},${shockNode.y.toFixed(1)})`} style={{ "--agent-color": agentAccent(shockNode) }} aria-hidden="true">
+              <circle className="shock-ring" r="20" fill="none">
+                <animate attributeName="r" from="20" to={max} dur="0.85s" begin="0s" fill="freeze" calcMode="spline" keySplines="0.16 1 0.3 1" keyTimes="0;1" />
+                <animate attributeName="opacity" from="0.75" to="0" dur="0.85s" begin="0s" fill="freeze" />
+              </circle>
+              <circle className="shock-ring shock-ring2" r="14" fill="none">
+                <animate attributeName="r" from="14" to={(max * 0.82).toFixed(0)} dur="0.85s" begin="0.09s" fill="freeze" calcMode="spline" keySplines="0.16 1 0.3 1" keyTimes="0;1" />
+                <animate attributeName="opacity" from="0.55" to="0" dur="0.85s" begin="0.09s" fill="freeze" />
+              </circle>
+            </g>;
+          })()}
         </svg>
         <p className="topo-key-help">Keyboard: Tab enters the map; Arrow keys move through every agent and relationship; Enter inspects; Escape clears.</p>
       </div>
