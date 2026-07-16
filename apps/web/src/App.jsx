@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Sidebar } from "./components/Sidebar";
+import { VortexBackdrop } from "./components/VortexBackdrop";
 import { TokenLogin } from "./components/TokenLogin";
 import { ConfigBanner } from "./components/Panels";
 import { UpdateBanner } from "./components/UpdateBanner";
@@ -46,6 +47,7 @@ export default function App() {
   return (
     <>
       <a className="skip-link" href="#main-content">Skip to workspace</a>
+      <VortexBackdrop />
       <div className="shell">
         <Sidebar
           view={view}

@@ -98,12 +98,38 @@ function rankedPositions(ids, edges, { x, y, width, height }) {
   }
   const maxRank = Math.max(...levels.keys(), 0);
   const positions = new Map();
+  // A node needs ~96px of vertical pitch (ring + two label lines). Ranks that
+  // exceed the band's capacity fan into extra columns instead of overlapping.
+  const minPitch = 96;
+  const maxPerColumn = Math.max(1, Math.floor(height / minPitch));
   for (const [level, levelIds] of [...levels].sort((a, b) => a[0] - b[0])) {
     levelIds.sort();
-    levelIds.forEach((id, index) => positions.set(id, {
-      x: x + (maxRank ? level / maxRank : (index + 1) / (levelIds.length + 1)) * width,
-      y: y + (index + 1) * height / (levelIds.length + 1),
-    }));
+    if (!maxRank) {
+      levelIds.forEach((id, index) => positions.set(id, {
+        x: x + (index + 1) / (levelIds.length + 1) * width,
+        y: y + (index + 1) * height / (levelIds.length + 1),
+      }));
+      continue;
+    }
+    const columns = Math.ceil(levelIds.length / maxPerColumn);
+    const perColumn = Math.ceil(levelIds.length / columns);
+    const t = level / maxRank;
+    const baseX = x + t * width;
+    const dx = Math.min(124, width / (maxRank + 1) * 0.55);
+    levelIds.forEach((id, index) => {
+      const column = Math.floor(index / perColumn);
+      const inColumn = index % perColumn;
+      const rowsInColumn = Math.min(perColumn, levelIds.length - column * perColumn);
+      // Edge ranks fan inward so no column leaves the band; middle ranks center.
+      const spread = columns === 1 ? 0
+        : t > 0.66 ? -column * dx
+        : t < 0.34 ? column * dx
+        : (column - (columns - 1) / 2) * dx;
+      positions.set(id, {
+        x: Math.min(x + width, Math.max(x, baseX + spread)),
+        y: y + (inColumn + 0.5) * height / rowsInColumn,
+      });
+    });
   }
   return positions;
 }
