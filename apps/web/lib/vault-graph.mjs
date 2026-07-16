@@ -47,12 +47,18 @@ export function buildVaultGraph({ files = [], generatedAt = new Date().toISOStri
     adjacencySets.get(target).add(source);
   };
 
-  const readableFiles = files.filter((file) => typeof file?.rel === 'string' && file.rel.toLowerCase().endsWith('.md'));
-  for (const file of readableFiles) {
-    const label = file.rel.split('/').pop().replace(/\.md$/i, '');
+  /* Three node classes from one file list: vault .md → note (link-parsed), vault non-.md → asset
+     (embed/link TARGET only — the Boss decree .txt and Assets/ become visible), kind:'repo' → code
+     (repo source under the virtual Repo/ folder). Only notes are parsed for links. */
+  const allFiles = files.filter((file) => typeof file?.rel === 'string');
+  const readableFiles = allFiles.filter((file) => file.kind !== 'repo' && file.rel.toLowerCase().endsWith('.md'));
+  for (const file of allFiles) {
+    const isMd = file.rel.toLowerCase().endsWith('.md');
+    const type = file.kind === 'repo' ? 'code' : isMd ? 'note' : 'asset';
+    const label = type === 'note' ? file.rel.split('/').pop().replace(/\.md$/i, '') : file.rel.split('/').pop();
     const directory = file.rel.includes('/') ? file.rel.slice(0, file.rel.lastIndexOf('/')) : '';
-    addNode(file.rel, { label, folder: directory || '(root)', type: 'note', mtime: file.mtime ?? 0 });
-    byPath.set(file.rel.toLowerCase().replace(/\.md$/, ''), file.rel);
+    addNode(file.rel, { label, folder: directory || '(root)', type, mtime: file.mtime ?? 0 });
+    byPath.set(isMd ? file.rel.toLowerCase().replace(/\.md$/, '') : file.rel.toLowerCase(), file.rel);
     const base = label.toLowerCase();
     if (!byBase.has(base)) byBase.set(base, []);
     byBase.get(base).push(file.rel);
@@ -83,7 +89,7 @@ export function buildVaultGraph({ files = [], generatedAt = new Date().toISOStri
     }
   }
 
-  for (const file of readableFiles) {
+  for (const file of allFiles) {
     const parts = file.rel.split('/').slice(0, -1);
     let previous = null;
     for (let index = 0; index < parts.length; index += 1) {
@@ -102,6 +108,8 @@ export function buildVaultGraph({ files = [], generatedAt = new Date().toISOStri
   }
   const stats = {
     notes: readableFiles.length,
+    assets: [...nodes.values()].filter((node) => node.type === 'asset').length,
+    codeFiles: [...nodes.values()].filter((node) => node.type === 'code').length,
     links: edges.filter((edge) => edge.type === 'link').length,
     ghosts: edges.filter((edge) => edge.type === 'ghost').length,
     tagEdges: edges.filter((edge) => edge.type === 'tag').length,

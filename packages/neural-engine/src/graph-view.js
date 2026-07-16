@@ -164,8 +164,8 @@ export function layoutGraph(data = {}, { width = 800, height = 600, iterations =
 
 export function layersForMode(mode) {
   return mode === "parity"
-    ? { link: true, ghost: true, tag: false, folder: false }
-    : { link: true, ghost: true, tag: true, folder: true };
+    ? { link: true, ghost: true, tag: false, folder: false, asset: false, code: false }
+    : { link: true, ghost: true, tag: true, folder: true, asset: true, code: true };
 }
 
 export function nodeSemantics(node, { generatedAt, changedNodeIds: changed = [], recentDays = 7 } = {}) {
@@ -183,7 +183,7 @@ export function nodeSemantics(node, { generatedAt, changedNodeIds: changed = [],
 }
 
 export function projectGraph(data = {}, { mode = "cosmos", layers = layersForMode(mode), focusId = null } = {}) {
-  const nodeAllowed = node => node.type === "note" || (node.type === "ghost" && layers.ghost) || (node.type === "tag" && layers.tag) || (node.type === "folder" && layers.folder);
+  const nodeAllowed = node => node.type === "note" || (node.type === "ghost" && layers.ghost) || (node.type === "tag" && layers.tag) || (node.type === "folder" && layers.folder) || (node.type === "asset" && layers.asset) || (node.type === "code" && layers.code);
   const allowed = new Set((data.nodes || []).filter(nodeAllowed).map(node => node.id));
   let edges = (data.edges || []).filter(edge => layers[edge.type || "link"] && allowed.has(edge.source ?? edge.s) && allowed.has(edge.target ?? edge.t));
   let visible = allowed;
@@ -206,7 +206,7 @@ export function projectGraph(data = {}, { mode = "cosmos", layers = layersForMod
   const count = type => nodes.filter(node => node.type === type).length;
   return {
     nodes, edges, adjacency,
-    counts: { nodes: nodes.length, edges: edges.length, notes: count("note"), ghosts: count("ghost"), tags: count("tag"), folders: count("folder") },
+    counts: { nodes: nodes.length, edges: edges.length, notes: count("note"), ghosts: count("ghost"), tags: count("tag"), folders: count("folder"), assets: count("asset"), codeFiles: count("code") },
     metadata: {
       ...(data.metadata || {}), mode, focusId: appliedFocusId,
       datasetIdentity: data.metadata?.datasetIdentity || datasetIdentity(data),

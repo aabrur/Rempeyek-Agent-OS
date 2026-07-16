@@ -11,7 +11,7 @@ test('preserves notes, resolved links, ghosts, tags, folders, and orphans in one
   ], generatedAt: '2026-07-12T00:00:00.000Z' });
 
   assert.equal(graph.nodes.filter((node) => node.type === 'note').length, 3);
-  assert.deepEqual(graph.stats, { notes: 3, links: 1, ghosts: 1, tagEdges: 1, folderEdges: 2, orphans: 1 });
+  assert.deepEqual(graph.stats, { notes: 3, assets: 0, codeFiles: 0, links: 1, ghosts: 1, tagEdges: 1, folderEdges: 2, orphans: 1 });
   assert.equal(graph.nodes.some((node) => node.id === 'ghost:Missing'), true);
   assert.equal(graph.nodes.some((node) => node.id === 'ghost:Ignored'), false);
   assert.deepEqual(graph.metadata, {
@@ -40,4 +40,35 @@ test('marks large datasets for reduced effects without removing graph truth', ()
   assert.equal(graph.nodes.length, 1001);
   assert.equal(graph.metadata.effectTier, 'aggregate-ready');
   assert.equal(graph.metadata.aggregation, 'none');
+});
+
+test('non-markdown vault files become asset nodes — embeds resolve to them instead of ghosts', () => {
+  const graph = buildVaultGraph({ files: [
+    { rel: 'Assets/Images/cosmos-brain.png', mtime: 5 },
+    { rel: '[SYSTEM OVERRIDE & SYNCHRONIZATION.txt', mtime: 4 },
+    { rel: 'Welcome.md', mtime: 3, text: '![[cosmos-brain.png]]' },
+  ] });
+  const asset = graph.nodes.find((node) => node.id === 'Assets/Images/cosmos-brain.png');
+  assert.equal(asset?.type, 'asset');
+  assert.equal(graph.nodes.find((node) => node.id === '[SYSTEM OVERRIDE & SYNCHRONIZATION.txt')?.type, 'asset',
+    'the Boss decree .txt is finally visible to the graph');
+  assert.equal(graph.edges.some((edge) => edge.type === 'link' && edge.target === 'Assets/Images/cosmos-brain.png'), true,
+    'the embed resolves to the real asset, not a ghost');
+  assert.equal(graph.nodes.some((node) => node.id === 'ghost:cosmos-brain.png'), false);
+  assert.equal(graph.stats.notes, 1, 'assets never inflate the note count');
+  assert.equal(graph.stats.assets, 2);
+});
+
+test('repo source files become a code layer under the virtual Repo/ folder', () => {
+  const graph = buildVaultGraph({ files: [
+    { rel: 'Repo/apps/web/server.js', mtime: 2, kind: 'repo' },
+    { rel: 'Repo/package.json', mtime: 1, kind: 'repo' },
+    { rel: 'INDEX.md', mtime: 3, text: '# index' },
+  ] });
+  const code = graph.nodes.filter((node) => node.type === 'code');
+  assert.deepEqual(code.map((node) => node.id).sort(), ['Repo/apps/web/server.js', 'Repo/package.json']);
+  assert.equal(graph.edges.some((edge) => edge.type === 'folder' && edge.source === 'Repo/apps/web/server.js' && edge.target === 'folder:Repo/apps/web'), true);
+  assert.equal(graph.stats.codeFiles, 2);
+  assert.equal(graph.stats.notes, 1);
+  assert.equal(graph.stats.assets, 0, 'repo files are code, never vault assets');
 });

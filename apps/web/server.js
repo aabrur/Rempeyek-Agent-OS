@@ -133,16 +133,16 @@ function scaffoldVaultLane(agent) {
 }
 
 /* ---------------- vault scan (view: Command Center) ---------------- */
-function walk(dir, out = [], base = dir, depth = 0) {
+function walk(dir, out = [], base = dir, depth = 0, opts = {}) {
   if (depth > 100) return out;               // R14: prevent runaway recursion (deep nesting)
   let entries;
   try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return out; }
   for (const e of entries) {
-    if (IGNORE.has(e.name) || e.name.startsWith(".")) continue;
+    if ((opts.all ? e.name === "node_modules" || e.name === ".git" || e.name === ".obsidian" : IGNORE.has(e.name)) || e.name.startsWith(".")) continue;
     if (e.isSymbolicLink()) continue;        // R14: skip symlinks/junctions → prevent loops
     const full = path.join(dir, e.name);
-    if (e.isDirectory()) walk(full, out, base, depth + 1);
-    else if (e.name.endsWith(".md")) {
+    if (e.isDirectory()) walk(full, out, base, depth + 1, opts);
+    else if (opts.all || e.name.endsWith(".md")) {
       let st; try { st = fs.statSync(full); } catch { continue; }
       out.push({ rel: path.relative(base, full).replace(/\\/g, "/"), mtime: st.mtimeMs });
     }
@@ -156,6 +156,31 @@ function walkVault() {
   if (_walkCache.data && Date.now() - _walkCache.t < 3000) return _walkCache.data;
   _walkCache = { t: Date.now(), data: walk(VAULT) };
   return _walkCache.data;
+}
+
+/* Full-fidelity walks for the Neural Vault graph ONLY. walkVaultAll() lifts the .md gate and the
+   Assets/ exclusion so every vault file (decree .txt, images, PDFs) becomes a node; every other
+   consumer keeps the lean .md walk above. walkRepo() adds the repo's own source as a `code` layer
+   under the virtual Repo/ folder — allowlisted dirs/files only, so .env, telemetry data, dist
+   output, and the vault itself can never leak into the graph. */
+function walkVaultAll() { return walk(VAULT, [], VAULT, 0, { all: true }); }
+const REPO_DIRS = ["apps", "packages", "scripts", "docs", "prompts", ".github"];
+const REPO_ROOT_FILES = ["README.md", "CHANGELOG.md", "CLAUDE.md", "CONTEXT.md", "LICENSE", "checkpoint.md", "package.json", "agents.config.example.json", ".env.example"];
+const REPO_EXT = new Set([".js", ".jsx", ".mjs", ".cjs", ".css", ".json", ".md", ".yml", ".yaml", ".html", ".cmd"]);
+function walkRepo() {
+  const out = [];
+  for (const dir of REPO_DIRS) {
+    const abs = path.join(ROOT, dir);
+    if (!fs.existsSync(abs)) continue;
+    for (const f of walk(abs, [], ROOT, 0, { all: true })) {
+      if (f.rel.includes("dist/") || !REPO_EXT.has(path.extname(f.rel).toLowerCase())) continue;
+      out.push({ rel: `Repo/${f.rel}`, mtime: f.mtime, kind: "repo" });
+    }
+  }
+  for (const name of REPO_ROOT_FILES) {
+    try { const st = fs.statSync(path.join(ROOT, name)); out.push({ rel: `Repo/${name}`, mtime: st.mtimeMs, kind: "repo" }); } catch {}
+  }
+  return out;
 }
 
 function agentVaultStatus(files, agent) {
@@ -1096,10 +1121,12 @@ let parityGraphCache = { t: 0, data: null };
 async function buildParityGraph() {
   if (parityGraphCache.data && Date.now() - parityGraphCache.t < 60000) return parityGraphCache.data;
   const { buildVaultGraph } = await VAULT_GRAPH;
-  const files = walkVault().map((file) => {
+  // Full fidelity: every vault file (only .md gets read + link-parsed) + repo source as `code`.
+  const files = walkVaultAll().map((file) => {
+    if (!file.rel.toLowerCase().endsWith(".md")) return file;
     try { return { ...file, text: fs.readFileSync(path.join(VAULT, file.rel), "utf8") }; }
     catch { return null; }
-  }).filter(Boolean);
+  }).filter(Boolean).concat(walkRepo());
   const data = buildVaultGraph({ files });
   parityGraphCache = { t: Date.now(), data };
   return data;

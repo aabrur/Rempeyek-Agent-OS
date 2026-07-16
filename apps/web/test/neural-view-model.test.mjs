@@ -33,11 +33,11 @@ test("seeded layout is stable across reload and input order", () => {
 });
 
 test("parity defaults to notes plus resolved and ghost links", () => {
-  assert.deepEqual(layersForMode("parity"), { link: true, ghost: true, tag: false, folder: false });
+  assert.deepEqual(layersForMode("parity"), { link: true, ghost: true, tag: false, folder: false, asset: false, code: false });
   const view = projectGraph(DATA, { mode: "parity" });
   assert.deepEqual(view.nodes.map(node => node.type).sort(), ["ghost", "note", "note"]);
   assert.deepEqual(view.edges.map(edge => edge.type).sort(), ["ghost", "link"]);
-  assert.deepEqual(view.counts, { nodes: 3, edges: 2, notes: 2, ghosts: 1, tags: 0, folders: 0 });
+  assert.deepEqual(view.counts, { nodes: 3, edges: 2, notes: 2, ghosts: 1, tags: 0, folders: 0, assets: 0, codeFiles: 0 });
 });
 
 test("neighborhood projection uses the same filtered nodes and edges", () => {
@@ -126,4 +126,18 @@ test("system reduced motion blocks Resume until the OS preference clears", () =>
 test("neighborhood label is resolved from focus id independently of selection", () => {
   assert.equal(labelForNodeId(DATA.nodes, "Projects/A.md"), "A");
   assert.equal(labelForNodeId(DATA.nodes, "missing-id"), "missing-id");
+});
+
+test("asset and code layers render in cosmos and stay out of parity (Obsidian default)", () => {
+  const data = { nodes: [
+    { id: "A.md", type: "note", degree: 1 },
+    { id: "Assets/x.png", type: "asset", degree: 1 },
+    { id: "Repo/server.js", type: "code", degree: 0 },
+  ], edges: [{ source: "A.md", target: "Assets/x.png", type: "link" }] };
+  const cosmos = projectGraph(data, { mode: "cosmos" });
+  assert.deepEqual(cosmos.nodes.map(n => n.id).sort(), ["A.md", "Assets/x.png", "Repo/server.js"]);
+  const parity = projectGraph(data, { mode: "parity" });
+  assert.deepEqual(parity.nodes.map(n => n.id), ["A.md"], "parity mirrors Obsidian: notes+ghosts only");
+  assert.equal(layersForMode("cosmos").asset, true);
+  assert.equal(layersForMode("parity").code, false);
 });

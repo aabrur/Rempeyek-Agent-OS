@@ -18,6 +18,7 @@
   --graph-canvas:#050310; --graph-panel:#0b0918; --graph-note:#46d9ff;
   --graph-tag:#f45bd8; --graph-folder:#9d6bff;
   --graph-ghost:#a39abf; --graph-star:210,205,255;
+  --graph-asset:#7ef0be; --graph-code:#f5b85a;
   --graph-edge-link:90,160,255; --graph-edge-ghost:160,140,255; --graph-edge-tag:255,61,216; --graph-edge-folder:124,92,255;
   --graph-label:rgba(220,214,255,.78); --graph-label-folder:rgba(200,188,255,.92); --graph-label-hover:#f2edff; --graph-meta:#a39abf;
   --graph-core:rgba(255,255,255,.86); --graph-particle:#8cc8ff; --graph-particle-glow:#4c9bff;
@@ -51,6 +52,7 @@
   --card-gap:20px; --card-padding:18px 0;
   --graph-canvas:#eee8de; --graph-panel:#f7f2ea; --graph-note:#4c6670;
   --graph-tag:#76596b; --graph-folder:#665f7c; --graph-ghost:#9a9188; --graph-star:72,67,62;
+  --graph-asset:#4f704d; --graph-code:#916c2f;
   --graph-edge-link:83,96,102; --graph-edge-ghost:145,136,126; --graph-edge-tag:118,89,107; --graph-edge-folder:102,95,124;
   --graph-label:#4b443c; --graph-label-folder:#3e3933; --graph-label-hover:#1d1a17; --graph-meta:#6f665d;
   --graph-core:#f4efe6; --graph-particle:#4c6670; --graph-particle-glow:#4c6670;
@@ -79,6 +81,7 @@
   --card-gap:12px; --card-padding:14px;
   --graph-canvas:#fff9ed; --graph-panel:#ffe358; --graph-note:#111;
   --graph-tag:#c90076; --graph-folder:#5535c9; --graph-ghost:#68615a; --graph-star:23,23,23;
+  --graph-asset:#437a22; --graph-code:#9a5500;
   --graph-edge-link:23,23,23; --graph-edge-ghost:81,77,70; --graph-edge-tag:201,0,118; --graph-edge-folder:85,53,201;
   --graph-label:#2e2a26; --graph-label-folder:#111; --graph-label-hover:#111; --graph-meta:#514d46;
   --graph-core:#fff9ed; --graph-particle:#171717; --graph-particle-glow:#171717;
@@ -108,6 +111,7 @@
   --card-gap:16px; --card-padding:18px;
   --graph-canvas:#07111f; --graph-panel:rgba(12,27,47,.8); --graph-note:#7dd3fc;
   --graph-tag:#e09bff; --graph-folder:#a5b4fc; --graph-ghost:#9fb5cb; --graph-star:205,232,255;
+  --graph-asset:#a7f3d0; --graph-code:#fde68a;
   --graph-edge-link:125,211,252; --graph-edge-ghost:159,181,203; --graph-edge-tag:224,155,255; --graph-edge-folder:165,180,252;
   --graph-label:rgba(225,238,251,.82); --graph-label-folder:#dbeafe; --graph-label-hover:#fff; --graph-meta:#b3c5d8;
   --graph-core:rgba(255,255,255,.88); --graph-particle:#a5dcff; --graph-particle-glow:#7dd3fc;

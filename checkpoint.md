@@ -187,3 +187,56 @@ one-click update. Every executed command is vetted server-side; nothing from a f
 ### Next → Stage 5
 Full-repo Neural Vault (all file types + repo source as a `code` layer), the 13 Copilot→Codex vault
 drifts, file-organizer cleanup (Audit/, memory-capture.json untrack, copilot residue, graphify-out).
+
+---
+
+## Stage 5 — Full-repo Neural Vault + Codex migration + cleanup ✅  (2026-07-16)
+
+The Neural Vault now surfaces EVERYTHING, the vault finally agrees with the registry about Codex,
+and the junk is gone.
+
+### Shipped — Neural Vault full fidelity
+- **Two new graph layers**: `asset` (every non-.md vault file — the `[SYSTEM OVERRIDE].txt` Boss
+  decree, `Assets/` images/PDFs — visible for the first time) and `code` (repo source under the
+  virtual `Repo/` folder). Embeds like `![[cosmos-brain.png]]` now resolve to real asset nodes
+  instead of ghosts.
+- **Live result: 599 nodes** (was ~401): 303 notes + 30 assets + 118 code files + folders/tags.
+  Tier `reduced` — the exact render budget the 1k-node benchmark already proves <1.5s.
+- **Security held**: walk allowlists (`apps/packages/scripts/docs/prompts/.github` + named root
+  files, extension gate) mean `.env`, `dist/`, `node_modules`, telemetry data, and dot-dirs
+  (`.remember`, `.claude`) can never enter the graph. Parity mode still mirrors Obsidian
+  (notes+ghosts only); cosmos shows all six layers. New theme tokens `--graph-asset`/`--graph-code`
+  in :root + all 4 themes.
+
+### Shipped — Codex migration (13 vault drifts closed)
+- `Agents.md` — Codex home `.copilot`→`.codex`, real status, icon ⬜, interface line.
+- `Brains/Copilot/` (331 lines, deleted agent) → **archived** to `Archive/Brains-Copilot/`
+  (same pattern as Brains-ZCode). `Brains/Codex/` completed with `Knowledge/` + `Notes/` indexes —
+  the shape `Our Family.md` always claimed it had.
+- Missing decision record written: `Brains/Shared/Decisions/2026-07-16 Roster Swap - Copilot to
+  Codex.md` (the Kilo/Cline/Pi swap got one; this one never did).
+- Roster/peer/lane-isolation fixes: `Warning.md`, `Data Map.md` (+ added `.codex/.kilocode/.cline/
+  .pi/.gemini`, dropped retired `.zcode/.kimi-code`), `[SYSTEM OVERRIDE].txt` roll-call,
+  `Brains/README.md` (+ Antigravity row), `Brains/Cline/{Memory (Node-15→12),Rules}`,
+  `Brains/{KiloCode,Pi}/Rules`, `Brains/Antigravity/Identity`, ECOSYSTEM runtime list + stale
+  checklist item, SOP prompt template, `Projects/Agentic OS.md` gateway table.
+- `Routing-Rules.md` — Codex ⬜ + Antigravity 🟠 added to the decision tree AND the specialization
+  table (they were unroutable before). `INDEX.md`/`Our Family.md` Codex icon + formatting.
+- `Brains/KiloCode/graphify-out/` runtime artifact removed (constitution forbids runtime in Brains).
+
+### Shipped — cleanup
+- Empty `Audit/` removed; `telemetry/memory-capture.json` untracked + gitignored (was the only
+  source of recurring commit noise); `telemetry/logs/copilot.log` + stale `dist/avatars/*.webp`
+  (incl. `Copilot.webp`) removed; `graphify-out/` dated snapshots pruned.
+- **Surfaced, NOT deleted (Boss decides):** 3 live git worktrees (`.worktrees/{plan-b,
+  roadmap-continuation,stage-e-agent-map}` — stage-e @2b29cec is NOT an ancestor of main, may hold
+  unmerged work; removal needs `git worktree remove`); root Python scratch files (gitignored,
+  nothing references them); 6.3 MB tracked design PNGs in `apps/web/public/`.
+
+### Tests — 98 pass (was 95)
+- vault-graph: asset layer + embed resolution + decree visibility; code layer under Repo/.
+- neural-view-model: cosmos shows asset+code, parity stays Obsidian-pure; palette maps both tokens.
+
+### Verified
+- Live `/api/graph`: 599 nodes, decree + `Repo/apps/web/server.js` present, tier `reduced`.
+- Active `copilot` grep in vault → only historical/archive references remain.

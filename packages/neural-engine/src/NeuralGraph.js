@@ -16,6 +16,8 @@ export function resolveGraphPalette(readToken = (_name, fallback) => fallback) {
     tag: readToken("--graph-tag", "#FF3DD8"),
     ghost: readToken("--graph-ghost", "#8E88BE"),
     folder: readToken("--graph-folder", "#7C5CFF"),
+    asset: readToken("--graph-asset", "#7EF0BE"),
+    code: readToken("--graph-code", "#F5B85A"),
   };
   return {
     nodes,

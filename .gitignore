@@ -45,3 +45,4 @@ summarize*.py
 subagents.json
 system_prompt.txt
 *.canvas
+telemetry/memory-capture.json
