@@ -1,26 +1,30 @@
 import { useCallback, useState } from "react";
 import { api } from "../api";
 
+/** The approval round-trip (confirm → request → decide), shared by every gated action.
+    Standalone so the Add-Agent catalog and the update banner reuse the exact same dance. */
+export async function approveAction(type, target, consequence) {
+  if (!confirm(`${consequence}\n\nTarget: ${target}\n\nContinue?`)) return null;
+  const requested = await api("/api/approvals", {
+    method: "POST",
+    body: JSON.stringify({ type, target, consequence, actor: "dashboard-user" }),
+  });
+  if (requested.error) { alert(requested.error); return null; }
+  const decided = await api(`/api/approvals/${requested.id}/decision`, {
+    method: "POST",
+    body: JSON.stringify({ decision: "approved", confirmed: true }),
+  });
+  if (decided.error) { alert(decided.error); return null; }
+  return requested.id;
+}
+
 /** Gateway actions shared by cards and the detail panel. */
 export function useGateway(agents, refresh) {
   const [busy, setBusy] = useState(null);
   const key = (id, act) => `${id}:${act}`;
   const isBusy = (id, act) => busy === key(id, act);
 
-  const approve = useCallback(async (type, target, consequence) => {
-    if (!confirm(`${consequence}\n\nTarget: ${target}\n\nContinue?`)) return null;
-    const requested = await api("/api/approvals", {
-      method: "POST",
-      body: JSON.stringify({ type, target, consequence, actor: "dashboard-user" }),
-    });
-    if (requested.error) { alert(requested.error); return null; }
-    const decided = await api(`/api/approvals/${requested.id}/decision`, {
-      method: "POST",
-      body: JSON.stringify({ decision: "approved", confirmed: true }),
-    });
-    if (decided.error) { alert(decided.error); return null; }
-    return requested.id;
-  }, []);
+  const approve = useCallback((type, target, consequence) => approveAction(type, target, consequence), []);
 
   /** start | stop | stop-term | restart | status | run */
   const runAction = useCallback(async (id, act) => {

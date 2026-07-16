@@ -1,16 +1,26 @@
 {
   "workdir": "C:\\Users\\you",
   "agency": "AGENTIC//OS",
+  "_readme": [
+    "Copy to agents.config.json and replace C:\\Users\\you with your home directory.",
+    "This is the real 8-agent roster. Easiest path: skip hand-editing and use the dashboard's",
+    "+ ADD AGENT catalog — it registers agents with correct expanded paths and can run the vetted",
+    "installer for you (approval-gated). Entries here start observe-only (actions: []); grant",
+    "gateway actions like start/stop/status only for agents whose gateway CLI you actually run.",
+    "accent is an optional #hex used by the map and cards; probe = real TCP liveness check;",
+    "watchdog: true = auto-restart when down (max 3x/hour); owner: native-service = the agent",
+    "runs as its own Windows service and the dashboard only manages, never replaces, it."
+  ],
   "agents": [
     {
       "id": "claude-code",
       "name": "Claude Code",
       "icon": "⚫",
       "role": "Coding & technical specialist",
-      "node": "Node-1",
+      "node": "Node-10",
       "lane": "ClaudeCode",
       "enabled": true,
-      "note": "Full gateway control: the dashboard can start/stop/restart/status/run this agent headlessly.",
+      "note": "Full gateway control via claude-gateway (global npm bin). cwd must be the .claude home.",
       "gateway": {
         "bin": "claude-gateway",
         "cwd": "C:\\Users\\you\\.claude",
@@ -21,41 +31,116 @@
       }
     },
     {
-      "id": "service-agent",
-      "name": "Service Agent (24/7 example)",
-      "icon": "🟢",
-      "role": "Always-on ops agent",
-      "node": "Node-2",
-      "lane": "ServiceAgent",
+      "id": "codex",
+      "name": "Codex",
+      "icon": "⬜",
+      "role": "Repository-aware software engineering agent",
+      "node": "Node-12",
+      "lane": "Codex",
       "enabled": true,
-      "owner": "native-service",
-      "note": "owner: native-service = runs as a Windows Scheduled Task 24/7. The dashboard manages the service and asks for confirmation before destructive actions. probe = real TCP liveness check. watchdog: true = auto-restart when down (max 3x/hour).",
+      "note": "Observe-only. Summon opens a terminal at `home` running `codex`; if missing, the catalog installs it.",
       "gateway": {
-        "bin": "your-agent gateway",
-        "cwd": "C:\\Users\\you\\.your-agent",
-        "home": "C:\\Users\\you\\.your-agent",
-        "trigger": "your-agent",
-        "runCmd": "your-agent gateway run --force",
-        "schtask": "YourAgent Gateway",
-        "probe": { "host": "127.0.0.1", "port": 18789 },
-        "watchdog": false,
-        "actions": ["start", "stop", "restart", "status", "run"]
+        "home": "C:\\Users\\you\\.codex",
+        "trigger": "codex",
+        "install": { "cmd": "npm install -g @openai/codex", "url": "https://developers.openai.com/codex/cli" },
+        "actions": []
       }
     },
     {
-      "id": "cli-only-agent",
-      "name": "CLI-only Agent (observability example)",
-      "icon": "⬜",
-      "role": "Manual CLI assistant",
-      "node": "Node-3",
-      "lane": "CliAgent",
+      "id": "kilo-code",
+      "name": "Kilo Code",
+      "icon": "🟣",
+      "role": "Development agent (coding/debugging)",
+      "node": "Node-9",
+      "lane": "KiloCode",
       "enabled": true,
-      "accent": "#3CFFC8",
-      "note": "No gateway subcommand — actions: [] means observability-only. The dashboard shows status from telemetry and offers a Summon button (opens an admin terminal at `home` and runs `trigger`). If the CLI is missing, Summon shows `install` guidance (cmd + url) instead of opening a dead terminal. `accent` (optional #hex) colors this agent everywhere in the UI; agents added via the dashboard's ＋ ADD AGENT button get it automatically.",
+      "note": "Observe-only. Summon runs `kilo`.",
       "gateway": {
-        "home": "C:\\Users\\you\\.cli-agent",
-        "trigger": "cli-agent",
-        "install": { "cmd": "npm install -g your-cli-agent", "url": "https://example.com/install" },
+        "home": "C:\\Users\\you\\.kilocode",
+        "trigger": "kilo",
+        "install": { "cmd": "npm install -g @kilocode/cli", "url": "https://kilo.ai" },
+        "actions": []
+      }
+    },
+    {
+      "id": "cline",
+      "name": "Cline",
+      "icon": "🟡",
+      "role": "Autonomous coding agent",
+      "node": "Node-11",
+      "lane": "Cline",
+      "enabled": true,
+      "note": "Observe-only. Summon runs `cline`.",
+      "gateway": {
+        "home": "C:\\Users\\you\\.cline",
+        "trigger": "cline",
+        "install": { "cmd": "npm install -g cline", "url": "https://cline.bot" },
+        "actions": []
+      }
+    },
+    {
+      "id": "pi",
+      "name": "Pi",
+      "icon": "🌀",
+      "role": "Minimal open-source coding agent",
+      "node": "Node-14",
+      "lane": "Pi",
+      "enabled": true,
+      "note": "Observe-only. Summon runs `pi`.",
+      "gateway": {
+        "home": "C:\\Users\\you\\.pi",
+        "trigger": "pi",
+        "install": { "cmd": "npm install -g @mariozechner/pi-coding-agent", "url": "https://pi.dev" },
+        "actions": []
+      }
+    },
+    {
+      "id": "antigravity",
+      "name": "Antigravity",
+      "icon": "🟠",
+      "role": "Advanced agentic coding & integration",
+      "node": "Node-13",
+      "lane": "Antigravity",
+      "enabled": true,
+      "note": "Observe-only. IDE/CLI install — no npm one-liner; the catalog links its install page.",
+      "gateway": {
+        "home": "C:\\Users\\you\\.gemini",
+        "trigger": "agy",
+        "install": { "url": "https://antigravity.google" },
+        "actions": []
+      }
+    },
+    {
+      "id": "hermes",
+      "name": "Hermes",
+      "icon": "🟢",
+      "role": "Crypto, research & ops 24/7",
+      "node": "Node-8",
+      "lane": "Hermes",
+      "enabled": false,
+      "owner": "native-service",
+      "note": "Native service with its own installer — set enabled:true and fill bin/cwd/runCmd after installing Hermes.",
+      "gateway": {
+        "home": "C:\\Users\\you\\AppData\\Local\\hermes",
+        "trigger": "hermes",
+        "actions": []
+      }
+    },
+    {
+      "id": "openclaw",
+      "name": "OpenClaw",
+      "icon": "🔵",
+      "role": "Strategy & business analysis",
+      "node": "Node-7",
+      "lane": "OpenClaw",
+      "enabled": false,
+      "owner": "native-service",
+      "note": "Native gateway (`openclaw gateway`, port 18789) — set enabled:true after installing OpenClaw.",
+      "gateway": {
+        "bin": "openclaw gateway",
+        "home": "C:\\Users\\you\\.openclaw",
+        "trigger": "openclaw",
+        "probe": { "host": "127.0.0.1", "port": 18789 },
         "actions": []
       }
     }

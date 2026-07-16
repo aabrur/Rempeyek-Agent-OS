@@ -1,0 +1,23 @@
+# Tag a release as v<version> (matching package.json) and this publishes it.
+# The dashboard's update banner reads /repos/<slug>/releases/latest — publishing here is what
+# makes every user's dashboard show "vX.Y.Z tersedia".
+name: release
+on:
+  push:
+    tags: ["v*"]
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true

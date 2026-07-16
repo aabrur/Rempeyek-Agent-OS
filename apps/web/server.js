@@ -43,6 +43,9 @@ AGENT_DETAIL.then(m => { agentDetailLib = m; }).catch(e => console.error("[agent
 const AGENT_CATALOG_MOD = import("./lib/agent-catalog.mjs");
 let catalogLib = null;
 AGENT_CATALOG_MOD.then(m => { catalogLib = m; }).catch(e => console.error("[agent-catalog]", e.message));
+const RELEASE_MOD = import("./lib/release-check.mjs");
+let releaseLib = null;
+RELEASE_MOD.then(m => { releaseLib = m; }).catch(e => console.error("[release-check]", e.message));
 /* PUBLIC = static source (images + runtime-uploaded avatars, never wiped by a build).
    DIST   = the built React app (`npm run build`). Requests resolve DIST first, then
    PUBLIC, then fall back to index.html — /avatars always comes from PUBLIC, because
@@ -86,15 +89,6 @@ function saveConfig(cfg) {
   _cfgCache = { mtime: 0, data: null };   // force reload on next loadConfig()
 }
 
-/* expandHome: a catalog/relative home (".codex") → absolute under the user's home. Absolute paths
-   pass through. Keeps the catalog portable while the persisted config stays concrete. */
-function expandHome(h) {
-  const s = String(h || "").trim();
-  if (!s) return "";
-  if (path.isAbsolute(s) || /^[a-zA-Z]:[\\/]/.test(s)) return s;
-  return path.join(os.homedir(), s.replace(/^~[\\/]?/, ""));
-}
-
 /* /api/agents/add — register a new agent from the dashboard.
    Two shapes:
      { catalogId }                     → pull id/name/icon/role/trigger/home/install from the curated
@@ -104,42 +98,23 @@ function expandHome(h) {
                                           silently dropped). No install.cmd is ever taken from the
                                           body — auto-install runs only vetted catalog commands. */
 function addAgent(body) {
-  const cat = (body.catalogId && catalogLib) ? catalogLib.catalogEntry(body.catalogId) : null;
-  if (body.catalogId && !cat) return { error: `unknown catalog agent '${body.catalogId}'` };
-  const id = String((cat?.id ?? body.id) || "").trim();
-  if (!/^[a-z0-9][a-z0-9-]{1,31}$/.test(id)) return { error: "id must be a 2-32 char slug (a-z, 0-9, -)" };
-  const name = String((cat?.name ?? body.name) || "").replace(/[\x00-\x1f\x7f]+/g, " ").trim().slice(0, 40);
-  if (!name) return { error: "name is required" };
+  if (!catalogLib) return { error: "catalog module still loading — retry in a moment" };
+  const cat = body.catalogId ? catalogLib.catalogEntry(body.catalogId) : null;
   const cfg = loadConfig();
-  if (cfg.agents.some(a => a.id === id)) return { error: `agent '${id}' already exists` };
-  const accent = /^#[0-9a-fA-F]{6}$/.test(String(body.accent || "")) ? body.accent : undefined;
   const nodeNums = cfg.agents.map(a => Number((String(a.node || "").match(/(\d+)$/) || [])[1])).filter(n => !Number.isNaN(n));
-
-  // gateway: persist trigger + home (→ summonable) and, from the catalog only, an install block.
-  const trigger = String((cat?.trigger ?? body.trigger) || "").trim().split(/\s+/)[0].slice(0, 60);
-  const home = expandHome(cat?.home ?? body.home);
-  const gateway = {};
-  if (home) gateway.home = home;
-  if (trigger) gateway.trigger = trigger;
-  if (cat?.install) gateway.install = cat.install;   // curated only — never from body
-  gateway.actions = [];                              // dashboard-added agents are observe-only
-
-  const agent = {
-    id, name,
-    icon: String((cat?.icon ?? body.icon) || "🤖").slice(0, 4),
-    role: String((cat?.role ?? body.role) || "Agent").trim().slice(0, 80),
-    node: `Node-${(nodeNums.length ? Math.max(...nodeNums) : 0) + 1}`,
-    lane: name.replace(/[^A-Za-z0-9]/g, ""),
-    enabled: true,
-    ...(accent ? { accent } : {}),
-    note: `Registered via dashboard ${localISO().slice(0, 10)}.${trigger ? ` Summon with \`${trigger}\`.` : " Observe-only until a gateway trigger is configured."}`,
-    ...((gateway.home || gateway.trigger || gateway.install) ? { gateway } : {}),
-  };
-  cfg.agents.push(agent);
+  const r = catalogLib.buildAgentRecord({
+    body, cat,
+    existingIds: cfg.agents.map(a => a.id),
+    existingNodeNums: nodeNums,
+    date: localISO().slice(0, 10),
+    homedir: os.homedir(),
+  });
+  if (r.error) return r;
+  cfg.agents.push(r.agent);
   try { saveConfig(cfg); } catch (e) { return { error: `failed to write config: ${e.message}` }; }
-  scaffoldVaultLane(agent);   // otherwise a dashboard-added agent's Brains/ lane is empty forever
-  sysEvent(id, "ok", `agent registered via dashboard (${agent.node})`);
-  return { ok: true, agent };
+  scaffoldVaultLane(r.agent);   // otherwise a dashboard-added agent's Brains/ lane is empty forever
+  sysEvent(r.agent.id, "ok", `agent registered via dashboard (${r.agent.node})`);
+  return { ok: true, agent: r.agent };
 }
 
 /* scaffoldVaultLane: create Brains/<Lane>/ in the canonical constitution shape (Identity/Memory/
@@ -980,6 +955,94 @@ function installedState(id) {
   const c = installedCache.get(id);
   return c ? c.installed : null;   // null = not yet probed
 }
+/* catalogInstalled: installed-probe for a CATALOG entry (registered or not), 60s cache. */
+function catalogInstalled(entry) {
+  const c = installedCache.get(entry.id);
+  if (c && Date.now() - c.at < 60000) return c.installed;
+  const installed = probeInstalled({ gateway: { trigger: entry.trigger } });
+  installedCache.set(entry.id, { installed, at: Date.now() });
+  return installed;
+}
+
+/* ---------------- catalog install + self-update (owned, streamed) ----------------
+   Both run as owned procs so the existing /api/proc/:id/log incremental tail shows them live in
+   the run-log pane. SECURITY: the install command comes ONLY from the vetted catalog
+   (catalogInstallCommand) and the update command is a fixed string — nothing here executes
+   caller-supplied input. Both routes sit behind withApproval(). */
+function installAgent(id) {
+  if (!catalogLib) return { error: "catalog module still loading — retry in a moment" };
+  const entry = catalogLib.catalogEntry(id);
+  if (!entry) return { error: `unknown catalog agent '${id}'` };
+  const cmd = catalogLib.catalogInstallCommand(id);
+  if (!cmd) return { error: `${entry.name} has no vetted auto-install command — use its install page`, url: (entry.install && entry.install.url) || null };
+  const existing = procs.get(id);
+  if (existing && existing.status === "running") return { error: `${id} already has an owned process running (pid ${existing.pid})` };
+  const p = { id, log: [], seq: 0, status: "running", mode: "install", startedAt: new Date().toISOString(), exitCode: null };
+  pushLog(p, "sys", `[agentic-os] install (vetted catalog): ${cmd}`);
+  let child;
+  try { child = spawn(cmd, [], { shell: true, windowsHide: true }); }
+  catch (e) { return { error: `spawn failed: ${e.message}` }; }
+  p.child = child; p.pid = child.pid;
+  child.stdout.on("data", d => pushLog(p, "out", d));
+  child.stderr.on("data", d => pushLog(p, "err", d));
+  child.on("exit", code => {
+    p.status = "exited"; p.exitCode = code;
+    pushLog(p, "sys", `[agentic-os] install exit code ${code}`);
+    if (code === 0) {
+      if (!loadConfig().agents.some(a => a.id === id)) {
+        const r = addAgent({ catalogId: id });
+        pushLog(p, "sys", r.error ? `[agentic-os] register failed: ${r.error}` : `[agentic-os] registered ${id} (${r.agent.node})`);
+      }
+      installedCache.set(id, { installed: probeInstalled({ gateway: { trigger: entry.trigger } }), at: Date.now() });
+      sysEvent(id, "ok", "installed via dashboard catalog");
+    }
+  });
+  child.on("error", err => { p.status = "error"; p.exitCode = -1; pushLog(p, "sys", `[agentic-os] spawn error: ${err.message}`); });
+  procs.set(id, p);
+  return { ok: true, pid: child.pid, id, log: `/api/proc/${id}/log` };
+}
+
+/* /api/version — local identity for the update banner. Cached (git calls are cheap, not free). */
+let versionCache = null;
+function versionInfo() {
+  if (versionCache) return versionCache;
+  let version = "0.0.0";
+  try { version = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8")).version || version; } catch {}
+  let rev = null, repo = null;
+  try { const r = spawnSync("git", ["rev-parse", "--short", "HEAD"], { cwd: ROOT, windowsHide: true, timeout: 4000, encoding: "utf8" }); if (r.status === 0) rev = r.stdout.trim(); } catch {}
+  try {
+    const r = spawnSync("git", ["remote", "get-url", "origin"], { cwd: ROOT, windowsHide: true, timeout: 4000, encoding: "utf8" });
+    if (r.status === 0 && releaseLib) repo = (releaseLib.parseRepoUrl(r.stdout) || {}).slug || null;
+  } catch {}
+  versionCache = { version, rev, repo, node: process.version };
+  return versionCache;
+}
+
+const UPDATE_ID = "os-update";   // reserved procs id — the /api/proc/:id/log tail route serves it
+function startUpdate() {
+  const existing = procs.get(UPDATE_ID);
+  if (existing && existing.status === "running") return { error: "an update is already running", log: `/api/proc/${UPDATE_ID}/log` };
+  const cmd = "git pull --ff-only && npm install && npm run build";
+  const p = { id: UPDATE_ID, log: [], seq: 0, status: "running", mode: "update", startedAt: new Date().toISOString(), exitCode: null };
+  pushLog(p, "sys", `[agentic-os] self-update: ${cmd}  (cwd: ${ROOT})`);
+  let child;
+  try { child = spawn(cmd, [], { cwd: ROOT, shell: true, windowsHide: true }); }
+  catch (e) { return { error: `spawn failed: ${e.message}` }; }
+  p.child = child; p.pid = child.pid;
+  child.stdout.on("data", d => pushLog(p, "out", d));
+  child.stderr.on("data", d => pushLog(p, "err", d));
+  child.on("exit", code => {
+    p.status = "exited"; p.exitCode = code;
+    versionCache = null;   // version on disk may have changed
+    pushLog(p, "sys", code === 0
+      ? "[agentic-os] update applied — UI assets are live now; restart the server to load backend changes"
+      : `[agentic-os] update failed (exit ${code}) — nothing was overwritten (--ff-only refuses to clobber local work)`);
+    sysEvent(UPDATE_ID, code === 0 ? "ok" : "warn", code === 0 ? "self-update applied" : `self-update failed (exit ${code})`);
+  });
+  child.on("error", err => { p.status = "error"; p.exitCode = -1; pushLog(p, "sys", `[agentic-os] spawn error: ${err.message}`); });
+  procs.set(UPDATE_ID, p);
+  return { ok: true, pid: child.pid, id: UPDATE_ID, log: `/api/proc/${UPDATE_ID}/log` };
+}
 
 /* ---------------- avatar ---------------- */
 function avatarUrl(id) {
@@ -1597,9 +1660,36 @@ function requestHandler(req, res) {
         });
       if (url === "/api/agents/add" && req.method === "POST")
         return readBody(req, res, body => {
-          let d; try { d = JSON.parse(body); } catch { return json(res, 400, { error: "body must be JSON {id,name,icon?,role?,accent?,trigger?,home?}" }); }
+          let d; try { d = JSON.parse(body); } catch { return json(res, 400, { error: "body must be JSON {catalogId} or {id,name,icon?,role?,accent?,trigger?,home?}" }); }
           const r = addAgent(d);
           json(res, r.error ? 400 : 200, r);
+        });
+      if (url === "/api/catalog") {
+        if (!catalogLib) return json(res, 503, { error: "catalog not loaded yet" });
+        const registered = new Set(loadConfig().agents.map(a => a.id));
+        return json(res, 200, {
+          entries: catalogLib.AGENT_CATALOG.map(e => ({
+            id: e.id, name: e.name, icon: e.icon, role: e.role,
+            install: { cmd: (e.install && e.install.cmd) || null, url: (e.install && e.install.url) || null },
+            registered: registered.has(e.id),
+            installed: catalogInstalled(e),
+          })),
+        });
+      }
+      if (url === "/api/agents/install" && req.method === "POST")
+        return readBody(req, res, body => {
+          let d; try { d = JSON.parse(body); } catch { return json(res, 400, { error: "body must be JSON {id}" }); }
+          const id = String(d.id || "");
+          return withApproval(req, res, "agent.install", id, () => {
+            const r = installAgent(id);
+            json(res, r.error ? 400 : 200, r);
+          });
+        });
+      if (url === "/api/version") return json(res, 200, versionInfo());
+      if (url === "/api/update" && req.method === "POST")
+        return withApproval(req, res, "system.update", "dashboard", () => {
+          const r = startUpdate();
+          json(res, r.error ? 409 : 200, r);
         });
       if (url === "/api/schedule") return buildSchedule(r => json(res, 200, r));      // R#8
       if (url === "/api/vault-health") return buildVaultHealth(r => json(res, 200, r)); // R#9
@@ -1675,7 +1765,7 @@ if (require.main === module) {
   });
 
   // Gate listen() on the ESM helper modules so telemetry windowing + catalog are ready before the first poll.
-  Promise.allSettled([AGENT_DETAIL, AGENT_CATALOG_MOD]).then(() => server.listen(PORT, process.env.DASH_HOST || "127.0.0.1", () => {
+  Promise.allSettled([AGENT_DETAIL, AGENT_CATALOG_MOD, RELEASE_MOD]).then(() => server.listen(PORT, process.env.DASH_HOST || "127.0.0.1", () => {
   console.log(`\n  Agentic OS running at  http://localhost:${PORT}`);
   console.log(`  Vault data source:     ${VAULT}`);
   console.log(`  Agent config:          ${CONFIG_PATH}`);

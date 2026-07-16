@@ -766,7 +766,52 @@ body {
 .brand-name { line-height: 1.25; }
 
 /* ---------------- add-agent modal ---------------- */
-.aa-box { width: min(460px, 92vw); }
+.aa-box { width: min(560px, 92vw); }
+/* ＋ Add Agent — curated catalog grid (install path) above the custom form */
+.aa-catalog { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 10px 0 4px; }
+.aa-cat-card {
+  display: flex; align-items: center; gap: 10px; padding: 9px 11px; min-width: 0;
+  background: var(--card); border: var(--surface-border-width) var(--surface-border-style) var(--line);
+  border-radius: var(--control-radius);
+}
+.aa-cat-icon { font-size: 17px; flex: none; }
+.aa-cat-body { min-width: 0; margin-right: auto; display: flex; flex-direction: column; }
+.aa-cat-body b { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.aa-cat-body small { font-size: 10px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.aa-cat-card .btn { flex: none; font-size: 10px; padding: 4px 8px; }
+.aa-cat-state { font-family: var(--font-data); font-size: 9px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); flex: none; }
+.aa-cat-state.ok { color: var(--lime); }
+.aa-cat-state a { color: var(--cyan); text-decoration: none; }
+.aa-cat-log {
+  margin: 8px 0 0; padding: 8px 10px; max-height: 130px; overflow: auto;
+  font-family: var(--font-data); font-size: 10px; line-height: 1.5; white-space: pre-wrap; word-break: break-word;
+  background: var(--graph-panel); color: var(--text);
+  border: var(--surface-border-width) var(--surface-border-style) var(--line); border-radius: var(--control-radius);
+}
+.aa-custom-head { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 10px; }
+@media (max-width: 560px) { .aa-catalog { grid-template-columns: 1fr; } }
+
+/* Update banner — silent unless GitHub has a strictly newer release */
+.update-banner {
+  margin: 0 0 12px; padding: 10px 14px;
+  background: var(--card); border: var(--surface-border-width) var(--surface-border-style) var(--acc);
+  border-radius: var(--surface-radius); box-shadow: var(--surface-shadow);
+}
+.update-banner.phase-done { border-color: var(--lime); }
+.update-banner.phase-failed { border-color: var(--red); }
+.update-banner-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 12px; }
+.update-banner-badge { color: var(--acc); font-weight: 700; }
+.update-banner-link {
+  background: none; border: none; padding: 0; cursor: pointer;
+  color: var(--cyan); font: inherit; font-size: 11px; text-decoration: underline;
+}
+.update-banner-spin { color: var(--muted); font-family: var(--font-data); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; }
+.update-banner-notes {
+  margin: 8px 0 0; padding: 8px 10px; max-height: 180px; overflow: auto;
+  font-family: var(--font-data); font-size: 10px; line-height: 1.5; white-space: pre-wrap; word-break: break-word;
+  background: var(--graph-panel); color: var(--text);
+  border: var(--surface-border-width) var(--surface-border-style) var(--line); border-radius: var(--control-radius);
+}
 .aa-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .aa-field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .aa-field.wide { grid-column: 1 / -1; }

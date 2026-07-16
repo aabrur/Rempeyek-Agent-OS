@@ -1,9 +1,11 @@
 {
   "name": "@rempeyek/theme-engine",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "private": true,
   "type": "module",
   "main": "src/themes.js",
-  "exports": { ".": "./src/themes.js",
-    "./themes.css": "./src/themes.css" }
+  "exports": {
+    ".": "./src/themes.js",
+    "./themes.css": "./src/themes.css"
+  }
 }

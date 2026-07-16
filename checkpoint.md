@@ -130,3 +130,60 @@ edges and per-node degree to make them expressive. Zero new invention; same laws
 
 ### Next → Stage 4
 Curated install catalog + version notify / one-click update.
+
+---
+
+## Stage 4 — Curated install catalog + version notify / one-click update ✅  (2026-07-16)
+
+"+ Add Agent" now actually installs, and the public gets version notifications with a safe
+one-click update. Every executed command is vetted server-side; nothing from a form ever runs.
+
+### Shipped
+- **`apps/web/lib/agent-catalog.mjs`** — the 8-agent curated catalog + `buildAgentRecord` (pure).
+  `catalogInstallCommand(id)` is the ONLY source of install shell; every cmd must match
+  `npm install -g <pkg>` exactly (test-enforced — no metacharacters, no chaining).
+- **`addAgent` delegated to `buildAgentRecord`** — killed the 30-line inline duplicate; trigger/home
+  persist (the original shipped bug), catalog installs auto-attach, vault lane scaffolds on register.
+- **`GET /api/catalog`** — entries + truthful `registered`/`installed` flags (60s probe cache).
+- **`POST /api/agents/install`** — behind `withApproval("agent.install", id)`; resolves the command
+  from the catalog by id, streams into the owned-proc log (`/api/proc/<id>/log` live tail), exit 0 →
+  auto-register + re-probe. Link-only entries (Antigravity/Hermes/OpenClaw) return `{error, url}`.
+- **`GET /api/version`** — `{version, rev, repo, node}`; repo slug parsed from the git remote.
+- **`POST /api/update`** — behind `withApproval("system.update","dashboard")`; runs
+  `git pull --ff-only && npm install && npm run build` streamed to `os-update` proc log.
+  `--ff-only` = a user's local changes can never be clobbered.
+- **`apps/web/lib/release-check.mjs`** (pure) — repo-URL parse, strict semver compare; malformed
+  tags can never claim an update; release notes bounded at 4000 chars (hostile-body guard).
+- **Client**: AddAgentModal = catalog grid (Install / Install+register / Register / ✓ ready states,
+  live install tail) + custom form; `UpdateBanner` (GitHub releases/latest, 12h localStorage cache,
+  silent on 404/no-release/rate-limit; approval-gated update with live tail + deterministic outcome
+  line); `approveAction` extracted from useGateway for reuse.
+- **Meta**: version 2.1.0 lockstep (6 package.json), `CHANGELOG.md`, `.github/workflows/{ci,release}.yml`
+  (tag `v*` → test → build → GitHub Release = what feeds every user's banner),
+  `agents.config.example.json` replaced fictional 3-agent demo with the real 8-agent roster.
+
+### Tests — 95 pass (was 83)
+- `agent-catalog.test.mjs` (8) — catalog integrity, vetted-cmd regex, body-install rejection,
+  record building (expand/observe-only/error paths).
+- `release-check.test.mjs` (4) — URL forms, semver strictness, malformed-tag silence, notes bound.
+
+### Verified end-to-end (live server + browser DOM)
+- `/api/version` → `{"version":"2.1.0","rev":"c6a1e8e","repo":"aabrur/Rempeyek-Agent-OS"}`.
+- `/api/catalog` → 8 truthful entries (all ready on this machine).
+- Install & update **403 without approval**; approval round-trip → update spawned, streamed live,
+  failed HONESTLY (`--ff-only`, dev branch has no upstream) with the deterministic outcome line —
+  full pipeline proven with zero side effects. Install error paths: unknown id, link-only + url.
+- Modal: 8 catalog cards render "✓ ready"; zero console errors; banner correctly SILENT (GitHub has
+  no release yet — cache `{tag:null}`).
+- NOT executed: a real `npm install -g` happy path (every CLI already installed on this machine —
+  running one would mutate global npm for no proof the streaming pipeline didn't already give).
+
+### Files touched
+`apps/web/lib/agent-catalog.mjs` (tests only — existed), `apps/web/lib/release-check.mjs` (new),
+`apps/web/server.js`, `apps/web/src/components/{AddAgentModal,UpdateBanner}.jsx`, `apps/web/src/App.jsx`,
+`apps/web/src/hooks/useGateway.js`, `packages/design-system/src/index.css`, 6× `package.json`,
+`CHANGELOG.md` (new), `.github/workflows/` (new), `agents.config.example.json`.
+
+### Next → Stage 5
+Full-repo Neural Vault (all file types + repo source as a `code` layer), the 13 Copilot→Codex vault
+drifts, file-organizer cleanup (Audit/, memory-capture.json untrack, copilot residue, graphify-out).

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Sidebar } from "./components/Sidebar";
 import { TokenLogin } from "./components/TokenLogin";
 import { ConfigBanner } from "./components/Panels";
+import { UpdateBanner } from "./components/UpdateBanner";
 import { CommandCenter } from "./views/CommandCenter";
 import { AgentsView } from "./views/AgentsView";
 import { NeuralVaultView, ReportsView } from "./views/SimpleViews";
@@ -59,6 +60,7 @@ export default function App() {
 
         <main className="main" id="main-content" tabIndex="-1">
           <ConfigBanner configError={state?.configError} stateError={error} />
+          <UpdateBanner />
 
           {!state ? (
             <section className="app-state" role="status" aria-live="polite">
