@@ -3,7 +3,7 @@
 All notable changes to Rempeyek Agent OS. The in-app update banner compares the local version
 against the latest GitHub Release of this repository — tag releases as `v<version>`.
 
-## [2.1.0] — Unreleased
+## [2.1.0] — 2026-07-16
 
 ### Added
 - **Real telemetry vocabulary** — `report.cjs --type subagent_start|subagent_done|comm|info`;
@@ -27,8 +27,11 @@ against the latest GitHub Release of this repository — tag releases as `v<vers
 - OpenClaw `info` telemetry rendering an empty Sessions panel.
 
 ### Changed
-- Copilot fully replaced by Codex (registry, avatars, workflows; vault sync lands in 2.1.0 final).
+- Copilot fully replaced by Codex across registry, avatars, workflows, and the entire vault
+  (13 documentation drifts closed; `Brains/Copilot` archived).
 - `agents.config.example.json` now ships the real 8-agent roster instead of fictional placeholders.
+- Design-reference PNGs moved out of `apps/web/public/` into `docs/design-refs/` (6.3 MB off the
+  served path); stale worktrees, scratch scripts, and runtime residue cleaned up.
 
 ## [2.0.0] — 2026-07-12
 
