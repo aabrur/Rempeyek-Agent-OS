@@ -61,15 +61,6 @@ function connectedComponents(nodes, edges) {
   return components.sort((a, b) => b.length - a.length || a[0].localeCompare(b[0]));
 }
 
-function gridPositions(ids, { x, y, width, height }) {
-  const columns = Math.max(1, Math.ceil(Math.sqrt(ids.length * (width / Math.max(height, 1)))));
-  const rows = Math.max(1, Math.ceil(ids.length / columns));
-  return new Map(ids.map((id, index) => [id, {
-    x: x + ((index % columns) + 0.5) * width / columns,
-    y: y + (Math.floor(index / columns) + 0.5) * height / rows,
-  }]));
-}
-
 function anchorFor(ids, degreeOf) {
   return [...ids].sort((a, b) => (degreeOf.get(b) || 0) - (degreeOf.get(a) || 0) || String(a).localeCompare(String(b)))[0];
 }
@@ -101,22 +92,34 @@ function constellationPositions(ids, degreeOf, { x, y, width, height }) {
   return { anchor, positions };
 }
 
-function perimeterPositions(ids, { x, y, width, height }) {
-  const positions = new Map();
-  const slots = [
-    [0.06, 0.91], [0.94, 0.91], [0.06, 0.09], [0.94, 0.09],
-    [0.24, 0.94], [0.76, 0.94], [0.24, 0.06], [0.76, 0.06],
-  ];
-  ids.slice().sort().forEach((id, index) => {
-    const slot = slots[index % slots.length];
-    const lap = Math.floor(index / slots.length);
-    const inset = Math.min(0.16, lap * 0.04);
-    positions.set(id, {
-      x: x + Math.min(0.92, Math.max(0.08, slot[0] + (slot[0] < 0.5 ? inset : -inset))) * width,
-      y: y + Math.min(0.91, Math.max(0.09, slot[1] + (slot[1] < 0.5 ? inset : -inset))) * height,
-    });
+function neuralFabric(positioned, focusId) {
+  if (!focusId || positioned.size < 2) return [];
+  const orbit = [...positioned.keys()].filter(id => id !== focusId).sort();
+  const pairs = [];
+  for (const id of orbit) pairs.push([focusId, id]);
+  if (orbit.length > 2) orbit.forEach((id, index) => pairs.push([id, orbit[(index + 1) % orbit.length]]));
+  const seen = new Set();
+  return pairs.flatMap(([sourceId, targetId], index) => {
+    const key = [sourceId, targetId].sort().join(":");
+    if (seen.has(key)) return [];
+    seen.add(key);
+    const source = positioned.get(sourceId);
+    const target = positioned.get(targetId);
+    const mx = (source.x + target.x) / 2;
+    const my = (source.y + target.y) / 2;
+    const dx = target.x - source.x;
+    const dy = target.y - source.y;
+    const length = Math.hypot(dx, dy) || 1;
+    const bend = (index % 2 ? -1 : 1) * Math.min(24, length * 0.08);
+    const cx = mx - dy / length * bend;
+    const cy = my + dx / length * bend;
+    return [{
+      id: `fabric:${key}`,
+      source: sourceId,
+      target: targetId,
+      path: `M${source.x.toFixed(1)},${source.y.toFixed(1)} Q${cx.toFixed(1)},${cy.toFixed(1)} ${target.x.toFixed(1)},${target.y.toFixed(1)}`,
+    }];
   });
-  return positions;
 }
 
 function edgeId(edge) {
@@ -156,10 +159,7 @@ export function buildAgentMap(topology = {}, { width = 760, height = 480, reduce
     .filter(edge => PROVENANCE_BY_TYPE.get(edge?.type) === edge?.provenance?.source && known.has(edge?.source) && known.has(edge?.target) && edge.source !== edge.target && edge.provenance?.id)
     .sort((a, b) => edgeId(a).localeCompare(edgeId(b)));
   const components = connectedComponents(nodes, edges);
-  const connected = components.filter(component => component.length > 1);
   const isolated = components.filter(component => component.length === 1).flat();
-  const positions = new Map();
-  const anchors = new Set();
   const padding = 58;
   const usableWidth = width - padding * 2;
   const usableHeight = height - padding * 2;
@@ -170,18 +170,9 @@ export function buildAgentMap(topology = {}, { width = 760, height = 480, reduce
     degreeOf.set(edge.target, (degreeOf.get(edge.target) || 0) + 1);
   }
 
-  if (!connected.length) {
-    for (const [id, position] of gridPositions(isolated, { x: padding, y: padding, width: usableWidth, height: usableHeight })) positions.set(id, position);
-  } else {
-    connected.forEach((component, index) => {
-      const bandWidth = usableWidth / connected.length;
-      const band = { x: padding + index * bandWidth, y: padding, width: bandWidth, height: usableHeight };
-      const projected = constellationPositions(component, degreeOf, band);
-      anchors.add(projected.anchor);
-      for (const [id, position] of projected.positions) positions.set(id, position);
-    });
-    if (isolated.length) for (const [id, position] of perimeterPositions(isolated, { x: padding, y: padding, width: usableWidth, height: usableHeight })) positions.set(id, position);
-  }
+  const visual = constellationPositions(nodes.map(node => node.id), degreeOf, { x: padding, y: padding, width: usableWidth, height: usableHeight });
+  const positions = visual.positions;
+  const hasAcceptedEdges = edges.length > 0;
   const projectedNodes = nodes.map(node => ({
     ...node,
     ...positions.get(node.id),
@@ -189,12 +180,14 @@ export function buildAgentMap(topology = {}, { width = 760, height = 480, reduce
     mode: MODES.has(node.proc?.mode) ? node.proc.mode : null,
     componentId: components.findIndex(component => component.includes(node.id)),
     degree: degreeOf.get(node.id) || 0,   // Stage 3: neural glow intensity scales with degree
-    isAnchor: anchors.has(node.id),
-    width: anchors.has(node.id) ? 150 : node.id && isolated.includes(node.id) ? 118 : 126,
-    height: anchors.has(node.id) ? 64 : node.id && isolated.includes(node.id) ? 52 : 54,
+    isVisualFocus: node.id === visual.anchor,
+    isAnchor: hasAcceptedEdges && node.id === visual.anchor,
+    width: node.id === visual.anchor ? 154 : 126,
+    height: node.id === visual.anchor ? 66 : 54,
     isolated: !(edges.some(edge => edge.source === node.id || edge.target === node.id)),
   }));
   const positioned = new Map(projectedNodes.map(node => [node.id, node]));
+  const fabric = neuralFabric(positioned, visual.anchor);
   const projectedEdges = edges.map((edge, index) => {
     const source = positioned.get(edge.source);
     const target = positioned.get(edge.target);
@@ -216,7 +209,7 @@ export function buildAgentMap(topology = {}, { width = 760, height = 480, reduce
   });
   const nodeNames = new Map(projectedNodes.map(node => [node.id, node.name || node.id]));
   const rows = [
-    ...projectedNodes.map(node => ({ kind: "agent", id: `node:${node.id}`, agentId: node.id, label: node.name || node.id, status: node.status, mode: node.mode, degree: node.degree, componentId: node.componentId, isolated: node.isolated, isAnchor: node.isAnchor, avatar: node.avatar || "" })),
+    ...projectedNodes.map(node => ({ kind: "agent", id: `node:${node.id}`, agentId: node.id, label: node.name || node.id, status: node.status, mode: node.mode, degree: node.degree, componentId: node.componentId, isolated: node.isolated, isAnchor: node.isAnchor, isVisualFocus: node.isVisualFocus, avatar: node.avatar || "" })),
     ...projectedEdges.map(edge => ({
       kind: "relationship",
       id: `edge:${edge.id}`,
@@ -235,6 +228,7 @@ export function buildAgentMap(topology = {}, { width = 760, height = 480, reduce
   return {
     nodes: projectedNodes,
     edges: projectedEdges,
+    fabric,
     components,
     legend: { relations: RELATIONS, statuses: STATUSES },
     rows,

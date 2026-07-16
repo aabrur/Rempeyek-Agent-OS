@@ -55,8 +55,10 @@ test("lays out the same relationship graph deterministically without an artifici
 
   assert.deepEqual(first.nodes.map(({ id, x, y }) => ({ id, x, y })), second.nodes.map(({ id, x, y }) => ({ id, x, y })));
   assert.deepEqual(first.edges.map(({ id, path }) => ({ id, path })), second.edges.map(({ id, path }) => ({ id, path })));
+  assert.deepEqual(first.fabric, second.fabric);
   assert.equal(first.nodes.some(node => node.id === "core" || node.synthetic), false);
   assert.equal(new Set(first.nodes.map(node => `${node.x},${node.y}`)).size, agents.length);
+  assert.equal(first.fabric.some(link => link.source === "cline" || link.target === "cline"), true);
 });
 
 test("anchors each connected constellation on the highest-degree real agent", () => {
@@ -97,6 +99,8 @@ test("separates connected components and marks unrelated agents as isolated", ()
   assert.notEqual(componentByNode.codex, componentByNode.pi);
   assert.notEqual(componentByNode.pi, componentByNode.cline);
   assert.deepEqual(map.nodes.filter(node => node.isolated).map(node => node.id), ["cline", "pi"]);
+  assert.equal(map.nodes.filter(node => node.isVisualFocus).length, 1);
+  assert.equal(map.fabric.every(link => !map.rows.some(row => row.id === `edge:${link.id}`)), true);
 });
 
 test("projects an honest zero-edge state with evidence guidance", () => {
@@ -106,9 +110,37 @@ test("projects an honest zero-edge state with evidence guidance", () => {
   assert.equal(map.edges.length, 0);
   assert.equal(map.nodes.every(node => node.isolated), true);
   assert.equal(map.nodes.every(node => !node.isAnchor), true);
+  assert.deepEqual(map.nodes.filter(node => node.isVisualFocus).map(node => node.id), ["cline"]);
+  assert.ok(map.fabric.length >= agents.length - 1);
+  assert.equal(map.rows.filter(row => row.kind === "relationship").length, 0);
   assert.match(map.emptyState.title, /No verified relationships/i);
   assert.match(map.emptyState.detail, /configuration|task|subagent|communication/i);
   assert.equal(map.metadata.droppedRelations, 2);
+});
+
+test("keeps an evidence-isolated Claude Code inside the same decorative neural fabric", () => {
+  const nodes = [
+    ...agents,
+    { id: "claude-code", name: "Claude Code", enabled: true, actions: ["run"] },
+    { id: "kilo-code", name: "Kilo Code", enabled: true, actions: [] },
+    { id: "openclaw", name: "OpenClaw", enabled: true, actions: [] },
+    { id: "antigravity", name: "Antigravity", enabled: true, actions: [] },
+  ];
+  const map = buildAgentMap({
+    nodes,
+    edges: [
+      { source: "codex", target: "hermes", type: "dependency", provenance: { source: "configuration", id: "one" } },
+      { source: "hermes", target: "pi", type: "communication", provenance: { source: "communication", id: "two" } },
+    ],
+  });
+  const claude = map.nodes.find(node => node.id === "claude-code");
+  assert.equal(claude.isolated, true);
+  assert.equal(claude.isVisualFocus, false);
+  assert.equal(map.fabric.some(link => link.source === claude.id || link.target === claude.id), true);
+  assert.ok(claude.x > 63 && claude.x < 697);
+  assert.ok(claude.y > 31 && claude.y < 449);
+  assert.equal(map.metadata.edgeCount, 2);
+  assert.equal(map.rows.filter(row => row.kind === "relationship").length, 2);
 });
 
 test("projects the complete edge vocabulary and provenance into inspectable rows", () => {

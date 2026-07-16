@@ -13,6 +13,7 @@
     "start": "node apps/web/server.js",
     "build": "npm run build --workspace @rempeyek/web",
     "ui": "npm run dev --workspace @rempeyek/web",
-    "server": "node apps/web/server.js"
+    "server": "node apps/web/server.js",
+    "audit:public": "node scripts/public-release-audit.mjs"
   }
 }

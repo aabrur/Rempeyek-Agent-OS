@@ -15,7 +15,7 @@
 - Only queued/running task-assignment and communication edges may animate.
 - Preserve keyboard navigation, reduced motion, flat-theme effect gates, and the accessible evidence table.
 - Use the existing avatars served by `/avatars/<agent-id>.<ext>`; fall back to a text glyph without emoji-dependent structure.
-- Keep the generated reference at `docs/design-refs/agent-map-neural-constellation.png` as design evidence, not a runtime asset.
+- Keep generated raster references outside the public repository and runtime package.
 
 ---
 
@@ -179,4 +179,3 @@ Expected: non-force push succeeds and `origin/main` equals `HEAD`.
 - [ ] **Step 4: Write handoff and vault records**
 
 Save a redacted handoff to the Windows temp directory. Append the verified outcome, test/build evidence, commit, and design decisions to the Codex daily log and durable memory. Update an existing project note only if it is already the canonical Agent OS state note.
-

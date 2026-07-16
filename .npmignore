@@ -1,0 +1,17 @@
+.agents/
+.codex/
+.superpowers/
+.env
+agents.config.json
+agents.config.json.bak
+Obsidian Vault/
+runtime/
+telemetry/
+graphify-out/
+docs/design-refs/
+docs/qa-screenshots/
+docs/superpowers/
+apps/web/test/
+apps/web/public/avatars/
+*.log
+*.canvas

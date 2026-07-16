@@ -9,7 +9,9 @@ const net = require("net");
 const os = require("os");
 const { spawn, execFile, spawnSync } = require("child_process");
 const crypto = require("crypto");
+const { buildAgentEnv } = require("./lib/child-env.cjs");
 const { createAccessPolicy } = require("./lib/access-policy.cjs");
+const { ensureEmptyConfig, resolveRuntimePaths } = require("./lib/runtime-paths.cjs");
 const { resolveSummonProfile } = require("./lib/summon-profile.cjs");
 
 /* Monorepo layout: this file lives in apps/web/, but runtime data (vault, config,
@@ -26,8 +28,9 @@ try {
 } catch {}
 
 const PORT = process.env.PORT || 4321;
-const VAULT = process.env.VAULT_PATH || path.join(ROOT, "Obsidian Vault");
-const CONFIG_PATH = process.env.AGENTS_CONFIG || path.join(ROOT, "agents.config.json");
+const RUNTIME_PATHS = resolveRuntimePaths({ env: process.env, root: ROOT, home: os.homedir() });
+const VAULT = RUNTIME_PATHS.vaultPath;
+const CONFIG_PATH = RUNTIME_PATHS.configPath;
 const TOKEN = process.env.DASH_TOKEN || "";
 const ACCESS_POLICY = createAccessPolicy(process.env);
 const TODAY_PROJECTION = import("./lib/today-projection.mjs");
@@ -46,8 +49,9 @@ AGENT_CATALOG_MOD.then(m => { catalogLib = m; }).catch(e => console.error("[agen
 const RELEASE_MOD = import("./lib/release-check.mjs");
 let releaseLib = null;
 RELEASE_MOD.then(m => { releaseLib = m; }).catch(e => console.error("[release-check]", e.message));
-/* PUBLIC = static source (images + runtime-uploaded avatars, never wiped by a build).
-   DIST   = the built React app (`npm run build`). Requests resolve DIST first, then
+/* PUBLIC = tracked static source. Runtime avatars live in the ignored state root so
+   Vite cannot copy a user's uploads into dist during a production build.
+   DIST = the built React app (`npm run build`). Requests resolve DIST first, then
    PUBLIC, then fall back to index.html — /avatars always comes from PUBLIC, because
    Vite's emptyOutDir would otherwise delete uploads on the next build. */
 const PUBLIC = path.join(__dirname, "public");
@@ -55,13 +59,14 @@ const DIST = path.join(__dirname, "dist");
 const IGNORE = new Set([".git", ".obsidian", "Assets", "node_modules"]);
 const DAY = 86400000;
 const LOG_MAX = 800;
-const AVATAR_DIR = path.join(PUBLIC, "avatars");
-const TELEMETRY_DIR = path.join(ROOT, "telemetry");
+const AVATAR_DIR = RUNTIME_PATHS.avatarDir;
+const TELEMETRY_DIR = RUNTIME_PATHS.telemetryDir;
 const LOG_DIR = path.join(TELEMETRY_DIR, "logs");   // R#4: per-agent run log, survives restarts
 const TERMS_DIR = path.join(TELEMETRY_DIR, "terms"); // summoned-terminal pid/kill handshake files
 const LOG_FILE_MAX = 1_000_000;                     // 1 MB/agent → naive rotation (keep the tail half)
 const CLAUDE_PROJECTS = process.env.CLAUDE_PROJECTS || path.join(os.homedir(), ".claude", "projects");
 for (const d of [AVATAR_DIR, TELEMETRY_DIR, LOG_DIR, TERMS_DIR]) { try { fs.mkdirSync(d, { recursive: true }); } catch {} }
+ensureEmptyConfig(CONFIG_PATH, { home: os.homedir() });
 
 /* loadConfig: memoize by mtime (B6) + tolerate config broken mid-edit → return last-good (R10).
    R#11: keep the last error so the dashboard can show a banner (not silently serve last-good). */
@@ -85,6 +90,7 @@ function loadConfig() {
    to <config>.bak first, writes pretty JSON, and invalidates the mtime cache. */
 function saveConfig(cfg) {
   try { fs.copyFileSync(CONFIG_PATH, CONFIG_PATH + ".bak"); } catch {}
+  fs.mkdirSync(path.dirname(CONFIG_PATH), { recursive: true });
   fs.writeFileSync(CONFIG_PATH, JSON.stringify(cfg, null, 2) + "\n", "utf8");
   _cfgCache = { mtime: 0, data: null };   // force reload on next loadConfig()
 }
@@ -645,7 +651,7 @@ function gwCtl(id, action, cb) {
   let out = "", done = false;
   const finish = (obj) => { if (done) return; done = true; clearTimeout(timer); cb(obj); };
   let child;
-  try { child = spawn(cmd, [], { cwd, shell: true, windowsHide: true, env: { ...process.env, AGENT_WORKDIR: loadConfig().workdir } }); }
+  try { child = spawn(cmd, [], { cwd, shell: true, windowsHide: true, env: buildAgentEnv(agent, process.env, loadConfig().workdir) }); }
   catch (e) { return cb({ error: `spawn failed: ${e.message}` }); }
   const timer = setTimeout(() => { killTree(child.pid, child); finish({ error: `timeout 30s: ${cmd}` }); }, 30000);
   child.stdout.on("data", d => { out += d; });
@@ -692,7 +698,7 @@ function gwRun(id) {
   const p = { id, log: [], seq: 0, status: "running", startedAt: new Date().toISOString(), exitCode: null };
   pushLog(p, "sys", `[agentic-os] run (owned): ${cmd}  (cwd: ${cwd})`);
   let child;
-  try { child = spawn(cmd, [], { cwd, shell: true, windowsHide: true, env: { ...process.env, AGENT_WORKDIR: loadConfig().workdir } }); }
+  try { child = spawn(cmd, [], { cwd, shell: true, windowsHide: true, env: buildAgentEnv(agent, process.env, loadConfig().workdir) }); }
   catch (e) { return { error: `spawn failed: ${e.message}` }; }
   p.child = child; p.pid = child.pid;
   child.stdout.on("data", d => pushLog(p, "out", d));
@@ -1747,10 +1753,13 @@ function requestHandler(req, res) {
     try { return fs.existsSync(file) && !fs.statSync(file).isDirectory() ? file : null; } catch { return null; }
   };
 
-  // /avatars/* is runtime-written → always from PUBLIC, never the (rebuilt) dist copy
-  const roots = rel.startsWith("avatars/") ? [PUBLIC] : [DIST, PUBLIC];
+  // /avatars/* is runtime-written and always served from the ignored state directory.
   let file = null;
-  for (const root of roots) { file = resolve(root, rel); if (file) break; }
+  if (rel.startsWith("avatars/")) {
+    file = resolve(AVATAR_DIR, rel.slice("avatars/".length));
+  } else {
+    for (const root of [DIST, PUBLIC]) { file = resolve(root, rel); if (file) break; }
+  }
 
   // SPA fallback: unknown non-asset path → the built index.html (client-side routing)
   if (!file && !path.extname(rel)) file = resolve(DIST, "index.html");

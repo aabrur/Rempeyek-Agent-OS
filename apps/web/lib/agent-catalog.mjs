@@ -8,12 +8,12 @@
 export const AGENT_CATALOG = [
   {
     id: "claude-code", name: "Claude Code", icon: "⚫", role: "Coding & technical specialist",
-    trigger: "claude", home: ".claude",
+    trigger: "claude", home: ".claude", envAllow: ["ANTHROPIC_API_KEY", "CLAUDE_CODE_OAUTH_TOKEN"],
     install: { cmd: "npm install -g @anthropic-ai/claude-code", url: "https://claude.com/claude-code" },
   },
   {
     id: "codex", name: "Codex", icon: "⬜", role: "Repository-aware software engineering agent",
-    trigger: "codex", home: ".codex",
+    trigger: "codex", home: ".codex", envAllow: ["OPENAI_API_KEY"],
     install: { cmd: "npm install -g @openai/codex", url: "https://developers.openai.com/codex/cli" },
   },
   {
@@ -33,12 +33,12 @@ export const AGENT_CATALOG = [
   },
   {
     id: "antigravity", name: "Antigravity", icon: "🟠", role: "Advanced agentic coding & integration",
-    trigger: "agy", home: ".gemini",
+    trigger: "agy", home: ".gemini", envAllow: ["GEMINI_API_KEY", "GOOGLE_API_KEY"],
     install: { url: "https://antigravity.google" },   // IDE/CLI install — link only, no npm one-liner
   },
   {
     id: "hermes", name: "Hermes", icon: "🟢", role: "Crypto, research & ops 24/7",
-    trigger: "hermes", home: ".hermes",
+    trigger: "hermes", home: ".hermes", envAllow: ["GEMINI_API_KEY", "GOOGLE_API_KEY"],
     install: { url: "https://github.com/aabrur/Rempeyek-Agent-OS" },   // native service — link only
   },
   {
@@ -96,6 +96,7 @@ export function buildAgentRecord({ body = {}, cat = null, existingIds = [], exis
   if (home) gateway.home = home;
   if (trigger) gateway.trigger = trigger;
   if (cat?.install) gateway.install = cat.install;   // curated only — never from body
+  if (cat?.envAllow) gateway.envAllow = [...cat.envAllow];
   const hasGateway = gateway.home || gateway.trigger || gateway.install;
 
   const agent = {

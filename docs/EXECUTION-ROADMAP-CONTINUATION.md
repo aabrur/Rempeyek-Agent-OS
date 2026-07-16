@@ -226,14 +226,14 @@ Kerjakan Stage A dari docs/EXECUTION-ROADMAP-CONTINUATION.md sampai acceptance c
 
 | Agent | Working directory | Command |
 |---|---|---|
-| Claude Code | `C:\Users\abrur\.claude` | `claude` |
-| Cline | `C:\Users\abrur\.cline` | `cline` |
-| Codex | `C:\Users\abrur\.codex` | `codex` |
-| Antigravity | `C:\Users\abrur\.gemini` | `agy` |
-| Kilo Code | `C:\Users\abrur\.kilocode` | `kilo` |
-| OpenClaw | `C:\Users\abrur\.openclaw` | `openclaw` |
-| Pi | `C:\Users\abrur\.pi` | `pi` |
-| Hermes | `C:\Users\abrur\AppData\Local\hermes` | `hermes` |
+| Claude Code | `%USERPROFILE%\.claude` | `claude` |
+| Cline | `%USERPROFILE%\.cline` | `cline` |
+| Codex | `%USERPROFILE%\.codex` | `codex` |
+| Antigravity | `%USERPROFILE%\.gemini` | `agy` |
+| Kilo Code | `%USERPROFILE%\.kilocode` | `kilo` |
+| OpenClaw | `%USERPROFILE%\.openclaw` | `openclaw` |
+| Pi | `%USERPROFILE%\.pi` | `pi` |
+| Hermes | `%LOCALAPPDATA%\hermes` | `hermes` |
 
 Built-in mapping adalah canonical dan tidak bergantung pada nilai config lama. Custom agent tetap memakai `gateway.home` dan `gateway.trigger` dari konfigurasi terpercaya.
 

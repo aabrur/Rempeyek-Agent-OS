@@ -6,10 +6,12 @@
 */
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 
-const ROOT = path.resolve(__dirname, '..');
-const TELEMETRY = path.join(ROOT, 'telemetry', 'hermes.jsonl');
-const VAULT = process.env.VAULT_PATH || 'C:\\Users\\abrur\\Obsidian Vault';
+const APP_DATA = process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local');
+const STATE_ROOT = process.env.AGENT_STATE_DIR || path.join(APP_DATA, 'Rempeyek-Agent-OS');
+const TELEMETRY = path.join(STATE_ROOT, 'telemetry', 'hermes.jsonl');
+const VAULT = process.env.VAULT_PATH || path.join(STATE_ROOT, 'Vault');
 const LANE_DIR = path.join(VAULT, 'Brains', 'Hermes', 'Daily');
 
 function now() {

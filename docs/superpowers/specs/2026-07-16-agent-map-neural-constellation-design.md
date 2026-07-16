@@ -4,7 +4,7 @@
 
 Turn the existing evidence-first Agent Map into a premium neural constellation without redesigning the surrounding REMPEYEK Agent OS dashboard or inventing runtime data.
 
-The approved visual reference is [agent-map-neural-constellation.png](../../design-refs/agent-map-neural-constellation.png). It translates the user's supplied composition into the repository's existing Neural Cosmos design system.
+The approved visual direction translates the supplied composition into the repository's existing Neural Cosmos design system. Raster references remain local review artifacts and are not shipped in the public repository or package.
 
 ## Visual direction
 
@@ -59,4 +59,3 @@ Below 1200 px, the inspector moves beneath the map. Below 900 px, both side rail
 - `npm test` and `npm run build` pass.
 - Visual verification covers cyberpunk, minimalist, brutalist, and glassmorph at desktop plus a 375 px viewport and reduced motion.
 - `graphify update .` succeeds after source changes.
-

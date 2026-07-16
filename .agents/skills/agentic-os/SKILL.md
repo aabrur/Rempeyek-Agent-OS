@@ -5,7 +5,7 @@ description: "Use whenever working with Agentic OS as the Windows dashboard for 
 
 # Agentic OS — Local Windows Dashboard + Gateway Control
 
-Class-level operational skill for the `C:\Users\abrur\Rempeyek-Agent-Os` dashboard stack:
+Class-level operational skill for the `<repo>` dashboard stack:
 - `server.js` HTTP API + `public/` frontend
 - `agents.config.json` agent registry with gateway control definitions
 - Windows service control via scheduled tasks and Hermes/OpenClaw CLIs
@@ -35,7 +35,7 @@ Keep timing-safe comparison for non-local callers; never remove token auth entir
 ### Quoted Windows paths in `gateway.bin`/`runCmd` fail when action is appended
 **Cause:** `agents.config.json` already includes a quoted executable path with extension, and `server.js` appends ` ${action}` or uses `runCmd` directly, resulting in malformed shell commands or path quoting conflicts.  
 **Fix:** For Hermes, use direct binary paths in config without extra quoting in config:
-- `gateway.bin`: `C:\Users\abrur\AppData\Local\hermes\hermes-agent\venv\Scripts\hermes.exe`
+- `gateway.bin`: `%LOCALAPPDATA%\hermes\hermes-agent\venv\Scripts\hermes.exe`
 - `gateway.runCmd`: same binary for foreground runs
 Avoid referring to wrapper scripts from config when `cwd` is not the wrapper’s folder; if wrappers are used, keep them tiny, no subcommand parsing, and call them from `cwd` only.
 
@@ -65,7 +65,7 @@ Run these in order after any `agents.config.json` or `server.js` change:
 
 ## Daily Bridge / Telemetry
 
-`C:\Users\abrur\Rempeyek-Agent-Os\scripts\hermes-daily-bridge.cjs` is the Hermes lane sync bridge. It writes `telemetry/hermes.jsonl` and updates `Brains/Hermes/Daily/YYYY-MM-DD.md`. Dashboard reads telemetry via `readTelemetry(id)` and shapes it through `telemetryActivity(events)`. If the dashboard shows empty telemetry for Hermes while the file exists, confirm:
+`<repo>\scripts\hermes-daily-bridge.cjs` is the Hermes lane sync bridge. It writes `telemetry/hermes.jsonl` and updates `Brains/Hermes/Daily/YYYY-MM-DD.md`. Dashboard reads telemetry via `readTelemetry(id)` and shapes it through `telemetryActivity(events)`. If the dashboard shows empty telemetry for Hermes while the file exists, confirm:
 - the event `type` values are exactly `task_start`, `task_progress`, `task_done`, `subagent_start`, `subagent_done`
 - `name`/`detail` are populated strings, not `null`
 - the dashboard backend is reading from the same `telemetry/` directory as the bridge writer

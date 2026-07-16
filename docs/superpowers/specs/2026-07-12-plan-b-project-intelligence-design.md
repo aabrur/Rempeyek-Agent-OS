@@ -189,7 +189,7 @@ throughput, and crypto-dashboard charts remain excluded.
 The Neural Vault remains a first-class specialist view. Its installation
 default is:
 
-`C:\Users\abrur\Rempeyek-Agent-Os\Obsidian Vault`
+`<your-vault>`
 
 `VAULT_PATH` may still override this for portability. The resolved path is
 visible in Settings and validated before scanning. The application never

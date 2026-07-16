@@ -123,6 +123,34 @@ const ConstellationEdge = memo(function ConstellationEdge({ edge, row, index, se
   </g>;
 });
 
+const NeuralFabric = memo(function NeuralFabric({ links = [], nodes = [], selectionId, activeAgentId, reducedMotion }) {
+  const visible = new Set(nodes.map(node => node.id));
+  return <g className="top-fabric" aria-hidden="true">
+    {links.filter(link => visible.has(link.source) && visible.has(link.target)).map((link, index) => {
+      const related = !selectionId || !activeAgentId || link.source === activeAgentId || link.target === activeAgentId;
+      return <m.path
+        key={link.id}
+        className="top-fabric-link"
+        d={link.path}
+        initial={reducedMotion ? false : { pathLength: 0, opacity: 0 }}
+        animate={{ pathLength: 1, opacity: related ? 0.34 : 0.08 }}
+        transition={{ pathLength: { duration: 0.8, delay: Math.min(index * 0.025, 0.25), ease: [0.16, 1, 0.3, 1] }, opacity: { duration: 0.22 } }}
+      />;
+    })}
+  </g>;
+});
+
+const NeuralFocus = memo(function NeuralFocus({ node, effectsOn, reducedMotion }) {
+  if (!node) return null;
+  return <g className={`top-neural-focus${effectsOn ? " has-effects" : ""}`} transform={`translate(${node.x.toFixed(1)},${node.y.toFixed(1)})`} aria-hidden="true">
+    <circle className="top-focus-orbit top-focus-orbit-outer" r="96" />
+    <circle className="top-focus-orbit top-focus-orbit-inner" r="72" />
+    <circle className="top-focus-core" r="34" />
+    <path className="top-focus-crosshair" d="M-48 0H48M0-48V48" />
+    {!reducedMotion && effectsOn && <circle className="top-focus-signal" r="44" />}
+  </g>;
+});
+
 const ConstellationNode = memo(function ConstellationNode({ node, index, selectionId, highlightedNodeIds, reducedMotion, onSelect, onKeyDown, setFocusRef }) {
   const id = `node:${node.id}`;
   const selected = selectionId === id;
@@ -135,7 +163,7 @@ const ConstellationNode = memo(function ConstellationNode({ node, index, selecti
   const avatarY = -avatarSize / 2;
   const copyX = avatarX + avatarSize + 9;
   const clipId = avatarClipId(node.id);
-  return <g ref={element => setFocusRef(id, element)} className={`top-node status-${node.status}${selected ? " is-selected" : ""}${node.isAnchor ? " is-anchor" : ""}${node.isolated ? " is-isolated" : ""}`} transform={`translate(${node.x.toFixed(1)},${node.y.toFixed(1)})`} role="button" tabIndex="0" aria-label={`${node.name}, status ${node.status}${node.mode ? `, ${node.mode} mode` : ""}, ${node.degree} verified relationships${node.isAnchor ? ", constellation anchor" : ""}${node.isolated ? ", no verified relationships" : ""}`} onFocus={() => onSelect(id)} onClick={() => onSelect(id)} onKeyDown={event => onKeyDown(event, id)}>
+  return <g ref={element => setFocusRef(id, element)} className={`top-node status-${node.status}${selected ? " is-selected" : ""}${node.isAnchor ? " is-anchor" : ""}${node.isVisualFocus ? " is-visual-focus" : ""}${node.isolated ? " is-isolated" : ""}`} transform={`translate(${node.x.toFixed(1)},${node.y.toFixed(1)})`} role="button" tabIndex="0" aria-label={`${node.name}, status ${node.status}${node.mode ? `, ${node.mode} mode` : ""}, ${node.degree} verified relationships${node.isAnchor ? ", constellation anchor" : ""}${node.isolated ? ", no verified relationships" : ""}`} onFocus={() => onSelect(id)} onClick={() => onSelect(id)} onKeyDown={event => onKeyDown(event, id)}>
     <defs><clipPath id={clipId}><circle cx={avatarX + avatarSize / 2} cy="0" r={avatarSize / 2 - 2} /></clipPath></defs>
     <m.g initial={reducedMotion ? false : { opacity: 0, scale: 0.9 }} animate={{ opacity: muted ? 0.32 : 1, scale: selected ? 1.035 : 1 }} transition={{ type: "spring", stiffness: 260, damping: 24, delay: reducedMotion ? 0 : Math.min(index * 0.025, 0.18) }}>
       {node.status === "running" && <rect className="top-status-pulse" x={-width / 2 - 3} y={-height / 2 - 3} width={width + 6} height={height + 6} rx={(height + 6) / 2} />}
@@ -269,6 +297,8 @@ export function TopologyMap({ state, accent, load, onOpen }) {
             {map.nodes.map(node => <ellipse key={node.id} className="top-node-halo" cx={node.x.toFixed(1)} cy={node.y.toFixed(1)} rx={(node.width * (node.isAnchor ? 0.72 : 0.58)).toFixed(1)} ry={(node.height * 0.82).toFixed(1)} style={{ "--agent-color": agentAccent(node), animationDelay: `${(-((node.degree || 0) * 0.37)).toFixed(2)}s` }} />)}
           </g>
 
+          <NeuralFocus node={map.nodes.find(node => node.isVisualFocus)} effectsOn={effectsOn} reducedMotion={reducedMotion} />
+          <NeuralFabric links={map.fabric} nodes={map.nodes} selectionId={selectionId} activeAgentId={activeAgentId} reducedMotion={reducedMotion} />
           {map.edges.map((edge, index) => <ConstellationEdge key={edge.id} edge={edge} row={rowById.get(`edge:${edge.id}`)} index={index} selectionId={selectionId} activeAgentId={activeAgentId} reducedMotion={reducedMotion} onSelect={select} onKeyDown={handleKeyDown} setFocusRef={setFocusRef} />)}
           {map.nodes.map((node, index) => <ConstellationNode key={node.id} node={node} index={index} selectionId={selectionId} highlightedNodeIds={highlightedNodeIds} reducedMotion={reducedMotion} onSelect={select} onKeyDown={handleKeyDown} setFocusRef={setFocusRef} />)}
 

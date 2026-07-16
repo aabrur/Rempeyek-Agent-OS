@@ -7,6 +7,7 @@ telemetry/*.jsonl
 telemetry/logs/
 apps/web/public/avatars/*
 !apps/web/public/avatars/.gitkeep
+runtime/
 
 # Personal memory layer (lives on disk, not in this repo)
 Obsidian Vault/

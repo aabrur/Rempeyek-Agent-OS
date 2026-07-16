@@ -44,16 +44,16 @@ React + Vite, split into components across an npm-workspaces monorepo.
 git clone <this-repo> rempeyek-agent-os
 cd rempeyek-agent-os
 
-# 1. Configure environment
-copy .env.example .env          # then edit: VAULT_PATH, DASH_TOKEN, ...
+# 1. Optional: point the dashboard at your own Obsidian vault
+copy .env.example .env          # then edit VAULT_PATH; keep secrets local
 
-# 2. Configure your agents
-copy agents.config.example.json agents.config.json   # then edit paths/commands
-
-# 3. Install + run
+# 2. Install + run. The first launch creates an empty private registry.
 npm install                     # React/Vite + workspace links
 npm run dev                     # builds the UI, then serves http://localhost:4321
 ```
+
+Open **Agents â†’ + Add Agent** to register only the agents you want. A clean
+installation never copies the maintainer's roster, vault, telemetry, or avatars.
 
 Port already taken? `set PORT=4322` then `npm run dev` again.
 
@@ -79,8 +79,9 @@ scripts/         bridges (telemetry ↔ vault)
 telemetry/       per-agent JSONL event streams (runtime data)
 ```
 
-Runtime data (`telemetry/`, `agents.config.json`, `.env`, your vault) stays at the
-repo root — see [docs/Architecture.md](docs/Architecture.md).
+New installations keep configuration, telemetry, avatars, and the optional starter
+vault under the operating system's local application-data directory. Existing ignored
+repository-local configurations remain compatible. See [SECURITY.md](SECURITY.md).
 
 ## Configuration
 
@@ -89,7 +90,9 @@ repo root — see [docs/Architecture.md](docs/Architecture.md).
 | Variable | Purpose | Default |
 |----------|---------|---------|
 | `PORT` | Dashboard port | `4321` |
-| `VAULT_PATH` | Absolute path to your Obsidian Vault | `<repo>\Obsidian Vault` |
+| `AGENT_STATE_DIR` | Private config/telemetry/avatar state root | `%LOCALAPPDATA%\Rempeyek-Agent-OS` |
+| `AGENTS_CONFIG` | Optional custom agent registry path | `<state>\agents.config.json` |
+| `VAULT_PATH` | Absolute path to your own Obsidian Vault | `<state>\Vault` |
 | `DASH_TOKEN` | Auth token for remote access (localhost is always allowed) | none |
 | `CLAUDE_PROJECTS` | Claude Code transcripts folder | `%USERPROFILE%\.claude\projects` |
 | `BACKUP_PATH` | Vault backup location (enables the backup-age row in Vault Health) | none |
@@ -110,6 +113,7 @@ has a `gateway` block:
 | `probe` | `{host, port}` TCP health probe (real liveness, not text matching) |
 | `watchdog` | `true` = auto-restart on down (max 3×/hour), default `false` |
 | `actions` | subset of `start,stop,restart,status,run` (empty = observability-only) |
+| `envAllow` | provider environment variables this gateway may receive |
 
 Agents without a gateway CLI (`actions: []`) still appear on the dashboard —
 status comes from telemetry and their vault lane instead.
@@ -140,6 +144,8 @@ in your vault — pan, zoom, drag, search. Click a node to open it in Obsidian.
 - Auth is **header-only** (`x-dash-token`); query-string tokens are not accepted.
 - Localhost requests are always allowed; set `DASH_TOKEN` before exposing the port.
 - The server never echoes internal error details to clients.
+- Gateway processes receive an allowlisted environment, never the dashboard's complete `.env`.
+- Public-release boundaries and reporting instructions are documented in [SECURITY.md](SECURITY.md).
 
 ## License
 

@@ -73,15 +73,7 @@ Theme picker memakai radiogroup berlabel. Arrow key berpindah dari Minimalist ke
 
 ## Bukti screenshot
 
-- `qa-screenshots/today-{minimalist,brutalist,glassmorph,cyberpunk}-1440.png`
-- `qa-screenshots/project-workspace-cyberpunk-1440.png`
-- `qa-screenshots/neural-vault-cosmos-cyberpunk-1440-final.png`
-- `qa-screenshots/agent-map-zero-edge-cyberpunk-1440.png`
-- `qa-screenshots/hermes-gateway-detail-cyberpunk-1440.png`
-- `qa-screenshots/today-cyberpunk-1280.png`
-- `qa-screenshots/neural-vault-cyberpunk-768.png`
-- `qa-screenshots/today-cyberpunk-mobile-390-final.png`
-- `qa-screenshots/agent-map-cyberpunk-mobile-390.png`
+- QA screenshots are generated locally during release review and kept outside the public repository and npm package because they may display a user's private roster, vault metadata, or avatars.
 
 ## Batasan yang disengaja
 

@@ -4,7 +4,7 @@
 
 ## Outcome and guardrails
 
-Build a project-first daily workspace on the existing Node + React/Vite stack. The first complete workflow is **Continue yesterday's work**. Minimalist, Brutalist, Glassmorph, and Cyberpunk share semantic tokens. Neural Vault and Agent Map render only real data. Default Vault is `C:\Users\abrur\Rempeyek-Agent-Os\Obsidian Vault`, overridable by `OBSIDIAN_VAULT_PATH`; tests use temporary fixture vaults. Remote access is fail-closed. Reduced-motion and non-canvas fallbacks are mandatory.
+Build a project-first daily workspace on the existing Node + React/Vite stack. The first complete workflow is **Continue yesterday's work**. Minimalist, Brutalist, Glassmorph, and Cyberpunk share semantic tokens. Neural Vault and Agent Map render only real data. The Vault is resolved from `VAULT_PATH` or the per-user application-data directory; tests use temporary fixture vaults. Remote access is fail-closed. Reduced-motion and non-canvas fallbacks are mandatory.
 
 ## 1. Test and server seams
 
