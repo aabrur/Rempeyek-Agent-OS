@@ -192,7 +192,7 @@
 :root[data-theme="minimalist"] .continuity-core { border:0; border-block:1px solid var(--line); border-radius:0; background:transparent; }
 :root[data-theme="minimalist"] .project-composer { border-width:1px 0; background:transparent; }
 :root[data-theme="minimalist"] :is(.topology-panel,.topo-box,.topo-legend) { background:transparent; box-shadow:none; border-color:var(--line); }
-:root[data-theme="minimalist"] .topology :is(.top-glow,.top-node:hover circle) { filter:none; }
+:root[data-theme="minimalist"] .topology :is(.top-glow,.top-node:hover .top-node-shell) { filter:none; }
 :root[data-theme="minimalist"] .topology .top-node-halo { fill:none; }
 :root[data-theme="minimalist"] :is(.topology-panel .topo-map,.topo-fallback) { background:transparent; box-shadow:none; }
 :root[data-theme="minimalist"] .topo-empty { background:transparent; border-block:1px solid var(--line); }
@@ -214,7 +214,7 @@
 :root[data-theme="brutalist"] .continuity-node::before { border-radius:0; }
 :root[data-theme="brutalist"] .continuity-core { background:var(--card-hi); border-width:3px; }
 :root[data-theme="brutalist"] .project-tabs button.active { color:#fff; background:#111; box-shadow:inset 0 -4px var(--acc); }
-:root[data-theme="brutalist"] .topology :is(.top-glow,.top-node:hover circle) { filter:none; }
+:root[data-theme="brutalist"] .topology :is(.top-glow,.top-node:hover .top-node-shell) { filter:none; }
 :root[data-theme="brutalist"] .topology .top-node-halo { fill:none; }
 :root[data-theme="brutalist"] :is(.topology-panel .topo-map,.topo-fallback) { border:3px solid var(--line); border-radius:0; background:var(--card-hi); box-shadow:4px 4px 0 var(--line); }
 :root[data-theme="brutalist"] .top-node-select { stroke-dasharray:none; }
@@ -227,12 +227,13 @@
 :root[data-theme="glassmorph"] :is(.page-head h1,.ws-hero-name) { filter:none; }
 :root[data-theme="glassmorph"] :is(.ws-hero,.topology-panel,.graph-wrap) { box-shadow:0 28px 80px rgba(0,0,0,.28),inset 0 1px rgba(255,255,255,.1); }
 :root[data-theme="glassmorph"] .continuity-core { background:rgba(125,211,252,.08); box-shadow:inset 0 1px rgba(255,255,255,.09); }
-:root[data-theme="glassmorph"] :is(.topology-panel .topo-map,.topo-fallback) { background:rgba(7,17,31,.58); backdrop-filter:blur(18px); box-shadow:inset 0 1px rgba(255,255,255,.08); }
+:root[data-theme="glassmorph"] :is(.topology-panel .topo-map,.topo-fallback) { background:rgba(7,17,31,.78); backdrop-filter:none; box-shadow:inset 0 1px rgba(255,255,255,.08); }
 
 /* Restrained Cosmos component structure */
 :root[data-theme="cyberpunk"] .sidebar { background:linear-gradient(180deg,rgba(13,10,32,.96),rgba(7,5,19,.98)); }
 :root[data-theme="cyberpunk"] :is(.page-head h1,.ws-hero-name) { filter:none; }
 :root[data-theme="cyberpunk"] :is(.panel,.tile,.agent-card,.ws-card,.topo-box,.topo-legend) { background:var(--surface-fill); backdrop-filter:blur(4px); }
+:root[data-theme="cyberpunk"] .topology-panel :is(.topo-box,.topo-legend) { backdrop-filter:none; }
 :root[data-theme="cyberpunk"] :is(.nav-item.active,.theme-sw.on,.btn-primary:focus-visible) { text-shadow:0 0 10px color-mix(in srgb,var(--acc) 34%,transparent); }
 :root[data-theme="cyberpunk"] .continuity-core { box-shadow:0 0 28px color-mix(in srgb,var(--ac,var(--acc)) 16%,transparent); }
 :root[data-theme="cyberpunk"] .continuity-node :is(a,button):focus-visible { box-shadow:0 0 16px color-mix(in srgb,var(--acc) 18%,transparent); }

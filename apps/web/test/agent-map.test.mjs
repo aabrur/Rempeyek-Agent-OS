@@ -41,7 +41,7 @@ test("beginning a topology refresh clears previous relationships until new evide
   assert.deepEqual(refreshing.metadata, { nodeCount: 3, edgeCount: 0, droppedRelations: 0, hasRelationships: false });
 });
 
-test("lays out the same relationship graph deterministically without a radial hub", () => {
+test("lays out the same relationship graph deterministically without an artificial hub", () => {
   const topology = {
     nodes: agents,
     edges: [
@@ -57,6 +57,33 @@ test("lays out the same relationship graph deterministically without a radial hu
   assert.deepEqual(first.edges.map(({ id, path }) => ({ id, path })), second.edges.map(({ id, path }) => ({ id, path })));
   assert.equal(first.nodes.some(node => node.id === "core" || node.synthetic), false);
   assert.equal(new Set(first.nodes.map(node => `${node.x},${node.y}`)).size, agents.length);
+});
+
+test("anchors each connected constellation on the highest-degree real agent", () => {
+  const map = buildAgentMap({
+    nodes: agents,
+    edges: [
+      { source: "codex", target: "hermes", type: "dependency", provenance: { source: "configuration", id: "hermes:codex" } },
+      { source: "hermes", target: "pi", type: "task_assignment", provenance: { source: "task", id: "task-1" } },
+    ],
+  });
+
+  const anchors = map.nodes.filter(node => node.isAnchor);
+  assert.deepEqual(anchors.map(node => node.id), ["hermes"]);
+  assert.ok(Math.abs(anchors[0].x - 380) < 1);
+  assert.ok(Math.abs(anchors[0].y - 240) < 1);
+  assert.equal(map.nodes.some(node => node.synthetic), false);
+  assert.equal(map.nodes.every(node => node.width > 0 && node.height > 0), true);
+  assert.equal(new Set(map.nodes.map(node => `${node.x},${node.y}`)).size, agents.length);
+});
+
+test("breaks equal-degree anchor ties by stable agent id", () => {
+  const map = buildAgentMap({
+    nodes: agents.slice(0, 2),
+    edges: [{ source: "codex", target: "hermes", type: "communication", provenance: { source: "communication", id: "message" } }],
+  });
+
+  assert.deepEqual(map.nodes.filter(node => node.isAnchor).map(node => node.id), ["codex"]);
 });
 
 test("separates connected components and marks unrelated agents as isolated", () => {
@@ -78,6 +105,7 @@ test("projects an honest zero-edge state with evidence guidance", () => {
   assert.equal(map.metadata.hasRelationships, false);
   assert.equal(map.edges.length, 0);
   assert.equal(map.nodes.every(node => node.isolated), true);
+  assert.equal(map.nodes.every(node => !node.isAnchor), true);
   assert.match(map.emptyState.title, /No verified relationships/i);
   assert.match(map.emptyState.detail, /configuration|task|subagent|communication/i);
   assert.equal(map.metadata.droppedRelations, 2);

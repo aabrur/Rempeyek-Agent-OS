@@ -1,8 +1,10 @@
+import { lazy, Suspense } from "react";
 import { Btn, PageHead, SectionRow } from "@rempeyek/ui";
-import { TopologyMap } from "../components/TopologyMap";
 import { AgentCard } from "../components/AgentCard";
 import { ReviewPanel } from "../components/ReviewPanel";
 import { ScheduleList, StatTiles, VaultHealth, WorkflowCards } from "../components/Panels";
+
+const TopologyMap = lazy(() => import("../components/TopologyMap").then(module => ({ default: module.TopologyMap })));
 
 export function CommandCenter({ state, accent, load, agentsById, gw, ops, openAgent, onOpenAgent, refresh }) {
   return (
@@ -17,7 +19,9 @@ export function CommandCenter({ state, accent, load, agentsById, gw, ops, openAg
         <Btn variant="primary" onClick={gw.startAll}>▶ START ALL GATEWAYS</Btn>
       </SectionRow>
 
-      <TopologyMap state={state} accent={accent} load={load} agentsById={agentsById} onOpen={onOpenAgent} />
+      <Suspense fallback={<div className="topology-panel topo-map-skeleton" role="status"><div className="skeleton-block" /><span>Loading Agent Map…</span></div>}>
+        <TopologyMap state={state} accent={accent} load={load} agentsById={agentsById} onOpen={onOpenAgent} />
+      </Suspense>
 
       <div className="agent-row">
         {state.agents.map(a => (

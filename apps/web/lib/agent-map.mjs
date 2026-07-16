@@ -70,67 +70,52 @@ function gridPositions(ids, { x, y, width, height }) {
   }]));
 }
 
-function rankedPositions(ids, edges, { x, y, width, height }) {
-  const member = new Set(ids);
-  const outgoing = new Map(ids.map(id => [id, []]));
-  const indegree = new Map(ids.map(id => [id, 0]));
-  for (const edge of edges) {
-    if (!member.has(edge.source) || !member.has(edge.target)) continue;
-    outgoing.get(edge.source).push(edge.target);
-    indegree.set(edge.target, indegree.get(edge.target) + 1);
-  }
-  for (const targets of outgoing.values()) targets.sort();
-  const roots = ids.filter(id => indegree.get(id) === 0);
-  const queue = (roots.length ? roots : [ids[0]]).map(id => [id, 0]);
-  const rank = new Map();
-  while (queue.length) {
-    const [id, level] = queue.shift();
-    if (rank.has(id)) continue;
-    rank.set(id, level);
-    for (const target of outgoing.get(id)) queue.push([target, level + 1]);
-  }
-  for (const id of ids) if (!rank.has(id)) rank.set(id, 0);
-  const levels = new Map();
-  for (const id of ids) {
-    const level = rank.get(id);
-    if (!levels.has(level)) levels.set(level, []);
-    levels.get(level).push(id);
-  }
-  const maxRank = Math.max(...levels.keys(), 0);
+function anchorFor(ids, degreeOf) {
+  return [...ids].sort((a, b) => (degreeOf.get(b) || 0) - (degreeOf.get(a) || 0) || String(a).localeCompare(String(b)))[0];
+}
+
+function constellationPositions(ids, degreeOf, { x, y, width, height }) {
   const positions = new Map();
-  // A node needs ~96px of vertical pitch (ring + two label lines). Ranks that
-  // exceed the band's capacity fan into extra columns instead of overlapping.
-  const minPitch = 96;
-  const maxPerColumn = Math.max(1, Math.floor(height / minPitch));
-  for (const [level, levelIds] of [...levels].sort((a, b) => a[0] - b[0])) {
-    levelIds.sort();
-    if (!maxRank) {
-      levelIds.forEach((id, index) => positions.set(id, {
-        x: x + (index + 1) / (levelIds.length + 1) * width,
-        y: y + (index + 1) * height / (levelIds.length + 1),
-      }));
-      continue;
-    }
-    const columns = Math.ceil(levelIds.length / maxPerColumn);
-    const perColumn = Math.ceil(levelIds.length / columns);
-    const t = level / maxRank;
-    const baseX = x + t * width;
-    const dx = Math.min(124, width / (maxRank + 1) * 0.55);
-    levelIds.forEach((id, index) => {
-      const column = Math.floor(index / perColumn);
-      const inColumn = index % perColumn;
-      const rowsInColumn = Math.min(perColumn, levelIds.length - column * perColumn);
-      // Edge ranks fan inward so no column leaves the band; middle ranks center.
-      const spread = columns === 1 ? 0
-        : t > 0.66 ? -column * dx
-        : t < 0.34 ? column * dx
-        : (column - (columns - 1) / 2) * dx;
-      positions.set(id, {
-        x: Math.min(x + width, Math.max(x, baseX + spread)),
-        y: y + (inColumn + 0.5) * height / rowsInColumn,
-      });
+  const anchor = anchorFor(ids, degreeOf);
+  const cx = x + width / 2;
+  const cy = y + height / 2;
+  positions.set(anchor, { x: cx, y: cy });
+
+  const orbit = ids.filter(id => id !== anchor).sort();
+  const ringCapacity = 8;
+  for (let index = 0; index < orbit.length; index++) {
+    const ring = Math.floor(index / ringCapacity);
+    const ringStart = ring * ringCapacity;
+    const count = Math.min(ringCapacity, orbit.length - ringStart);
+    const inRing = index - ringStart;
+    const startAngle = count === 1 ? -Math.PI / 2 : count === 2 ? Math.PI : -Math.PI / 2;
+    const step = count === 2 ? Math.PI : Math.PI * 2 / count;
+    const rx = Math.min(width / 2 - 70, width * (0.31 + ring * 0.1));
+    const ry = Math.min(height / 2 - 34, height * (0.27 + ring * 0.09));
+    const angle = startAngle + inRing * step + (ring % 2 ? step / 2 : 0);
+    positions.set(orbit[index], {
+      x: Math.min(x + width - 63, Math.max(x + 63, cx + Math.cos(angle) * rx)),
+      y: Math.min(y + height - 31, Math.max(y + 31, cy + Math.sin(angle) * ry)),
     });
   }
+  return { anchor, positions };
+}
+
+function perimeterPositions(ids, { x, y, width, height }) {
+  const positions = new Map();
+  const slots = [
+    [0.06, 0.91], [0.94, 0.91], [0.06, 0.09], [0.94, 0.09],
+    [0.24, 0.94], [0.76, 0.94], [0.24, 0.06], [0.76, 0.06],
+  ];
+  ids.slice().sort().forEach((id, index) => {
+    const slot = slots[index % slots.length];
+    const lap = Math.floor(index / slots.length);
+    const inset = Math.min(0.16, lap * 0.04);
+    positions.set(id, {
+      x: x + Math.min(0.92, Math.max(0.08, slot[0] + (slot[0] < 0.5 ? inset : -inset))) * width,
+      y: y + Math.min(0.91, Math.max(0.09, slot[1] + (slot[1] < 0.5 ? inset : -inset))) * height,
+    });
+  });
   return positions;
 }
 
@@ -174,27 +159,28 @@ export function buildAgentMap(topology = {}, { width = 760, height = 480, reduce
   const connected = components.filter(component => component.length > 1);
   const isolated = components.filter(component => component.length === 1).flat();
   const positions = new Map();
+  const anchors = new Set();
   const padding = 58;
   const usableWidth = width - padding * 2;
   const usableHeight = height - padding * 2;
-
-  if (!connected.length) {
-    for (const [id, position] of gridPositions(isolated, { x: padding, y: padding, width: usableWidth, height: usableHeight })) positions.set(id, position);
-  } else {
-    const isolatedHeight = isolated.length ? Math.min(140, usableHeight * 0.3) : 0;
-    const connectedHeight = usableHeight - isolatedHeight;
-    connected.forEach((component, index) => {
-      const bandHeight = connectedHeight / connected.length;
-      const band = { x: padding, y: padding + index * bandHeight, width: usableWidth, height: bandHeight };
-      for (const [id, position] of rankedPositions(component, edges, band)) positions.set(id, position);
-    });
-    if (isolated.length) for (const [id, position] of gridPositions(isolated, { x: padding, y: padding + connectedHeight, width: usableWidth, height: isolatedHeight })) positions.set(id, position);
-  }
 
   const degreeOf = new Map(nodes.map(node => [node.id, 0]));
   for (const edge of edges) {
     degreeOf.set(edge.source, (degreeOf.get(edge.source) || 0) + 1);
     degreeOf.set(edge.target, (degreeOf.get(edge.target) || 0) + 1);
+  }
+
+  if (!connected.length) {
+    for (const [id, position] of gridPositions(isolated, { x: padding, y: padding, width: usableWidth, height: usableHeight })) positions.set(id, position);
+  } else {
+    connected.forEach((component, index) => {
+      const bandWidth = usableWidth / connected.length;
+      const band = { x: padding + index * bandWidth, y: padding, width: bandWidth, height: usableHeight };
+      const projected = constellationPositions(component, degreeOf, band);
+      anchors.add(projected.anchor);
+      for (const [id, position] of projected.positions) positions.set(id, position);
+    });
+    if (isolated.length) for (const [id, position] of perimeterPositions(isolated, { x: padding, y: padding, width: usableWidth, height: usableHeight })) positions.set(id, position);
   }
   const projectedNodes = nodes.map(node => ({
     ...node,
@@ -203,6 +189,9 @@ export function buildAgentMap(topology = {}, { width = 760, height = 480, reduce
     mode: MODES.has(node.proc?.mode) ? node.proc.mode : null,
     componentId: components.findIndex(component => component.includes(node.id)),
     degree: degreeOf.get(node.id) || 0,   // Stage 3: neural glow intensity scales with degree
+    isAnchor: anchors.has(node.id),
+    width: anchors.has(node.id) ? 150 : node.id && isolated.includes(node.id) ? 118 : 126,
+    height: anchors.has(node.id) ? 64 : node.id && isolated.includes(node.id) ? 52 : 54,
     isolated: !(edges.some(edge => edge.source === node.id || edge.target === node.id)),
   }));
   const positioned = new Map(projectedNodes.map(node => [node.id, node]));
@@ -227,7 +216,7 @@ export function buildAgentMap(topology = {}, { width = 760, height = 480, reduce
   });
   const nodeNames = new Map(projectedNodes.map(node => [node.id, node.name || node.id]));
   const rows = [
-    ...projectedNodes.map(node => ({ kind: "agent", id: `node:${node.id}`, agentId: node.id, label: node.name || node.id, status: node.status, mode: node.mode })),
+    ...projectedNodes.map(node => ({ kind: "agent", id: `node:${node.id}`, agentId: node.id, label: node.name || node.id, status: node.status, mode: node.mode, degree: node.degree, componentId: node.componentId, isolated: node.isolated, isAnchor: node.isAnchor, avatar: node.avatar || "" })),
     ...projectedEdges.map(edge => ({
       kind: "relationship",
       id: `edge:${edge.id}`,
