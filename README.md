@@ -12,15 +12,23 @@ React + Vite, split into components across an npm-workspaces monorepo.
 
 ## Features
 
-- **Workspace (the front door)** — open on your projects, not your tools: a Continue
-  hero for the most recently touched project (goal, progress, last decision), one-click
-  resume, and a per-project decision log under `Projects/<slug>/`
+- **Agent Map (the front door)** — a living neural cosmos: every agent orbits the
+  Neural Vault core with glowing, provenance-verified relationship lines, travelling
+  particles, live status, and a right-hand inspector (connections, measured signals,
+  metadata). Fully keyboard-navigable, honest by design — no synthetic edges
+- **8-destination command deck** — Agent Map · Agents · Teams (project workspaces) ·
+  Memory (vault graph) · Protocols (approvals, workflows, schedule) · Marketplace
+  (vetted agent catalog) · Observatory (telemetry + reports) · Settings
 - **Project memory capture** — agents' `task_done` telemetry is auto-captured into the
   matching project's `decisions.md` (⚡auto entries, watermarked — never duplicated), and
   a **resume brief** can be dispatched to any agent via the task board
-- **Agent topology map** — live radial map of every agent and its gateway status
-- **Cosmic themes** — 13 switchable themes (Rempeyek · Neural Cosmos · Ember · Ghost Protocol · Quantum Glass · Dark Matter · Nebula · Aurora · Midnight · Solaris · Crimson Rift · Monochrome · Nothing OS), persisted per browser
-- **＋ Add Agent** — register new agents from the dashboard (auto node-numbering, per-agent accent color, optional summon CLI)
+- **4 structural themes** — Minimalist · Brutalist · Glassmorph · Cyberpunk (the neon
+  cosmos default), switched from Settings and persisted per browser; the flat themes
+  turn off glow and particles entirely, and the system reduce-motion preference is
+  always respected
+- **Marketplace / ＋ Add Agent** — install known agents with one approved click
+  (commands vetted server-side) or register custom agents (auto node-numbering,
+  per-agent accent color, optional summon CLI)
 - **Summon with install-gate** — one click opens an admin terminal at the agent's home folder and runs its CLI; if the CLI isn't installed, you get the install command + page instead
 - **Gateway control** — start / stop / restart / status / run agents from the dashboard
 - **Health monitoring** — TCP probes, 24h uptime history, watchdog auto-restart (opt-in), desktop alerts when an agent goes down
@@ -52,8 +60,13 @@ npm install                     # React/Vite + workspace links
 npm run dev                     # builds the UI, then serves http://localhost:4321
 ```
 
-Open **Agents â†’ + Add Agent** to register only the agents you want. A clean
-installation never copies the maintainer's roster, vault, telemetry, or avatars.
+Prefer a launcher? After `npm install`, double-click **`start.cmd`** (or run
+`node bin/rempeyek-agent-os.mjs`) — it builds the UI if needed, starts the server,
+and opens your browser.
+
+Open **Marketplace → Install** (or **Agents → ＋ Add Agent**) to register only the
+agents you want. A clean installation never copies the maintainer's roster, vault,
+telemetry, or avatars.
 
 Port already taken? `set PORT=4322` then `npm run dev` again.
 
@@ -134,9 +147,9 @@ and **Vault lane — Brains/**. Claude Code activity is parsed from its transcri
 other agents report via `telemetry\<id>.jsonl` (one-liner helper: `report.cmd "task name" 50`
 — see `telemetry\README.md`).
 
-## Neural Vault
+## Memory — the Neural Vault graph
 
-The **Neural Vault** tab renders a live force-directed graph of the `[[wikilinks]]`
+The **Memory** tab renders a live force-directed graph of the `[[wikilinks]]`
 in your vault — pan, zoom, drag, search. Click a node to open it in Obsidian.
 
 ## Security notes

@@ -22,7 +22,7 @@ for (const file of tracked) {
   if (personalRaster.test(file)) errors.push(`${file}: personal raster evidence is tracked`);
   if (!textExtensions.has(path.extname(file).toLowerCase())) continue;
   const text = fs.readFileSync(path.join(ROOT, file), "utf8");
-  if (/C:\\Users\\abrur(?:\\|\b)/i.test(text)) errors.push(`${file}: owner-specific absolute path`);
+  if (/C:[\\/]{1,2}Users[\\/]{1,2}abrur/i.test(text)) errors.push(`${file}: owner-specific absolute path`);
   if (secretPatterns.some(pattern => pattern.test(text))) errors.push(`${file}: high-confidence secret pattern`);
 }
 

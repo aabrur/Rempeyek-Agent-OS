@@ -1,25 +1,30 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { Sidebar } from "./components/Sidebar";
 import { VortexBackdrop } from "./components/VortexBackdrop";
 import { TokenLogin } from "./components/TokenLogin";
 import { ConfigBanner } from "./components/Panels";
 import { UpdateBanner } from "./components/UpdateBanner";
-import { CommandCenter } from "./views/CommandCenter";
 import { AgentsView } from "./views/AgentsView";
-import { NeuralVaultView, ReportsView } from "./views/SimpleViews";
+import { NeuralVaultView } from "./views/SimpleViews";
 import { WorkspaceView } from "./views/Workspace";
+import { ProtocolsView } from "./views/ProtocolsView";
+import { MarketplaceView } from "./views/MarketplaceView";
+import { ObservatoryView } from "./views/ObservatoryView";
+import { SettingsView } from "./views/SettingsView";
 import { useDashboard, useOps } from "./hooks/useDashboard";
 import { useTheme } from "./hooks/useTheme";
 import { useGateway } from "./hooks/useGateway";
 import { setUnauthorizedHandler } from "./api";
 
+const AgentMapView = lazy(() => import("./views/AgentMapView").then(module => ({ default: module.AgentMapView })));
+
 export default function App() {
-  const [view, setView] = useState("workspace");   // front door: projects, not plumbing
+  const [view, setView] = useState("map");   // front door: the Agent Map cosmos
   const [openAgent, setOpenAgent] = useState(null);
   const [locked, setLocked] = useState(false);
 
   const { state, error, refresh, load } = useDashboard();
-  const ops = useOps(view === "command");
+  const ops = useOps(view === "protocols" || view === "observatory");
   const { theme, accent, setTheme } = useTheme();
 
   useEffect(() => { setUnauthorizedHandler(() => setLocked(true)); }, []);
@@ -55,12 +60,9 @@ export default function App() {
           agents={state?.agents || []}
           agency={state?.agency}
           vault={state?.vault}
-          theme={theme}
-          onTheme={setTheme}
-          onOpenAgent={openAgentDetail}
         />
 
-        <main className="main" id="main-content" tabIndex="-1">
+        <main className={`main${view === "map" && state ? " main-flush" : ""}`} id="main-content" tabIndex="-1">
           <ConfigBanner configError={state?.configError} stateError={error} />
           <UpdateBanner />
 
@@ -71,21 +73,27 @@ export default function App() {
               <p>{error ? "Rempeyek could not reach the local service. Your Vault remains untouched." : "Reading projects, recent activity, and the next useful action…"}</p>
               {error && <button className="btn btn-primary" onClick={refresh}>Try again</button>}
             </section>
-          ) : view === "command" ? (
-            <CommandCenter
-              state={state} accent={accent} load={load} agentsById={agentsById}
-              gw={gw} ops={ops} openAgent={openAgent}
-              onOpenAgent={openAgentDetail} refresh={refresh}
-            />
+          ) : view === "map" ? (
+            <Suspense fallback={<div className="cosmos-view" role="status"><div className="skeleton-block" style={{ margin: 24, flex: 1 }} /><span className="sr-only">Loading Agent Map…</span></div>}>
+              <AgentMapView state={state} load={load} onOpenAgent={openAgentDetail} onView={setView} />
+            </Suspense>
           ) : view === "agents" ? (
             <AgentsView
               agents={state.agents} gw={gw} openAgent={openAgent}
               onOpenAgent={setOpenAgent} refresh={refresh}
             />
-          ) : view === "graph" ? (
+          ) : view === "teams" ? (
+            <WorkspaceView projects={state.projects} agents={state.agents} agentsById={agentsById} refresh={refresh} />
+          ) : view === "memory" ? (
             <NeuralVaultView active theme={theme} />
-          ) : view === "reports" ? (
-            <ReportsView accent={accent} />
+          ) : view === "protocols" ? (
+            <ProtocolsView state={state} ops={ops} refresh={refresh} />
+          ) : view === "marketplace" ? (
+            <MarketplaceView refresh={refresh} />
+          ) : view === "observatory" ? (
+            <ObservatoryView state={state} accent={accent} ops={ops} />
+          ) : view === "settings" ? (
+            <SettingsView theme={theme} onTheme={setTheme} state={state} />
           ) : (
             <WorkspaceView projects={state.projects} agents={state.agents} agentsById={agentsById} refresh={refresh} />
           )}

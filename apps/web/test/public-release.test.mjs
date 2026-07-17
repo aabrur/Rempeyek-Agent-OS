@@ -18,7 +18,8 @@ test("tracked public text contains no owner-specific absolute Windows path", () 
   const textExtensions = new Set([".md", ".json", ".js", ".cjs", ".mjs", ".jsx", ".ts", ".tsx", ".css", ".html", ".txt", ".yml", ".yaml"]);
   const offenders = tracked().filter(file => textExtensions.has(path.extname(file).toLowerCase())).filter(file => {
     const text = fs.readFileSync(path.join(ROOT, file), "utf8");
-    return /C:\\Users\\abrur(?:\\|\b)/i.test(text);
+    // one-or-two separators so JSON-escaped owner paths are caught too
+    return /C:[\\/]{1,2}Users[\\/]{1,2}abrur/i.test(text);
   });
   assert.deepEqual(offenders, []);
 });

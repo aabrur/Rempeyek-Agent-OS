@@ -10,7 +10,7 @@
   `:root` *is* the Neural Cosmos theme; the other 12 live in
   [`@rempeyek/theme-engine`](../theme-engine).
 - **Component classes** — `.panel` `.tile` `.agent-card` `.pill` `.chip` `.btn*`
-  `.topology-*` `.graph-*` `.detail-*` `.token-ov` `.theme-sw` …, consumed by
+  `.cosmos-*` `.graph-*` `.detail-*` `.token-ov` `.theme-sw` …, consumed by
   [`@rempeyek/ui`](../ui) and the app's components.
 - **Ambient layers** — cosmos backdrop, nebula drift, star twinkle, skeleton shimmer.
   All motion is gated behind `prefers-reduced-motion`.

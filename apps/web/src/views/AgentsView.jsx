@@ -15,6 +15,7 @@ export function AgentsView({ agents, gw, openAgent, onOpenAgent, refresh }) {
       </PageHead>
 
       <SectionRow label="REGISTERED NODES">
+        <Btn onClick={gw.startAll}>▶ START ALL GATEWAYS</Btn>
         <Btn variant="primary" onClick={() => setAdding(true)}>＋ ADD AGENT</Btn>
       </SectionRow>
 

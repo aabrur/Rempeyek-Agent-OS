@@ -30,7 +30,7 @@ export function WorkspaceView({ projects = [], agents = [], agentsById = {}, ref
   };
 
   return <section className="view active">
-    <PageHead title="TODAY">Continue the current project from its local Markdown record.</PageHead>
+    <PageHead title="TEAMS">Projects are shared workspaces — continue the current one from its local Markdown record.</PageHead>
     <TodayContinuity
       today={today}
       approvals={approvals}

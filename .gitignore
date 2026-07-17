@@ -32,6 +32,7 @@ repomix-output.xml
 # Personal config & tooling (copy agents.config.example.json instead)
 agents.config.json
 .claude/
+.codex/
 
 # Runtime handshake files
 telemetry/terms/
