@@ -537,6 +537,24 @@ body {
 .topo-fallback td { font:10px/1.4 var(--mono); }
 .topo-fallback button { border:1px solid var(--line); background:transparent; color:var(--text); padding:6px 8px; cursor:pointer; font:9px var(--mono); }
 
+/* stacked page sections (Protocols, Observatory, Settings) */
+.view-stack { display: grid; gap: 14px; }
+
+/* settings page */
+.settings-themes .theme-pick { grid-template-columns: repeat(4, minmax(120px, 1fr)); gap: 12px; padding: 0; }
+.settings-themes .theme-sw { min-height: 84px; }
+.settings-themes .theme-sw-label { padding-top: 52px; font-size: 9px; }
+.settings-themes .side-label { margin: 0 0 8px; }
+.settings-note { margin: 12px 0 0; color: var(--muted); font-size: 11.5px; line-height: 1.55; }
+.settings-note code { font-family: var(--font-data, var(--mono)); font-size: 10px; color: var(--acc); }
+.settings-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
+.settings-facts > div { display: grid; gap: 3px; min-width: 0; }
+.settings-facts span { font: 8.5px var(--font-data, var(--mono)); letter-spacing: .12em; color: var(--muted); }
+.settings-facts b { font-size: 12px; font-weight: 600; overflow-wrap: anywhere; }
+.settings-facts a { color: var(--acc); text-decoration: none; }
+.settings-facts a:hover { text-decoration: underline; }
+@media (max-width: 860px) { .settings-themes .theme-pick { grid-template-columns: 1fr 1fr; } }
+
 /* ---------------- skeleton loaders ---------------- */
 .skeleton-block {
   height: 58px; border-radius: 9px;
