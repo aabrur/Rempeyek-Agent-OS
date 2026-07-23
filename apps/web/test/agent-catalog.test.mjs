@@ -5,24 +5,23 @@ import { AGENT_CATALOG, catalogEntry, catalogInstallCommand, buildAgentRecord } 
 
 const HOMEDIR = 'C:\\Users\\test';
 
-test('catalog entries are complete, unique, and portable', () => {
+test('catalog exposes the exact 20 portable agent seeds', () => {
   const ids = AGENT_CATALOG.map(e => e.id);
   assert.equal(new Set(ids).size, ids.length, 'ids must be unique');
-  assert.ok(ids.length >= 8, 'the full 8-agent roster ships in the catalog');
+  assert.equal(ids.length, 20, 'the full curated agent roster ships in the catalog');
   for (const e of AGENT_CATALOG) {
     assert.match(e.id, /^[a-z0-9][a-z0-9-]{1,31}$/, `${e.id}: id is a valid slug`);
     assert.ok(e.name && e.icon && e.role, `${e.id}: name/icon/role present`);
     assert.match(e.trigger, /^[a-z][a-z0-9-]*$/, `${e.id}: trigger is a single bare CLI token`);
     assert.ok(!/^[a-zA-Z]:[\\/]/.test(e.home), `${e.id}: home is relative (portable across machines)`);
-    assert.ok(e.install && (e.install.cmd || e.install.url), `${e.id}: install has cmd or url`);
+    assert.ok(e.install?.url, `${e.id}: official URL is present`);
+    assert.equal(e.install.cmd, undefined, `${e.id}: executable commands are not projected`);
   }
 });
 
-test('every auto-install command is a vetted npm global install — nothing else can ever run', () => {
+test('compatibility catalog never exposes executable installer strings', () => {
   for (const e of AGENT_CATALOG) {
-    if (!e.install?.cmd) continue;
-    assert.match(e.install.cmd, /^npm install -g [@a-zA-Z0-9/._-]+$/,
-      `${e.id}: install.cmd must be exactly one npm -g package spec (no shell metacharacters, no chaining)`);
+    assert.equal(e.install?.cmd, undefined);
   }
 });
 
@@ -45,7 +44,8 @@ test('buildAgentRecord from a catalog entry persists a summonable gateway', () =
   assert.equal(agent.lane, 'Codex');
   assert.equal(agent.gateway.trigger, 'codex');
   assert.equal(agent.gateway.home, 'C:\\Users\\test\\.codex', 'relative catalog home expands under homedir');
-  assert.deepEqual(agent.gateway.install, { cmd: 'npm install -g @openai/codex', url: 'https://developers.openai.com/codex/cli' });
+  assert.equal(agent.gateway.marketplaceId, 'codex');
+  assert.equal(agent.gateway.install, undefined);
   assert.deepEqual(agent.gateway.actions, [], 'dashboard-added agents are observe-only');
   assert.match(agent.note, /Summon with `codex`/);
 });
