@@ -2,14 +2,24 @@ import { useEffect, useState } from "react";
 import { PageHead, Panel } from "@rempeyek/ui";
 import { THEMES } from "@rempeyek/theme-engine";
 import { api } from "../api";
+import { AgentManagementPanel } from "../components/AgentManagementPanel";
 import { ThemePicker } from "../components/ThemePicker";
 
 /** Settings — appearance (the four structural themes), software version, workspace facts. */
 export function SettingsView({ theme, onTheme, state }) {
   const [version, setVersion] = useState(null);
+  const [lifecycle, setLifecycle] = useState(null);
+  const loadLifecycle = async () => {
+    const response = await api("/api/agents/lifecycle");
+    if (response && !response.error) setLifecycle(response);
+    return response;
+  };
   useEffect(() => {
     let alive = true;
     api("/api/version").then(v => { if (alive && v && !v.error) setVersion(v); });
+    api("/api/agents/lifecycle").then(value => {
+      if (alive && value && !value.error) setLifecycle(value);
+    });
     return () => { alive = false; };
   }, []);
 
@@ -31,6 +41,10 @@ export function SettingsView({ theme, onTheme, state }) {
             stars, and particles by design; the system “reduce motion” preference is always respected.
           </p>
         </Panel>
+
+        {lifecycle
+          ? <AgentManagementPanel state={lifecycle} refresh={loadLifecycle} />
+          : null}
 
         <Panel title="SOFTWARE" chip="auto-update">
           <div className="settings-facts">

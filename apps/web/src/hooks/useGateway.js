@@ -3,8 +3,13 @@ import { api } from "../api";
 
 /** The approval round-trip (confirm → request → decide), shared by every gated action.
     Standalone so the Add-Agent catalog and the update banner reuse the exact same dance. */
-export async function approveAction(type, target, consequence) {
-  if (!confirm(`${consequence}\n\nTarget: ${target}\n\nContinue?`)) return null;
+export async function approveAction(
+  type,
+  target,
+  consequence,
+  confirmAction = message => confirm(message),
+) {
+  if (!await confirmAction(`${consequence}\n\nTarget: ${target}\n\nContinue?`)) return null;
   const requested = await api("/api/approvals", {
     method: "POST",
     body: JSON.stringify({ type, target, consequence, actor: "dashboard-user" }),

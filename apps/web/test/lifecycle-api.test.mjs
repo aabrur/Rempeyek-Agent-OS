@@ -140,6 +140,12 @@ test("activate and disable mutate only registry state and replay one operation i
     const state = await fetch(`${base}/api/state`).then(value => value.json());
     assert.equal(state.activeAgentId, null);
     assert.equal(state.agents.find(agent => agent.id === "codex").enabled, false);
+
+    const lifecycle = await fetch(`${base}/api/agents/lifecycle`).then(value => value.json());
+    const codex = lifecycle.agents.find(agent => agent.id === "codex");
+    assert.equal(codex.name, "Codex");
+    assert.equal(codex.role, "Coding agent");
+    assert.equal(codex.uninstallable, true);
   });
 });
 

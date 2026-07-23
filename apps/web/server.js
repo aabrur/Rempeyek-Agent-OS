@@ -1729,16 +1729,27 @@ function lifecycleState(services, id, config = services.loadConfig()) {
     candidate.id === id || candidate.gateway?.marketplaceId === id,
   ) || null;
   const installed = entry?.kind === "agent"
-    ? installedState(entry.id)
+    ? catalogInstalled(entry)
     : entry
       ? receiptInstalled(services, entry.id)
       : null;
-  return lifecycleLib.deriveLifecycle({
+  const derived = lifecycleLib.deriveLifecycle({
     entry: entry || { id },
     agent,
     installed,
     activeAgentId: config.activeAgentId || null,
   });
+  return {
+    ...derived,
+    name: agent?.name || entry?.name || id,
+    role: agent?.role || entry?.agent?.role || entry?.summary || "",
+    note: agent?.note || "",
+    enabled: agent ? agent.enabled !== false : false,
+    parentId: agent?.parentId || null,
+    uninstallable: Boolean(entry?.uninstallers?.some(adapter =>
+      !adapter.platforms || adapter.platforms.includes(process.platform)
+    )),
+  };
 }
 
 function lifecycleSnapshot(services) {
