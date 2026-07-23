@@ -56,6 +56,8 @@ test("public Marketplace projection strips executable adapter details", () => {
     installed: true,
   });
   assert.deepEqual(projected.adapterIds, ["npm"]);
+  assert.equal(projected.icon, "⬜");
+  assert.equal(projected.role, "Repository-aware software engineering agent");
   assert.equal(projected.installed, true);
   assert.equal(projected.registered, false);
   for (const forbidden of ["program", "args", "package", "packageId", "sourceRef"]) {

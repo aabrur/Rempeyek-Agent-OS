@@ -44,7 +44,7 @@ export function AddAgentModal({ open, onClose, onAdded }) {
         Known agents install with one approved click — the command is vetted server-side, never typed here.
       </div>
 
-      <CatalogGrid onAdded={onAdded} />
+      <CatalogGrid kind="agent" onAdded={onAdded} />
 
       <div className="token-sub aa-custom-head">Custom agent</div>
       <form className="aa-grid" onSubmit={submit}>

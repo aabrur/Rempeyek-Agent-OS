@@ -336,6 +336,8 @@ export function publicMarketplaceEntry(entry, state = {}) {
     id: entry.id,
     kind: entry.kind,
     name: entry.name,
+    icon: entry.agent?.icon || (entry.kind === "plugin" ? "◆" : "◇"),
+    role: entry.agent?.role || entry.summary,
     publisher: entry.publisher,
     summary: entry.summary,
     officialUrl: entry.officialUrl,
