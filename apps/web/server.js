@@ -46,6 +46,12 @@ AGENT_DETAIL.then(m => { agentDetailLib = m; }).catch(e => console.error("[agent
 const AGENT_CATALOG_MOD = import("./lib/agent-catalog.mjs");
 let catalogLib = null;
 AGENT_CATALOG_MOD.then(m => { catalogLib = m; }).catch(e => console.error("[agent-catalog]", e.message));
+const MARKETPLACE_MOD = import("./lib/marketplace-manifest.mjs");
+let marketplaceLib = null;
+MARKETPLACE_MOD.then(m => { marketplaceLib = m; }).catch(e => console.error("[marketplace]", e.message));
+const PROCESS_ADAPTERS_MOD = import("./lib/process-adapters.mjs");
+let processAdaptersLib = null;
+PROCESS_ADAPTERS_MOD.then(m => { processAdaptersLib = m; }).catch(e => console.error("[process-adapters]", e.message));
 const RELEASE_MOD = import("./lib/release-check.mjs");
 let releaseLib = null;
 RELEASE_MOD.then(m => { releaseLib = m; }).catch(e => console.error("[release-check]", e.message));
@@ -990,28 +996,55 @@ function installedState(id) {
 function catalogInstalled(entry) {
   const c = installedCache.get(entry.id);
   if (c && Date.now() - c.at < 60000) return c.installed;
-  const installed = probeInstalled({ gateway: { trigger: entry.trigger } });
+  const manifestEntry = marketplaceLib?.marketplaceEntry(entry.id);
+  const probe = processAdaptersLib?.resolveProbe({
+    entry: manifestEntry,
+    platform: process.platform,
+  });
+  let installed = false;
+  if (probe) {
+    try {
+      installed = spawnSync(probe.program, probe.args, {
+        shell: false,
+        windowsHide: true,
+        encoding: "utf8",
+        timeout: 5_000,
+      }).status === 0;
+    } catch {}
+  }
   installedCache.set(entry.id, { installed, at: Date.now() });
   return installed;
 }
 
 /* ---------------- catalog install + self-update (owned, streamed) ----------------
    Both run as owned procs so the existing /api/proc/:id/log incremental tail shows them live in
-   the run-log pane. SECURITY: the install command comes ONLY from the vetted catalog
-   (catalogInstallCommand) and the update command is a fixed string — nothing here executes
-   caller-supplied input. Both routes sit behind withApproval(). */
-function installAgent(id) {
-  if (!catalogLib) return { error: "catalog module still loading — retry in a moment" };
-  const entry = catalogLib.catalogEntry(id);
-  if (!entry) return { error: `unknown catalog agent '${id}'` };
-  const cmd = catalogLib.catalogInstallCommand(id);
-  if (!cmd) return { error: `${entry.name} has no vetted auto-install command — use its install page`, url: (entry.install && entry.install.url) || null };
+   the run-log pane. SECURITY: installer selection comes ONLY from the reviewed Marketplace
+   manifest and resolves to a fixed program plus argv. Caller input never becomes executable text. */
+function installAgent(id, adapterId) {
+  if (!catalogLib || !marketplaceLib || !processAdaptersLib)
+    return { error: "Marketplace modules still loading — retry in a moment" };
+  const entry = marketplaceLib.marketplaceEntry(id);
+  if (!entry || entry.kind !== "agent") return { error: `unknown catalog agent '${id}'` };
+  const available = entry.installers.filter(adapter =>
+    !adapter.platforms || adapter.platforms.includes(process.platform));
+  const selectedAdapterId = String(adapterId || available[0]?.id || "");
+  const spec = processAdaptersLib.resolveAdapter({
+    entry,
+    adapterId: selectedAdapterId,
+    action: "install",
+    platform: process.platform,
+  });
+  if (!spec)
+    return {
+      error: `${entry.name} has no vetted auto-install adapter for this platform — use its install page`,
+      url: entry.officialUrl || null,
+    };
   const existing = procs.get(id);
   if (existing && existing.status === "running") return { error: `${id} already has an owned process running (pid ${existing.pid})` };
   const p = { id, log: [], seq: 0, status: "running", mode: "install", startedAt: new Date().toISOString(), exitCode: null };
-  pushLog(p, "sys", `[agentic-os] install (vetted catalog): ${cmd}`);
+  pushLog(p, "sys", `[agentic-os] install (reviewed adapter): ${spec.display}`);
   let child;
-  try { child = spawn(cmd, [], { shell: true, windowsHide: true }); }
+  try { child = processAdaptersLib.startResolvedProcess(spec, { spawnImpl: spawn }); }
   catch (e) { return { error: `spawn failed: ${e.message}` }; }
   p.child = child; p.pid = child.pid;
   child.stdout.on("data", d => pushLog(p, "out", d));
@@ -1024,7 +1057,12 @@ function installAgent(id) {
         const r = addAgent({ catalogId: id });
         pushLog(p, "sys", r.error ? `[agentic-os] register failed: ${r.error}` : `[agentic-os] registered ${id} (${r.agent.node})`);
       }
-      installedCache.set(id, { installed: probeInstalled({ gateway: { trigger: entry.trigger } }), at: Date.now() });
+      installedCache.delete(id);
+      const registered = catalogLib.catalogEntry(id);
+      installedCache.set(id, {
+        installed: registered ? catalogInstalled(registered) : false,
+        at: Date.now(),
+      });
       sysEvent(id, "ok", "installed via dashboard catalog");
     }
   });
@@ -1711,10 +1749,10 @@ function requestHandler(req, res) {
       }
       if (url === "/api/agents/install" && req.method === "POST")
         return readBody(req, res, body => {
-          let d; try { d = JSON.parse(body); } catch { return json(res, 400, { error: "body must be JSON {id}" }); }
+          let d; try { d = JSON.parse(body); } catch { return json(res, 400, { error: "body must be JSON {id,adapterId?}" }); }
           const id = String(d.id || "");
           return withApproval(req, res, "agent.install", id, () => {
-            const r = installAgent(id);
+            const r = installAgent(id, d.adapterId);
             json(res, r.error ? 400 : 200, r);
           });
         });
@@ -1801,7 +1839,13 @@ if (require.main === module) {
   });
 
   // Gate listen() on the ESM helper modules so telemetry windowing + catalog are ready before the first poll.
-  Promise.allSettled([AGENT_DETAIL, AGENT_CATALOG_MOD, RELEASE_MOD]).then(() => server.listen(PORT, process.env.DASH_HOST || "127.0.0.1", () => {
+  Promise.allSettled([
+    AGENT_DETAIL,
+    AGENT_CATALOG_MOD,
+    MARKETPLACE_MOD,
+    PROCESS_ADAPTERS_MOD,
+    RELEASE_MOD,
+  ]).then(() => server.listen(PORT, process.env.DASH_HOST || "127.0.0.1", () => {
   console.log(`\n  Agentic OS running at  http://localhost:${PORT}`);
   console.log(`  Vault data source:     ${VAULT}`);
   console.log(`  Agent config:          ${CONFIG_PATH}`);

@@ -1,3 +1,5 @@
+const reversibleInstallerTypes = new Set(["npm-global", "winget", "python-tool"]);
+
 const agent = (id, name, icon, role, trigger, home, sourceUrl, installers = [], extra = {}) => ({
   schemaVersion: 1,
   id,
@@ -21,7 +23,9 @@ const agent = (id, name, icon, role, trigger, home, sourceUrl, installers = [], 
     envAllow: extra.envAllow || [],
   },
   installers,
-  uninstallers: extra.uninstallers || [],
+  uninstallers: extra.uninstallers || installers
+    .filter(installer => reversibleInstallerTypes.has(installer.type))
+    .map(installer => ({ ...installer })),
   featured: false,
   children: [],
   availabilityNote: extra.availabilityNote || "",

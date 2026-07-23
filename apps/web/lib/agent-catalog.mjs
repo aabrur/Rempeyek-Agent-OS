@@ -1,7 +1,6 @@
 import {
   MARKETPLACE_ENTRIES,
   agentSeed,
-  marketplaceEntry,
 } from "./marketplace-manifest.mjs";
 
 export const AGENT_CATALOG = MARKETPLACE_ENTRIES
@@ -15,12 +14,6 @@ const CATALOG_BY_ID = new Map(AGENT_CATALOG.map(entry => [entry.id, entry]));
 
 export function catalogEntry(id) {
   return CATALOG_BY_ID.get(String(id || "")) || null;
-}
-
-export function catalogInstallCommand(id) {
-  const entry = marketplaceEntry(id);
-  const adapter = entry?.installers.find(candidate => candidate.type === "npm-global");
-  return adapter ? `npm install -g ${adapter.package}` : null;
 }
 
 const HOME_ABS = value => /^([a-zA-Z]:[\\/]|[\\/])/.test(value);

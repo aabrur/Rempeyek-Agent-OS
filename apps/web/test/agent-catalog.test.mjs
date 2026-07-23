@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { AGENT_CATALOG, catalogEntry, catalogInstallCommand, buildAgentRecord } from '../lib/agent-catalog.mjs';
+import { AGENT_CATALOG, catalogEntry, buildAgentRecord } from '../lib/agent-catalog.mjs';
 
 const HOMEDIR = 'C:\\Users\\test';
 
@@ -25,12 +25,9 @@ test('compatibility catalog never exposes executable installer strings', () => {
   }
 });
 
-test('catalogInstallCommand resolves only vetted ids and never a caller-supplied string', () => {
-  assert.equal(catalogInstallCommand('codex'), 'npm install -g @openai/codex');
-  assert.equal(catalogInstallCommand('antigravity'), null, 'link-only entries are not auto-installable');
-  assert.equal(catalogInstallCommand('unknown'), null);
-  assert.equal(catalogInstallCommand('rm -rf /'), null);
+test('catalog lookup rejects unknown and caller-shaped ids', () => {
   assert.equal(catalogEntry('nope'), null);
+  assert.equal(catalogEntry('rm -rf /'), null);
 });
 
 test('buildAgentRecord from a catalog entry persists a summonable gateway', () => {
