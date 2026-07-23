@@ -11,6 +11,7 @@ const { spawn, execFile, spawnSync } = require("child_process");
 const crypto = require("crypto");
 const { buildAgentEnv } = require("./lib/child-env.cjs");
 const { createAccessPolicy } = require("./lib/access-policy.cjs");
+const { createConfigStore } = require("./lib/config-store.cjs");
 const { ensureEmptyConfig, resolveRuntimePaths } = require("./lib/runtime-paths.cjs");
 const { resolveSummonProfile } = require("./lib/summon-profile.cjs");
 
@@ -52,6 +53,12 @@ MARKETPLACE_MOD.then(m => { marketplaceLib = m; }).catch(e => console.error("[ma
 const PROCESS_ADAPTERS_MOD = import("./lib/process-adapters.mjs");
 let processAdaptersLib = null;
 PROCESS_ADAPTERS_MOD.then(m => { processAdaptersLib = m; }).catch(e => console.error("[process-adapters]", e.message));
+const AGENT_LIFECYCLE_MOD = import("./lib/agent-lifecycle.mjs");
+let lifecycleLib = null;
+AGENT_LIFECYCLE_MOD.then(m => { lifecycleLib = m; }).catch(e => console.error("[agent-lifecycle]", e.message));
+const MANAGED_BUNDLE_MOD = import("./lib/managed-bundle.mjs");
+let managedBundleLib = null;
+MANAGED_BUNDLE_MOD.then(m => { managedBundleLib = m; }).catch(e => console.error("[managed-bundle]", e.message));
 const RELEASE_MOD = import("./lib/release-check.mjs");
 let releaseLib = null;
 RELEASE_MOD.then(m => { releaseLib = m; }).catch(e => console.error("[release-check]", e.message));
@@ -99,6 +106,134 @@ function saveConfig(cfg) {
   fs.mkdirSync(path.dirname(CONFIG_PATH), { recursive: true });
   fs.writeFileSync(CONFIG_PATH, JSON.stringify(cfg, null, 2) + "\n", "utf8");
   _cfgCache = { mtime: 0, data: null };   // force reload on next loadConfig()
+}
+
+function createRuntimeServices(runtime = {}) {
+  const configPath = runtime.configPath || CONFIG_PATH;
+  const stateRoot = runtime.stateRoot || RUNTIME_PATHS.stateRoot;
+  const vaultPath = runtime.vaultPath || VAULT;
+  const telemetryDir = runtime.telemetryDir || path.join(stateRoot, "telemetry");
+  const tombstoneDir = runtime.tombstoneDir || path.join(stateRoot, "tombstones");
+  const receiptDir = runtime.receiptDir || path.join(stateRoot, "receipts");
+  const bundleRoot = runtime.bundleRoot || RUNTIME_PATHS.bundleRoot;
+  const userHome = runtime.userHome || os.homedir();
+  const completedMutations = new Map();
+  const ownedMutations = new Map();
+
+  const readConfig = () => {
+    const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
+    if (!Array.isArray(config.agents)) {
+      throw new Error("agents.config.json must contain an agents array");
+    }
+    return config;
+  };
+  const store = createConfigStore({
+    configPath,
+    tombstoneDir,
+    onCommit: () => {
+      if (path.resolve(configPath) === path.resolve(CONFIG_PATH)) {
+        _cfgCache = { mtime: 0, data: null };
+      }
+    },
+  });
+  return {
+    bundleRoot,
+    completedMutations,
+    configPath,
+    loadConfig: readConfig,
+    ownedMutations,
+    receiptDir,
+    startResolvedProcess: runtime.startResolvedProcess || null,
+    stateRoot,
+    store,
+    telemetryDir,
+    tombstoneDir,
+    userHome,
+    vaultPath,
+  };
+}
+
+const DEFAULT_RUNTIME_SERVICES = createRuntimeServices();
+
+function mutationReplay(services, operationId) {
+  const result = services.completedMutations.get(operationId);
+  return result ? { ...JSON.parse(JSON.stringify(result)), replayed: true } : null;
+}
+
+function rememberMutation(services, operationId, result) {
+  const stored = { ...JSON.parse(JSON.stringify(result)), replayed: false };
+  services.completedMutations.set(operationId, stored);
+  return stored;
+}
+
+function validOperationId(operationId) {
+  return /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$/.test(String(operationId || ""));
+}
+
+function receiptPath(services, id) {
+  if (!/^[a-z0-9][a-z0-9-]{1,63}$/.test(String(id || ""))) {
+    throw new Error("invalid Marketplace id");
+  }
+  return path.join(services.receiptDir, `${id}.json`);
+}
+
+function receiptInstalled(services, id) {
+  try {
+    const receipt = JSON.parse(fs.readFileSync(receiptPath(services, id), "utf8"));
+    return receipt.schemaVersion === 1 && Array.isArray(receipt.files);
+  } catch {
+    return false;
+  }
+}
+
+function verifyManagedBundle(sourceRoot, entry) {
+  const manifestPath = path.join(sourceRoot, "bundle.manifest.json");
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+  if (manifest.sourceRef !== entry.sourceRef || !Array.isArray(manifest.files)) {
+    throw new Error("managed bundle manifest does not match the reviewed source");
+  }
+  for (const file of manifest.files) {
+    const absolute = path.resolve(sourceRoot, String(file.path || ""));
+    const relative = path.relative(path.resolve(sourceRoot), absolute);
+    if (!relative || relative === ".." || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
+      throw new Error("managed bundle manifest escapes its source root");
+    }
+    const actual = crypto.createHash("sha256").update(fs.readFileSync(absolute)).digest("hex");
+    if (actual !== file.sha256) throw new Error(`managed bundle hash mismatch: ${file.path}`);
+  }
+  return manifest;
+}
+
+function reviewedAgentProfile(config, entry, userHome = os.homedir()) {
+  const catalog = catalogLib?.catalogEntry(entry.id);
+  if (!catalog) throw new Error(`unknown catalog agent '${entry.id}'`);
+  const nodeNums = config.agents
+    .map(agent => Number((String(agent.node || "").match(/(\d+)$/) || [])[1]))
+    .filter(number => !Number.isNaN(number));
+  const built = catalogLib.buildAgentRecord({
+    body: { catalogId: entry.id },
+    cat: catalog,
+    existingIds: config.agents.map(agent => agent.id),
+    existingNodeNums: nodeNums,
+    date: localISO().slice(0, 10),
+    homedir: userHome,
+  });
+  if (built.error) throw new Error(built.error);
+  return built.agent;
+}
+
+function scaffoldRuntimeVaultLane(agent, vaultPath) {
+  if (!agentDetailLib || !agent?.lane) return;
+  const entries = agentDetailLib.laneScaffold(agent.lane, {
+    node: agent.node,
+    icon: agent.icon,
+    date: localISO().slice(0, 10),
+  });
+  for (const entry of entries) {
+    const absolute = path.join(vaultPath, "Brains", agent.lane, ...entry.rel.split("/"));
+    fs.mkdirSync(path.dirname(absolute), { recursive: true });
+    if (!fs.existsSync(absolute)) fs.writeFileSync(absolute, entry.content, "utf8");
+  }
 }
 
 /* /api/agents/add — register a new agent from the dashboard.
@@ -1588,6 +1723,216 @@ function markTaskDone(source, text) {
   } catch (e) { return { error: `update failed: ${e.message}` }; }
 }
 
+function lifecycleState(services, id, config = services.loadConfig()) {
+  const entry = marketplaceLib?.marketplaceEntry(id) || null;
+  const agent = config.agents.find(candidate =>
+    candidate.id === id || candidate.gateway?.marketplaceId === id,
+  ) || null;
+  const installed = entry?.kind === "agent"
+    ? installedState(entry.id)
+    : entry
+      ? receiptInstalled(services, entry.id)
+      : null;
+  return lifecycleLib.deriveLifecycle({
+    entry: entry || { id },
+    agent,
+    installed,
+    activeAgentId: config.activeAgentId || null,
+  });
+}
+
+function lifecycleSnapshot(services) {
+  const config = services.loadConfig();
+  const ids = new Set(
+    marketplaceLib.MARKETPLACE_ENTRIES
+      .filter(entry => entry.kind === "agent")
+      .map(entry => entry.id),
+  );
+  for (const agent of config.agents) ids.add(agent.id);
+  return {
+    schemaVersion: 1,
+    activeAgentId: config.activeAgentId || null,
+    busy: [...services.ownedMutations.values()]
+      .some(operation => operation.status === "running"),
+    agents: [...ids].map(id => lifecycleState(services, id, config)),
+    tombstones: services.store.listTombstones().map(tombstone => ({
+      id: tombstone.id,
+      agentId: tombstone.agent?.id || "",
+      name: tombstone.agent?.name || tombstone.agent?.id || "",
+      removedAt: tombstone.removedAt,
+      retained: Array.isArray(tombstone.retained) ? tombstone.retained : [],
+    })),
+  };
+}
+
+function marketplaceSnapshot(services) {
+  const config = services.loadConfig();
+  const registered = new Set();
+  for (const agent of config.agents) {
+    registered.add(agent.id);
+    if (agent.gateway?.marketplaceId) registered.add(agent.gateway.marketplaceId);
+  }
+  const entries = marketplaceLib.MARKETPLACE_ENTRIES.map(entry =>
+    marketplaceLib.publicMarketplaceEntry(entry, {
+      platform: process.platform,
+      registered: registered.has(entry.id),
+      installed: entry.kind === "agent"
+        ? catalogInstalled(entry)
+        : receiptInstalled(services, entry.id),
+    }),
+  );
+  return { schemaVersion: 1, entries };
+}
+
+function startMarketplaceProcess(services, entry, adapterId, action, operationId) {
+  const spec = processAdaptersLib.resolveAdapter({
+    entry,
+    adapterId,
+    action,
+    platform: process.platform,
+  });
+  if (!spec) {
+    throw new Error(`${entry.name} has no reviewed ${action} adapter for this platform`);
+  }
+  const running = services.ownedMutations.get(entry.id);
+  if (running?.status === "running") {
+    throw new Error(`${entry.id} already has a Marketplace mutation running`);
+  }
+  const child = services.startResolvedProcess
+    ? services.startResolvedProcess(spec)
+    : processAdaptersLib.startResolvedProcess(spec, { spawnImpl: spawn });
+  const operation = {
+    id: operationId,
+    entityId: entry.id,
+    action,
+    status: "running",
+    pid: child.pid || null,
+    startedAt: new Date().toISOString(),
+  };
+  services.ownedMutations.set(entry.id, operation);
+  child.once("exit", code => {
+    operation.status = "exited";
+    operation.exitCode = code;
+    operation.finishedAt = new Date().toISOString();
+    installedCache.delete(entry.id);
+  });
+  child.once("error", error => {
+    operation.status = "error";
+    operation.error = error.message;
+    operation.finishedAt = new Date().toISOString();
+  });
+  return operation;
+}
+
+function installMarketplace(services, entry, data) {
+  const prior = mutationReplay(services, data.operationId);
+  if (prior) return { code: prior.event?.type?.endsWith("_started") ? 202 : 200, body: prior };
+
+  if (entry.kind === "plugin" || entry.kind === "skill") {
+    if (entry.id !== "hypertaks-agent" && entry.id !== "hypertaks-founder") {
+      throw new Error(`no managed installer for '${entry.id}'`);
+    }
+    const sourceRoot = path.join(services.bundleRoot, "hypertaks-agent");
+    verifyManagedBundle(sourceRoot, entry);
+    const plan = managedBundleLib.buildHypertaksCopyPlan({
+      sourceRoot,
+      userHome: services.userHome,
+      kind: entry.kind,
+    });
+    const result = managedBundleLib.applyCopyPlan(
+      plan,
+      receiptPath(services, entry.id),
+    );
+    if (!result.ok) {
+      const error = new Error("managed install would overwrite existing user files");
+      error.status = 409;
+      error.collisions = result.collisions;
+      throw error;
+    }
+    const body = rememberMutation(services, data.operationId, {
+      operationId: data.operationId,
+      state: lifecycleState(services, entry.id),
+      event: { type: "marketplace.managed_installed", entityId: entry.id },
+    });
+    return { code: 200, body };
+  }
+
+  const available = entry.installers.filter(adapter =>
+    !adapter.platforms || adapter.platforms.includes(process.platform));
+  const adapterId = String(data.adapterId || available[0]?.id || "");
+  const operation = startMarketplaceProcess(
+    services,
+    entry,
+    adapterId,
+    "install",
+    data.operationId,
+  );
+
+  let config = services.loadConfig();
+  if (data.register === true && !config.agents.some(agent =>
+    agent.id === entry.id || agent.gateway?.marketplaceId === entry.id
+  )) {
+    const agent = reviewedAgentProfile(config, entry, services.userHome);
+    config = { ...config, agents: [...config.agents, agent] };
+    services.store.commit(config, data.operationId);
+    scaffoldRuntimeVaultLane(agent, services.vaultPath);
+  }
+  const body = rememberMutation(services, data.operationId, {
+    operationId: data.operationId,
+    state: lifecycleState(services, entry.id, config),
+    event: {
+      type: "agent.install_started",
+      agentId: entry.id,
+      pid: operation.pid,
+    },
+  });
+  return { code: 202, body };
+}
+
+function uninstallMarketplace(services, entry, data) {
+  const prior = mutationReplay(services, data.operationId);
+  if (prior) return { code: prior.event?.type?.endsWith("_started") ? 202 : 200, body: prior };
+
+  if (entry.kind === "plugin" || entry.kind === "skill") {
+    const file = receiptPath(services, entry.id);
+    if (!fs.existsSync(file)) throw new Error(`'${entry.id}' is not managed by Rempeyek`);
+    const result = managedBundleLib.removeManagedFiles(file);
+    if (result.preserved.length === 0) fs.unlinkSync(file);
+    const body = rememberMutation(services, data.operationId, {
+      operationId: data.operationId,
+      state: lifecycleState(services, entry.id),
+      event: {
+        type: "marketplace.managed_uninstalled",
+        entityId: entry.id,
+        removed: result.removed.length,
+        preserved: result.preserved,
+      },
+    });
+    return { code: result.preserved.length ? 409 : 200, body };
+  }
+
+  const available = entry.uninstallers.filter(adapter =>
+    !adapter.platforms || adapter.platforms.includes(process.platform));
+  const adapterId = String(data.adapterId || available[0]?.id || "");
+  const operation = startMarketplaceProcess(
+    services,
+    entry,
+    adapterId,
+    "uninstall",
+    data.operationId,
+  );
+  const body = rememberMutation(services, data.operationId, {
+    operationId: data.operationId,
+    state: lifecycleState(services, entry.id),
+    event: {
+      type: "agent.uninstall_started",
+      agentId: entry.id,
+      pid: operation.pid,
+    },
+  });
+  return { code: 202, body };
+}
+
 function readBody(req, res, cb) {
   let body = "", aborted = false;
   req.on("data", d => {
@@ -1628,9 +1973,53 @@ function withApproval(req, res, type, target, run) {
   }).catch(() => json(res, 503, { error: "approval service unavailable" }));
 }
 
+function withTwoApprovals(req, res, first, second, run) {
+  return APPROVAL_QUEUE.then(queue => {
+    const a = queue.authorize(req.headers["x-approval-id"], {
+      ...first,
+      actor: "dashboard",
+    });
+    if (!a.allowed) {
+      return json(res, 403, {
+        error: "first approval required",
+        reason: a.reason,
+      });
+    }
+    const b = queue.authorize(req.headers["x-confirmation-id"], {
+      ...second,
+      actor: "dashboard",
+    });
+    if (!b.allowed) {
+      return json(res, 403, {
+        error: "second approval required",
+        reason: b.reason,
+      });
+    }
+    return run();
+  }).catch(() => json(res, 503, { error: "approval service unavailable" }));
+}
+
+function withLifecycleModules(res, run) {
+  return Promise.all([
+    AGENT_CATALOG_MOD,
+    AGENT_DETAIL,
+    MARKETPLACE_MOD,
+    PROCESS_ADAPTERS_MOD,
+    AGENT_LIFECYCLE_MOD,
+    MANAGED_BUNDLE_MOD,
+  ])
+    .then(run)
+    .catch(error => {
+      console.error("[lifecycle-api]", error.message);
+      if (!res.headersSent) {
+        json(res, 503, { error: "lifecycle services unavailable" });
+      }
+    });
+}
+
 const MIME = { ".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".svg": "image/svg+xml", ".png": "image/png", ".jpg": "image/jpeg", ".webp": "image/webp", ".md": "text/markdown; charset=utf-8" };
 
-function requestHandler(req, res) {
+function requestHandler(req, res, services = DEFAULT_RUNTIME_SERVICES) {
   const access = ACCESS_POLICY.authorize(req);
   if (!access.allowed) return json(res, access.status, { error: access.error });
   const url = (req.url || "/").split("?")[0];
@@ -1658,7 +2047,277 @@ function requestHandler(req, res) {
           if (data.confirmed !== true) return json(res, 400, { error: "explicit founder confirmation is required" });
           APPROVAL_QUEUE.then(queue => { try { json(res, 200, queue.decide(approvalMatch[1], { decision: data.decision, actor: "founder-confirmed-dashboard" })); } catch (error) { json(res, 400, { error: error.message }); } });
         });
-      if (url === "/api/state") return json(res, 200, buildState());
+      if ((url === "/api/marketplace" || url === "/api/catalog") && req.method === "GET")
+        return withLifecycleModules(res, () => {
+          try {
+            return json(res, 200, marketplaceSnapshot(services));
+          } catch (error) {
+            return json(res, 500, { error: error.message });
+          }
+        });
+      if (url === "/api/agents/lifecycle" && req.method === "GET")
+        return withLifecycleModules(res, () => {
+          try {
+            return json(res, 200, lifecycleSnapshot(services));
+          } catch (error) {
+            return json(res, 500, { error: error.message });
+          }
+        });
+      let lifecycleMatch = url.match(/^\/api\/agents\/([a-z0-9][a-z0-9-]{1,63})$/);
+      if (lifecycleMatch && req.method === "PATCH")
+        return readBody(req, res, body => {
+          let data;
+          try { data = JSON.parse(body); }
+          catch { return json(res, 400, { error: "body must be JSON" }); }
+          const id = lifecycleMatch[1];
+          if (!validOperationId(data.operationId)) {
+            return json(res, 400, { error: "valid operationId is required" });
+          }
+          const allowed = new Set(["operationId", "enabled", "name", "role", "note"]);
+          if (Object.keys(data).some(key => !allowed.has(key))) {
+            return json(res, 400, { error: "unsupported profile field" });
+          }
+          const type = Object.hasOwn(data, "enabled")
+            ? data.enabled ? "enable" : "disable"
+            : "edit";
+          return withApproval(req, res, `agent.${type}`, id, () =>
+            withLifecycleModules(res, () => {
+              try {
+                const config = services.loadConfig();
+                const next = lifecycleLib.applyLifecycleChange(config, {
+                  type,
+                  id,
+                  patch: data,
+                });
+                const committed = services.store.commit(next, data.operationId);
+                const state = lifecycleState(services, id, committed.config);
+                return json(res, 200, {
+                  operationId: data.operationId,
+                  state,
+                  event: { type: "agent.profile_updated", agentId: id },
+                  replayed: committed.replayed,
+                });
+              } catch (error) {
+                return json(res, /not found|unknown agent/i.test(error.message) ? 404 : 400, {
+                  error: error.message,
+                });
+              }
+            }),
+          );
+        });
+      lifecycleMatch = url.match(/^\/api\/agents\/([a-z0-9][a-z0-9-]{1,63})\/activate$/);
+      if (lifecycleMatch && req.method === "POST")
+        return readBody(req, res, body => {
+          let data;
+          try { data = JSON.parse(body); }
+          catch { return json(res, 400, { error: "body must be JSON" }); }
+          const id = lifecycleMatch[1];
+          const allowed = new Set(["operationId"]);
+          if (
+            !validOperationId(data.operationId) ||
+            Object.keys(data).some(key => !allowed.has(key))
+          ) {
+            return json(res, 400, { error: "valid operationId is required" });
+          }
+          return withApproval(req, res, "agent.activate", id, () =>
+            withLifecycleModules(res, () => {
+              try {
+                const next = lifecycleLib.applyLifecycleChange(services.loadConfig(), {
+                  type: "activate",
+                  id,
+                });
+                const committed = services.store.commit(next, data.operationId);
+                return json(res, 200, {
+                  operationId: data.operationId,
+                  state: lifecycleState(services, id, committed.config),
+                  event: { type: "agent.activated", agentId: id },
+                  replayed: committed.replayed,
+                });
+              } catch (error) {
+                return json(res, /not found|unknown agent/i.test(error.message) ? 404 : 409, {
+                  error: error.message,
+                });
+              }
+            }),
+          );
+        });
+      lifecycleMatch = url.match(/^\/api\/agents\/([a-z0-9][a-z0-9-]{1,63})\/remove$/);
+      if (lifecycleMatch && req.method === "POST")
+        return readBody(req, res, body => {
+          let data;
+          try { data = JSON.parse(body); }
+          catch { return json(res, 400, { error: "body must be JSON" }); }
+          const id = lifecycleMatch[1];
+          const allowed = new Set(["operationId", "detachChildren"]);
+          if (
+            !validOperationId(data.operationId) ||
+            Object.keys(data).some(key => !allowed.has(key))
+          ) {
+            return json(res, 400, { error: "valid operationId is required" });
+          }
+          return withApproval(req, res, "agent.remove", id, () =>
+            withLifecycleModules(res, () => {
+              const config = services.loadConfig();
+              const childIds = config.agents
+                .filter(agent => agent.parentId === id)
+                .map(agent => agent.id);
+              if (childIds.length && data.detachChildren !== true) {
+                return json(res, 409, {
+                  error: "agent has child profiles",
+                  childIds,
+                });
+              }
+              try {
+                const result = services.store.removeProfile(
+                  config,
+                  id,
+                  { detachChildren: data.detachChildren === true },
+                  data.operationId,
+                );
+                return json(res, 200, {
+                  operationId: data.operationId,
+                  state: lifecycleState(services, id, result.config),
+                  event: { type: "agent.profile_removed", agentId: id },
+                  tombstone: result.tombstone,
+                  retained: result.retained,
+                  replayed: result.replayed,
+                });
+              } catch (error) {
+                return json(res, /not found/i.test(error.message) ? 404 : 400, {
+                  error: error.message,
+                });
+              }
+            }),
+          );
+        });
+      lifecycleMatch = url.match(/^\/api\/agents\/([a-z0-9][a-z0-9-]{1,63})\/restore$/);
+      if (lifecycleMatch && req.method === "POST")
+        return readBody(req, res, body => {
+          let data;
+          try { data = JSON.parse(body); }
+          catch { return json(res, 400, { error: "body must be JSON" }); }
+          const id = lifecycleMatch[1];
+          const allowed = new Set(["operationId", "tombstoneId"]);
+          if (
+            !validOperationId(data.operationId) ||
+            !String(data.tombstoneId || "") ||
+            Object.keys(data).some(key => !allowed.has(key))
+          ) {
+            return json(res, 400, { error: "operationId and tombstoneId are required" });
+          }
+          return withApproval(req, res, "agent.restore", id, () =>
+            withLifecycleModules(res, () => {
+              try {
+                const tombstone = services.store
+                  .listTombstones()
+                  .find(candidate => candidate.id === data.tombstoneId);
+                if (tombstone && tombstone.agent?.id !== id) {
+                  return json(res, 409, {
+                    error: "tombstone profile does not match route id",
+                  });
+                }
+                const result = services.store.restoreProfile(
+                  services.loadConfig(),
+                  data.tombstoneId,
+                  data.operationId,
+                );
+                if (result.restoredAgentId !== id) {
+                  return json(res, 409, {
+                    error: "restored profile does not match route id",
+                  });
+                }
+                return json(res, 200, {
+                  operationId: data.operationId,
+                  state: lifecycleState(services, id, result.config),
+                  event: { type: "agent.profile_restored", agentId: id },
+                  replayed: result.replayed,
+                });
+              } catch (error) {
+                return json(res, /not found/i.test(error.message) ? 404 : 409, {
+                  error: error.message,
+                });
+              }
+            }),
+          );
+        });
+      lifecycleMatch = url.match(/^\/api\/marketplace\/([a-z0-9][a-z0-9-]{1,63})\/install$/);
+      if (lifecycleMatch && req.method === "POST")
+        return readBody(req, res, body => {
+          let data;
+          try { data = JSON.parse(body); }
+          catch { return json(res, 400, { error: "body must be JSON" }); }
+          const id = lifecycleMatch[1];
+          const allowed = new Set(["adapterId", "operationId", "register"]);
+          if (Object.keys(data).some(key => !allowed.has(key)) || !validOperationId(data.operationId)) {
+            return json(res, 400, { error: "only adapterId, operationId, and register are accepted" });
+          }
+          return withApproval(req, res, "agent.install", id, () =>
+            withLifecycleModules(res, () => {
+              const entry = marketplaceLib.marketplaceEntry(id);
+              if (!entry) return json(res, 404, { error: "unknown Marketplace entity" });
+              try {
+                const result = installMarketplace(services, entry, data);
+                return json(res, result.code, result.body);
+              } catch (error) {
+                return json(res, error.status || 400, {
+                  error: error.message,
+                  ...(error.collisions ? { collisions: error.collisions } : {}),
+                });
+              }
+            }),
+          );
+        });
+      lifecycleMatch = url.match(/^\/api\/agents\/([a-z0-9][a-z0-9-]{1,63})\/uninstall$/);
+      if (lifecycleMatch && req.method === "POST")
+        return readBody(req, res, body => {
+          let data;
+          try { data = JSON.parse(body); }
+          catch { return json(res, 400, { error: "body must be JSON" }); }
+          const id = lifecycleMatch[1];
+          const allowed = new Set(["operationId", "adapterId"]);
+          if (
+            !validOperationId(data.operationId) ||
+            Object.keys(data).some(key => !allowed.has(key))
+          ) {
+            return json(res, 400, { error: "valid operationId is required" });
+          }
+          return withTwoApprovals(
+            req,
+            res,
+            { type: "agent.uninstall", target: id },
+            { type: "agent.uninstall.confirm", target: id },
+            () => withLifecycleModules(res, () => {
+              const entry = marketplaceLib.marketplaceEntry(id);
+              if (!entry) return json(res, 404, { error: "unknown Marketplace entity" });
+              try {
+                const result = uninstallMarketplace(services, entry, data);
+                return json(res, result.code, result.body);
+              } catch (error) {
+                return json(res, error.status || 400, { error: error.message });
+              }
+            }),
+          );
+        });
+      if (url === "/api/state") {
+        if (services === DEFAULT_RUNTIME_SERVICES) {
+          const state = buildState();
+          state.activeAgentId = loadConfig().activeAgentId || null;
+          return json(res, 200, state);
+        }
+        const config = services.loadConfig();
+        return json(res, 200, {
+          vault: services.vaultPath,
+          agency: config.agency || "AGENTIC//OS",
+          activeAgentId: config.activeAgentId || null,
+          generatedAt: new Date().toISOString(),
+          agents: config.agents.map(agent => ({ ...agent, gateway: undefined })),
+          stats: {},
+          events: [],
+          review: [],
+          projects: [],
+          knowledge: [],
+        });
+      }
       if (url === "/api/procs") {
         const cfg = loadConfig();
         return json(res, 200, cfg.agents.map(a => ({ id: a.id, name: a.name, icon: a.icon, enabled: a.enabled, note: a.note || null, cwd: a.gateway && a.gateway.cwd, bin: a.gateway && a.gateway.bin, actions: gwActions(a), ...procInfo(a.id) })));
@@ -1736,25 +2395,11 @@ function requestHandler(req, res) {
           json(res, r.error ? 400 : 200, r);
         });
       if (url === "/api/catalog") {
-        if (!catalogLib) return json(res, 503, { error: "catalog not loaded yet" });
-        const registered = new Set(loadConfig().agents.map(a => a.id));
-        return json(res, 200, {
-          entries: catalogLib.AGENT_CATALOG.map(e => ({
-            id: e.id, name: e.name, icon: e.icon, role: e.role,
-            install: { cmd: (e.install && e.install.cmd) || null, url: (e.install && e.install.url) || null },
-            registered: registered.has(e.id),
-            installed: catalogInstalled(e),
-          })),
-        });
+        return json(res, 405, { error: "GET only" });
       }
       if (url === "/api/agents/install" && req.method === "POST")
-        return readBody(req, res, body => {
-          let d; try { d = JSON.parse(body); } catch { return json(res, 400, { error: "body must be JSON {id,adapterId?}" }); }
-          const id = String(d.id || "");
-          return withApproval(req, res, "agent.install", id, () => {
-            const r = installAgent(id, d.adapterId);
-            json(res, r.error ? 400 : 200, r);
-          });
+        return json(res, 410, {
+          error: "use POST /api/marketplace/:id/install with an operationId",
         });
       if (url === "/api/version") return json(res, 200, versionInfo());
       if (url === "/api/update" && req.method === "POST")
@@ -1813,7 +2458,10 @@ function requestHandler(req, res) {
   } catch { res.writeHead(500, { "Content-Type": "text/plain" }); res.end("error"); }
 }
 
-function createServer() { return http.createServer(requestHandler); }
+function createServer(runtime) {
+  const services = runtime ? createRuntimeServices(runtime) : DEFAULT_RUNTIME_SERVICES;
+  return http.createServer((req, res) => requestHandler(req, res, services));
+}
 const server = createServer();
 
 /* R1+R3: shutdown & crash handlers — SIGINT/SIGTERM/SIGHUP + uncaughtException are not covered by
@@ -1844,6 +2492,8 @@ if (require.main === module) {
     AGENT_CATALOG_MOD,
     MARKETPLACE_MOD,
     PROCESS_ADAPTERS_MOD,
+    AGENT_LIFECYCLE_MOD,
+    MANAGED_BUNDLE_MOD,
     RELEASE_MOD,
   ]).then(() => server.listen(PORT, process.env.DASH_HOST || "127.0.0.1", () => {
   console.log(`\n  Agentic OS running at  http://localhost:${PORT}`);
@@ -1863,7 +2513,7 @@ if (require.main === module) {
   }));
 }
 
-module.exports = { createServer, legacyDecisionContext };
+module.exports = { createRuntimeServices, createServer, legacyDecisionContext };
 
 /* R#2: run scripts/hermes-daily-bridge.cjs (sync telemetry + vault daily note) */
 function runDailyBridge() {
