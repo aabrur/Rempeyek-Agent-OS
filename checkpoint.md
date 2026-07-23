@@ -358,3 +358,62 @@ six implementation phases.
 Boss reviews the written specification. After approval, write the executable
 implementation plan; production implementation must not start before that plan
 is accepted.
+
+---
+
+## HT-20260724-RAO - Phase 2 - Implementation Planning (2026-07-24)
+
+**Status:** completed. The specification is approved and the implementation is
+fully mapped; no production code, installer mutation, desktop package, release,
+or deployment was created in this phase.
+
+### Planning artifacts
+
+- `docs/superpowers/plans/2026-07-24-agent-marketplace-lifecycle-subagents.md`
+  contains 11 test-first tasks across Marketplace foundation, lifecycle and
+  Settings, subagents, and public closure.
+- `docs/superpowers/plans/2026-07-24-electron-desktop-auto-update.md` contains
+  8 test-first tasks across desktop runtime, verified update/package flow, and
+  clean-machine acceptance.
+- The execution order is the 11 web-platform tasks first, followed by the 8
+  desktop tasks. Each task has focused RED/GREEN evidence, an explicit commit
+  boundary, and the two plans define six phase checkpoints (A–F).
+
+### Review corrections locked into the plan
+
+- Hypertaks installs from a public, commit-pinned, SHA-256-manifested bundle
+  shipped with the application; it does not depend on a developer checkout or
+  mutable remote response.
+- Marketplace adapter IDs are filtered by the active platform. Cline remains in
+  the catalog, while its one-click adapter is hidden on Windows until official
+  CLI support exists there.
+- OpenCode uses its documented npm adapter rather than an unverified Winget ID;
+  Crush uses its documented Winget identifier.
+- Electron injects its random desktop session header below the renderer network
+  layer. The token is not exposed through preload, DOM JavaScript, local
+  storage, logs, or process arguments.
+- Desktop icon generation is deterministic from the existing brand asset; no
+  visual asset or interface is redesigned.
+- Source checkout updates use fixed sequential `execFile` calls and reject a
+  dirty tree. Packaged stable releases require SHA-512 metadata, valid
+  Authenticode signatures, and an approved restart.
+- Unsigned packages may exist only as short-retention test artifacts and can
+  never become the stable update feed.
+
+### Verification
+
+- Plan self-review found balanced code fences, no unresolved `TODO`, `TBD`,
+  `FIXME`, placeholder, owner-local path, or diff-whitespace error.
+- Fresh regression gate: `npm test` passes 120/120.
+- Fresh production gate: `npm run build` succeeds.
+- Fresh public boundary gate: `npm run audit:public` passes across 163 tracked
+  paths.
+- The design lock remains absolute: no shell, navigation, theme, card, graph,
+  typography, palette, spacing, or motion redesign is planned.
+
+### Next gate
+
+Boss selects the implementation execution mode. Recommended: task-isolated
+subagent-driven development with specification and code-quality review after
+each task. Alternative: execute inline in this task with the approved
+`executing-plans` checkpoints.
