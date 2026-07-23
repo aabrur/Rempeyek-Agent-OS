@@ -1,0 +1,35 @@
+{
+  "name": "hypertaks",
+  "version": "4.4.0",
+  "description": "Hypertaks Founder Operating System - contract integrity, retrieval intelligence, targeted host capabilities, and professional execution.",
+  "author": {
+    "name": "abrur",
+    "email": "abrur_nic@yahoo.com",
+    "url": "https://github.com/aabrur"
+  },
+  "homepage": "https://github.com/aabrur/hypertaks-agent",
+  "repository": "https://github.com/aabrur/hypertaks-agent",
+  "license": "MIT",
+  "keywords": [
+    "founder",
+    "strategy",
+    "multi-agent",
+    "solidity",
+    "web3",
+    "marketing",
+    "finance",
+    "supply-chain",
+    "iot"
+  ],
+  "skills": "./skills/",
+  "supportedAgents": [
+    "claude-code",
+    "codex",
+    "cursor",
+    "kimi-code",
+    "openclaw",
+    "hermes",
+    "opencode",
+    "pi"
+  ]
+}

@@ -13,6 +13,7 @@ function resolveRuntimePaths({ env = process.env, root, home, platform = process
   const legacyPath = p.join(root, "agents.config.json");
   const legacyConfig = !env.AGENTS_CONFIG && exists(legacyPath);
   const stateRoot = env.AGENT_STATE_DIR || (legacyConfig ? root : defaultStateRoot);
+  const managedStateRoot = env.AGENT_STATE_DIR || defaultStateRoot;
   const legacyVault = p.join(root, "Obsidian Vault");
 
   return {
@@ -22,6 +23,9 @@ function resolveRuntimePaths({ env = process.env, root, home, platform = process
     vaultPath: env.VAULT_PATH || (legacyConfig && exists(legacyVault) ? legacyVault : p.join(stateRoot, "Vault")),
     telemetryDir: legacyConfig ? p.join(root, "telemetry") : p.join(stateRoot, "telemetry"),
     avatarDir: legacyConfig ? p.join(root, "runtime", "avatars") : p.join(stateRoot, "avatars"),
+    receiptDir: p.join(managedStateRoot, "receipts"),
+    installCacheDir: p.join(managedStateRoot, "install-cache"),
+    bundleRoot: p.join(root, "marketplace", "bundles"),
   };
 }
 

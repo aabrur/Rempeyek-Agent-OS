@@ -1,0 +1,152 @@
+{
+  "schemaVersion": 1,
+  "entityId": "hypertaks-agent",
+  "sourceUrl": "https://github.com/aabrur/hypertaks-agent",
+  "sourceRef": "b45cc6b9c686c30615b971f880c532b1ed48e80b",
+  "roots": [
+    ".agents/plugins/hypertaks.json",
+    "skills/hypertaks"
+  ],
+  "files": [
+    {
+      "path": ".agents/plugins/hypertaks.json",
+      "sha256": "63e8b4d083609d49a4d428c8cf719c558fff4bfe2970c66db66cf2c5248aeb7f"
+    },
+    {
+      "path": "skills/hypertaks/AGENTS.md",
+      "sha256": "5e3bde2853c8e41b1f49070d9b27d8e43c6e2446c63aefdc06eaf54b7be9d9ae"
+    },
+    {
+      "path": "skills/hypertaks/assets/agent-brief-template.md",
+      "sha256": "fb93523fb37fca2097d518c2fa0126e5cec6b6729e998df882ec9ddcba13f8df"
+    },
+    {
+      "path": "skills/hypertaks/assets/contract-schema.yaml",
+      "sha256": "411d46e803084dad6dc369f959b53081eca3bd5c6801096b5eef6843ea7fe328"
+    },
+    {
+      "path": "skills/hypertaks/assets/deliverable-template.md",
+      "sha256": "aa725a996f4dc24720968688da6196106d0ccc68cfffa716351f9528b4ef7d39"
+    },
+    {
+      "path": "skills/hypertaks/hypertaks-skill-card.md",
+      "sha256": "3c5d11e8e3df4bf84075790bd16a5ecb6ea125c74bce5c2be816441669140d52"
+    },
+    {
+      "path": "skills/hypertaks/references/00-security-kernel.md",
+      "sha256": "023079e3609994d863c5f121b774ac2c5a74a6e02eedc4ad1360d0ccb11f3b83"
+    },
+    {
+      "path": "skills/hypertaks/references/01-state-and-transactions.md",
+      "sha256": "54f20be5664df5d0178f1cbf671de0a30277457a17f37d042699be9ec3c8f45b"
+    },
+    {
+      "path": "skills/hypertaks/references/02-retrieval-and-evidence.md",
+      "sha256": "182e79200c02f04ca32fd6c2e700d787ae128cbe8bed8c93a028f7d00ad96ad6"
+    },
+    {
+      "path": "skills/hypertaks/references/03-professional-execution.md",
+      "sha256": "a9cce02398abe07efc4cb76b1e0b22dadd41c7edad1eda36796be8d780141d4a"
+    },
+    {
+      "path": "skills/hypertaks/references/04-visual-delivery.md",
+      "sha256": "afeafe3d0f5ede13587ffc742feafd24ada34e661f83319c7f0023c46aef2ecf"
+    },
+    {
+      "path": "skills/hypertaks/references/agent-roles.md",
+      "sha256": "ae87152d2fbc9694e41dd2c70ba6ac01019fc76053b3c59520d42b8a82dce91c"
+    },
+    {
+      "path": "skills/hypertaks/references/domains/D1-quant-core.md",
+      "sha256": "87de02205871ed930b529eb855d3588a3a7cb98b2702cfa3c466f4e996a2bbbb"
+    },
+    {
+      "path": "skills/hypertaks/references/domains/D10-design-ux.md",
+      "sha256": "ccea2ff97e0ac7ddeca207b56be4862ca2bd5ac91d4b0e2dc441121cca718482"
+    },
+    {
+      "path": "skills/hypertaks/references/domains/D11-engineering-economy.md",
+      "sha256": "c725602dab082312969fd822952ab2e3a237396ad355a5c2282b3c450dc5c8d8"
+    },
+    {
+      "path": "skills/hypertaks/references/domains/D12-soft-skills.md",
+      "sha256": "1499795facc82b361719b3fb98ae59c731218b4ea94acda4b462a70c2f136bda"
+    },
+    {
+      "path": "skills/hypertaks/references/domains/D2-economics.md",
+      "sha256": "ae9ffae5fd3cc691685a9d7403c1956c740fa4ae7d737637a490da052169cee7"
+    },
+    {
+      "path": "skills/hypertaks/references/domains/D3-data-tools.md",
+      "sha256": "07b24f4b40e0b47a83725628b2dcb68aba28a8fc0801d6793819fabbfa686d60"
+    },
+    {
+      "path": "skills/hypertaks/references/domains/D4-research-method.md",
+      "sha256": "0cac3a37ab1da533c79df2d55be7cb06f88a74fa464f7bf02c3e83ec916f8838"
+    },
+    {
+      "path": "skills/hypertaks/references/domains/D5-logistics-scm.md",
+      "sha256": "1852d8f227604c58d02e5a52e78768e633ee8d210ad9148938082d90f4ecee48"
+    },
+    {
+      "path": "skills/hypertaks/references/domains/D6-operations-quality.md",
+      "sha256": "091fc59d1018f1b266f930547bec73f40969d454b68fa0eb5ff4de3ff18506dd"
+    },
+    {
+      "path": "skills/hypertaks/references/domains/D7-trade-customs.md",
+      "sha256": "2c1c783b3600ceab774ba9b209a8c0629e72fd97532a21d5311d8121fef42d1c"
+    },
+    {
+      "path": "skills/hypertaks/references/domains/D8-business-finance.md",
+      "sha256": "6e27e2d404eef0a0f057e0324841e06bbf24b15d79195d10da8bb371edf54c71"
+    },
+    {
+      "path": "skills/hypertaks/references/domains/D9-software-engineering.md",
+      "sha256": "1338289b26532e13697c3d9f68b9937fe3648081dfd3e8b7833eacacd7db4639"
+    },
+    {
+      "path": "skills/hypertaks/references/domains/INDEX.md",
+      "sha256": "9f0f2807c11d94eba301878549f3ef767f376bb7c845708a1517aa540e0ae939"
+    },
+    {
+      "path": "skills/hypertaks/references/engineering.md",
+      "sha256": "f37412bdecaf1cbf8bea0c1b664f2a17fba3f10dfe4a34891c7a68afd171b137"
+    },
+    {
+      "path": "skills/hypertaks/references/frameworks.md",
+      "sha256": "2131c80f28963383b32dbd90c39219f429e73462140b7ea00400a9b58d3954c4"
+    },
+    {
+      "path": "skills/hypertaks/references/intake-protocol.md",
+      "sha256": "0c6701700148dfd990a4ae9800697c0724d119a3084e98a3067087c08c9e41a1"
+    },
+    {
+      "path": "skills/hypertaks/references/knowledge-base.md",
+      "sha256": "9b211683ca58129bf877efd1f7d0c9b4bf360597d67f796609eeed5ab5945ffa"
+    },
+    {
+      "path": "skills/hypertaks/references/plugins-and-mcp.md",
+      "sha256": "12d13846079dd45c33b7a491100b39e78f0c9c63347be91ddb661e2d4b268dad"
+    },
+    {
+      "path": "skills/hypertaks/references/superpowers-map.md",
+      "sha256": "70f751b80251cdb119ab55105162a330990cd7a828772e97a9b0b371f455978e"
+    },
+    {
+      "path": "skills/hypertaks/references/token-discipline.md",
+      "sha256": "b5e00275d4e78dd3e920791a011d494c2f763b71710e466224de839d6c29a2ae"
+    },
+    {
+      "path": "skills/hypertaks/RELEASE-NOTES.md",
+      "sha256": "169b6acc53e59363b436ee949a77f5e94dd28365c42f02adc938ea199d5162a3"
+    },
+    {
+      "path": "skills/hypertaks/SKILL-core.md",
+      "sha256": "b347ebc0242e313087e5e2602e2faa33e992e90e4c3a048f677790f7c9353a74"
+    },
+    {
+      "path": "skills/hypertaks/SKILL.md",
+      "sha256": "ff3ba05fe634c93ce5ffc389c6363cd7b410521699ce254549713c884be0e270"
+    }
+  ]
+}

@@ -417,3 +417,59 @@ Boss selects the implementation execution mode. Recommended: task-isolated
 subagent-driven development with specification and code-quality review after
 each task. Alternative: execute inline in this task with the approved
 `executing-plans` checkpoints.
+
+---
+
+## HT-20260724-RAO - Phase A - Marketplace Foundation (2026-07-24)
+
+**Status:** implemented and verified. This checkpoint covers web Tasks 1–3;
+the visual design and navigation were not changed.
+
+### Implemented
+
+- Replaced the eight-entry executable catalog with a typed, reviewed manifest
+  containing the exact curated 20 agents, featured Hypertaks plugin, and its
+  public skill child.
+- Crimson Odyssey is discoverable but has no executable adapter while its
+  canonical-owner evidence remains inconsistent.
+- Public Marketplace projections expose adapter IDs and official URLs only.
+  Package identifiers, program names, argument arrays, and source refs stay
+  server-side.
+- Installer resolution now uses fixed platform-specific `program + argv`
+  specifications and `shell: false`. Unsupported platforms fall back to the
+  official page instead of presenting a broken one-click action.
+- Hypertaks is shipped as a public offline bundle pinned to commit
+  `b45cc6b9c686c30615b971f880c532b1ed48e80b`, with 35 reviewed files and a
+  per-file SHA-256 manifest.
+- Bundle installation refuses collisions. Receipt-based removal deletes only
+  unchanged managed files and preserves user edits.
+- Git attributes preserve exact bundle bytes across operating systems so the
+  committed hashes remain reproducible.
+- Marketplace receipts and install cache remain outside the source checkout,
+  including legacy-config mode.
+
+### Evidence
+
+- Task 1 commit: `0180baf`.
+- Task 2 commit: `a05f1c7`.
+- Focused Marketplace, adapter, bundle, and runtime-path tests pass.
+- Full repository gate passes 136/136 tests.
+- Production Vite build succeeds.
+- Public release audit passes across 207 tracked paths, including the staged
+  Hypertaks bundle.
+- `git diff --cached --check` passes.
+
+### Preserved boundaries
+
+- No global agent/plugin installation was executed during verification.
+- No user skill, vault lane, telemetry, credential, or agent profile was
+  modified or deleted.
+- No shell, navigation, card, theme, graph, typography, palette, spacing, or
+  motion redesign was introduced.
+- No release, push, deployment, signing, or repository visibility mutation
+  occurred.
+
+### Next task
+
+Phase B begins with the atomic config store, independent software/profile
+lifecycle axes, idempotent operations, backups, and secret-free tombstones.
