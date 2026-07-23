@@ -25,6 +25,7 @@ function resolveRuntimePaths({ env = process.env, root, home, platform = process
     avatarDir: legacyConfig ? p.join(root, "runtime", "avatars") : p.join(stateRoot, "avatars"),
     receiptDir: p.join(managedStateRoot, "receipts"),
     installCacheDir: p.join(managedStateRoot, "install-cache"),
+    tombstoneDir: p.join(managedStateRoot, "tombstones"),
     bundleRoot: p.join(root, "marketplace", "bundles"),
   };
 }

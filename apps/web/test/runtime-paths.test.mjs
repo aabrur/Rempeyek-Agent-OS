@@ -26,6 +26,7 @@ test("clean Windows install keeps config, vault, telemetry, and avatars outside 
   assert.equal(paths.avatarDir, path.win32.join(paths.stateRoot, "avatars"));
   assert.equal(paths.receiptDir, path.win32.join(paths.stateRoot, "receipts"));
   assert.equal(paths.installCacheDir, path.win32.join(paths.stateRoot, "install-cache"));
+  assert.equal(paths.tombstoneDir, path.win32.join(paths.stateRoot, "tombstones"));
   assert.equal(paths.bundleRoot, path.win32.join(root, "marketplace", "bundles"));
   for (const value of [
     paths.configPath,
@@ -34,6 +35,7 @@ test("clean Windows install keeps config, vault, telemetry, and avatars outside 
     paths.avatarDir,
     paths.receiptDir,
     paths.installCacheDir,
+    paths.tombstoneDir,
   ]) {
     assert.equal(value.toLowerCase().startsWith(root.toLowerCase()), false);
   }
@@ -73,8 +75,10 @@ test("existing ignored repository config remains compatible without using public
   const managedState = "C:\\Users\\owner\\AppData\\Local\\Rempeyek-Agent-OS";
   assert.equal(paths.receiptDir, path.win32.join(managedState, "receipts"));
   assert.equal(paths.installCacheDir, path.win32.join(managedState, "install-cache"));
+  assert.equal(paths.tombstoneDir, path.win32.join(managedState, "tombstones"));
   assert.equal(paths.receiptDir.toLowerCase().startsWith(root.toLowerCase()), false);
   assert.equal(paths.installCacheDir.toLowerCase().startsWith(root.toLowerCase()), false);
+  assert.equal(paths.tombstoneDir.toLowerCase().startsWith(root.toLowerCase()), false);
 });
 
 test("bundle root follows the supplied source or packaged app root", () => {
