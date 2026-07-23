@@ -240,3 +240,121 @@ and the junk is gone.
 ### Verified
 - Live `/api/graph`: 599 nodes, decree + `Repo/apps/web/server.js` present, tier `reduced`.
 - Active `copilot` grep in vault → only historical/archive references remain.
+
+---
+
+## HT-20260724-RAO - Phase 0 - Public Agent Platform Audit (2026-07-24)
+
+**Contract:** Hyper / Deep / score 12 / 8 roles. Local reversible work only;
+publish, deploy, delete, spend, and on-chain actions remain out of scope.
+
+### Verified baseline
+
+- Public workspace cloned to `%USERPROFILE%\Documents\Rempeyek-Agent-Os` on
+  branch `codex/agent-platform-public`; application source in the canonical
+  checkout remains untouched on `main`. The nested vault repository received
+  only the explicitly requested Codex checkpoint/log updates.
+- `npm test`: 120/120 passing.
+- `npm run build`: Vite production build completed successfully.
+- `npm run audit:public`: 160 tracked paths checked; no personal/runtime data,
+  owner-specific absolute path, roster leak, raster evidence, or high-confidence
+  secret found.
+- Existing scaffolds confirmed: curated install catalog, Add Agent modal,
+  Marketplace, Settings, approval-gated updater, telemetry/subagent display.
+
+### Gaps that define the design
+
+- Catalog contains 8 entries, not the requested current top 20.
+- Registry supports add/install only; update, enable/disable, switch, remove,
+  and uninstall semantics are not implemented.
+- Agent profiles display subagent telemetry but cannot create a subagent.
+- Settings has no agent-management controls.
+- `apps/desktop` is documentation only; no runnable desktop shell exists.
+- Current updater is Git-checkout-specific and does not cover packaged desktop
+  releases.
+
+### Hard constraints carried forward
+
+- Preserve the existing visual design and all four structural themes.
+- Preserve vault, telemetry, activity, workflows, and user-owned agent data
+  during profile removal or software updates.
+- Never execute caller-supplied shell text; installer operations must resolve
+  from a vetted manifest and require explicit approval.
+- Hypertaks is the featured marketplace plugin; Crimson Odyssey is a first-class
+  installable agent entry after its official install contract is reconciled.
+
+### Next gate
+
+Brainstorming design approval is required before a spec, implementation plan,
+or production code can be written.
+
+---
+
+## HT-20260724-RAO - Phase 1 - Public Platform Design (2026-07-24)
+
+**Status:** completed and awaiting written-spec review. No production code was
+changed in this phase.
+
+### Locked decisions
+
+- The existing visual design, navigation, cards, Agent Map, four themes, and
+  interaction language remain unchanged. New behavior must use existing
+  components and semantic tokens.
+- Agent, plugin, and skill discovery uses one typed, reviewed Marketplace
+  manifest. Executable adapters use fixed programs and argument arrays with no
+  caller-supplied shell.
+- Installed-software state is independent from registered-profile state.
+- Remove agent profile is available in Settings and preserves vault, telemetry,
+  activity, workflows, logs, credentials, installed software, and user files.
+  Restore uses a secret-free tombstone.
+- Software uninstall is a separate Advanced action with two explicit approvals
+  and no data cascade.
+- The launch catalog is a maintained 20-agent curation, including Crimson
+  Odyssey. Hypertaks Agent is the featured plugin and exposes compatible public
+  skills through the same manifest.
+- Crimson Odyssey remains link/registration-capable but its one-click adapter is
+  disabled until its public repository and README agree on the canonical install
+  owner.
+- A primary-agent profile gains an existing-style `+` form for creating a
+  parent-bound subagent with purpose, domain, outcome, scope, permissions,
+  memory, tools/skills, and activation policy.
+- Electron is the Windows-first desktop shell because it can package the current
+  React UI and Node control plane without introducing a Rust sidecar.
+- Packaged releases auto-check and can download verified stable updates in the
+  background, but apply only on user-approved restart and never write the vault.
+
+### Curated current-agent set
+
+Claude Code, OpenAI Codex, Kilo Code, Cline, Pi, Antigravity, Hermes, OpenClaw,
+Gemini CLI, GitHub Copilot CLI, OpenCode, Aider, Goose, OpenHands, Qwen Code,
+Kimi Code, Mistral Vibe, Cursor Agent, Crush, and Crimson Odyssey.
+
+Roo Code is excluded because its official repository is archived and read-only.
+This set is a dated Rempeyek integration curation, not a popularity ranking.
+
+### Design artifact
+
+`docs/superpowers/specs/2026-07-24-public-agent-platform-desktop-design.md`
+
+The specification covers lifecycle state transitions, safe process adapters,
+data preservation, Marketplace schemas, Settings, subagent creation, Electron
+runtime, verified updates, workflow contracts, error handling, test gates, and
+six implementation phases.
+
+### Verification
+
+- Self-review found no unresolved `TODO`, `TBD`, or `FIXME`.
+- The 20-entry launch set is explicit and source-provenance requirements are
+  testable.
+- Destructive semantics, external authority boundaries, and unsupported
+  one-click states are stated without placeholders.
+- Fresh gate: `npm test` passes 120/120, `npm run build` succeeds, and
+  `npm run audit:public` passes across 160 tracked paths.
+- `git diff --check` passes after removing one pre-existing trailing-space line
+  at the Phase 0 boundary.
+
+### Next gate
+
+Boss reviews the written specification. After approval, write the executable
+implementation plan; production implementation must not start before that plan
+is accepted.
