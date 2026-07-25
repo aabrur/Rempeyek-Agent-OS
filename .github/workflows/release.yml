@@ -12,8 +12,8 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: npm
@@ -29,7 +29,7 @@ jobs:
         run: |
           "## TEST ONLY - UNSIGNED" >> $env:GITHUB_STEP_SUMMARY
           "These files are not a stable release or updater feed." >> $env:GITHUB_STEP_SUMMARY
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: unsigned-desktop-test
           retention-days: 3
@@ -44,18 +44,18 @@ jobs:
     runs-on: windows-latest
     permissions:
       contents: write
-    env:
-      CSC_LINK: ${{ secrets.CSC_LINK }}
-      CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
-      DESKTOP_PUBLISHER_SUBJECT: ${{ vars.DESKTOP_PUBLISHER_SUBJECT }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: npm
       - name: Require signing identity before build
         shell: pwsh
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          DESKTOP_PUBLISHER_SUBJECT: ${{ vars.DESKTOP_PUBLISHER_SUBJECT }}
         run: |
           if ([string]::IsNullOrWhiteSpace($env:CSC_LINK)) {
             throw "CSC_LINK is required for a signed tag release"
@@ -71,7 +71,9 @@ jobs:
       - run: npm run test:desktop
       - run: npm run build
       - run: npm run audit:public
+      - run: npm run audit:release
       - name: Match tag and workspace versions
+        id: release_meta
         shell: pwsh
         run: |
           $tagVersion = $env:GITHUB_REF_NAME -replace '^v', ''
@@ -80,14 +82,22 @@ jobs:
           if ($tagVersion -ne $rootVersion -or $tagVersion -ne $desktopVersion) {
             throw "tag, root, and desktop versions must match"
           }
+          $isPrerelease = $tagVersion -match '-'
+          "prerelease=$($isPrerelease.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
       - name: Build signed desktop artifacts
         shell: pwsh
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          DESKTOP_PUBLISHER_SUBJECT: ${{ vars.DESKTOP_PUBLISHER_SUBJECT }}
         run: |
           npx electron-builder --projectDir apps/desktop --win --publish never `
             -c.win.publisherName="$env:DESKTOP_PUBLISHER_SUBJECT"
       - run: npm run desktop:test-package
       - name: Verify Authenticode and update metadata
         shell: pwsh
+        env:
+          DESKTOP_PUBLISHER_SUBJECT: ${{ vars.DESKTOP_PUBLISHER_SUBJECT }}
         run: |
           $executables = @(Get-ChildItem apps/desktop/dist/*.exe)
           if ($executables.Count -ne 2) {
@@ -124,9 +134,11 @@ jobs:
               throw "latest.yml references a missing artifact: $artifactName"
             }
           }
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           draft: false
+          prerelease: ${{ steps.release_meta.outputs.prerelease }}
+          make_latest: ${{ steps.release_meta.outputs.prerelease == 'false' }}
           generate_release_notes: true
           files: |
             apps/desktop/dist/*.exe

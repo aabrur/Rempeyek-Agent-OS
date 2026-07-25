@@ -1,5 +1,37 @@
 import { fork } from "node:child_process";
 
+const DESKTOP_ENVIRONMENT_OVERRIDES = Object.freeze([
+  "AGENT_STATE_DIR",
+  "AGENTS_CONFIG",
+  "VAULT_PATH",
+  "DASH_REMOTE",
+  "DASH_TOKEN",
+  "DASH_ALLOWED_ORIGINS",
+  "DASH_HOST",
+  "PORT",
+  "DESKTOP_SESSION_TOKEN",
+]);
+
+export function buildServerEnvironment({
+  baseEnv = process.env,
+  stateRoot,
+  desktopToken,
+} = {}) {
+  if (!stateRoot || !desktopToken) {
+    throw new Error("stateRoot and desktopToken are required");
+  }
+  const env = { ...baseEnv };
+  for (const key of DESKTOP_ENVIRONMENT_OVERRIDES) delete env[key];
+  return {
+    ...env,
+    ELECTRON_RUN_AS_NODE: "1",
+    PORT: "0",
+    DASH_HOST: "127.0.0.1",
+    AGENT_STATE_DIR: stateRoot,
+    DESKTOP_SESSION_TOKEN: desktopToken,
+  };
+}
+
 export function startServerProcess({
   forkImpl = fork,
   execPath,
@@ -16,14 +48,7 @@ export function startServerProcess({
   return new Promise((resolve, reject) => {
     const child = forkImpl(serverPath, [], {
       execPath,
-      env: {
-        ...process.env,
-        ELECTRON_RUN_AS_NODE: "1",
-        PORT: "0",
-        DASH_HOST: "127.0.0.1",
-        AGENT_STATE_DIR: stateRoot,
-        DESKTOP_SESSION_TOKEN: desktopToken,
-      },
+      env: buildServerEnvironment({ stateRoot, desktopToken }),
       stdio: ["ignore", "pipe", "pipe", "ipc"],
       windowsHide: true,
     });

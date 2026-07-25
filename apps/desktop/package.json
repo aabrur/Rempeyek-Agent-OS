@@ -34,6 +34,7 @@
       "preload.cjs",
       "server-process.mjs",
       "desktop-settings.mjs",
+      "notification-service.mjs",
       "update-service.mjs",
       "security.mjs",
       "assets/**",

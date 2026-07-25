@@ -23,6 +23,7 @@
     "desktop:pack": "npm run pack --workspace @rempeyek/desktop",
     "desktop:dist": "npm run dist --workspace @rempeyek/desktop",
     "desktop:test-package": "node --test apps/desktop/test/package-contents.test.mjs",
-    "audit:public": "node scripts/public-release-audit.mjs"
+    "audit:public": "node scripts/public-release-audit.mjs",
+    "audit:release": "node scripts/dependency-audit-policy.mjs"
   }
 }

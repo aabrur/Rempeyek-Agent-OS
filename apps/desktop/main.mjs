@@ -8,6 +8,7 @@ import {
   dialog,
   ipcMain,
   Menu,
+  Notification,
   session,
   shell,
   Tray,
@@ -24,6 +25,7 @@ import {
   resolveDesktopUserDataPath,
 } from "./desktop-settings.mjs";
 import { startServerProcess } from "./server-process.mjs";
+import { createDesktopNotifier } from "./notification-service.mjs";
 import { createUpdateService } from "./update-service.mjs";
 
 const { autoUpdater } = electronUpdater;
@@ -47,6 +49,7 @@ let closeBehavior = "tray";
 let startMinimized = false;
 let settingsStore = null;
 let updateService = null;
+let notifyDesktop = null;
 
 const iconPath = path.join(import.meta.dirname, "assets", "icon.ico");
 
@@ -67,6 +70,7 @@ function stopOwnedServer() {
 function sendUpdateState(state) {
   if (!mainWindow || mainWindow.isDestroyed()) return;
   mainWindow.webContents.send("desktop:update-state", { ...state });
+  notifyDesktop?.(state);
 }
 
 function createTray() {
@@ -191,6 +195,10 @@ function registerIpcHandlers() {
   settingsStore = createDesktopSettingsStore(
     path.join(paths.stateRoot, "desktop-settings.json"),
   );
+  notifyDesktop = createDesktopNotifier({
+    NotificationImpl: Notification,
+    settingsStore,
+  });
   const settings = settingsStore.read();
   closeBehavior = settings.closeBehavior;
   startMinimized = settings.startMinimized;

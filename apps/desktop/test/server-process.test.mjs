@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import test from "node:test";
 
-import { startServerProcess } from "../server-process.mjs";
+import {
+  buildServerEnvironment,
+  startServerProcess,
+} from "../server-process.mjs";
 
 class FakeChild extends EventEmitter {
   killCalls = 0;
@@ -10,6 +13,42 @@ class FakeChild extends EventEmitter {
     this.killCalls += 1;
   }
 }
+
+test("desktop server environment removes inherited source and remote overrides", () => {
+  const env = buildServerEnvironment({
+    baseEnv: {
+      SystemRoot: "C:\\Windows",
+      PATH: "C:\\Tools",
+      AGENT_STATE_DIR: "C:\\WrongState",
+      AGENTS_CONFIG: "C:\\Outside\\agents.json",
+      VAULT_PATH: "C:\\Outside\\Vault",
+      DASH_REMOTE: "1",
+      DASH_TOKEN: "wrong-token",
+      DASH_ALLOWED_ORIGINS: "https://outside.example",
+      DASH_HOST: "0.0.0.0",
+      PORT: "9999",
+      DESKTOP_SESSION_TOKEN: "old-token",
+    },
+    stateRoot: "C:\\State",
+    desktopToken: "desktop-token",
+  });
+
+  assert.equal(env.SystemRoot, "C:\\Windows");
+  assert.equal(env.PATH, "C:\\Tools");
+  assert.equal(env.AGENT_STATE_DIR, "C:\\State");
+  assert.equal(env.DESKTOP_SESSION_TOKEN, "desktop-token");
+  assert.equal(env.DASH_HOST, "127.0.0.1");
+  assert.equal(env.PORT, "0");
+  for (const key of [
+    "AGENTS_CONFIG",
+    "VAULT_PATH",
+    "DASH_REMOTE",
+    "DASH_TOKEN",
+    "DASH_ALLOWED_ORIGINS",
+  ]) {
+    assert.equal(Object.hasOwn(env, key), false, key);
+  }
+});
 
 test("server child resolves only after a valid ready message", async () => {
   const child = new FakeChild();

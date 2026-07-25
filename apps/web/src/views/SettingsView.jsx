@@ -174,7 +174,7 @@ export function SettingsView({ theme, onTheme, state }) {
                 </label>
               </div>
               <div>
-                <span>NATIVE NOTIFICATIONS</span>
+                <span>UPDATE NOTIFICATIONS</span>
                 <label>
                   <input
                     type="checkbox"

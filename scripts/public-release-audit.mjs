@@ -78,6 +78,9 @@ for (const boundary of [
   'Status -ne "Valid"',
   "latest.yml",
   "sha512",
+  "npm run audit:release",
+  "prerelease:",
+  "make_latest:",
 ]) {
   if (!releaseWorkflow.includes(boundary)) {
     errors.push(`release.yml: missing signed-release boundary ${boundary}`);
@@ -85,6 +88,13 @@ for (const boundary of [
 }
 if (!releaseWorkflow.includes("if: startsWith(github.ref, 'refs/tags/v')")) {
   errors.push("release.yml: public release must be restricted to a v* tag");
+}
+for (const match of releaseWorkflow.matchAll(
+  /^\s*-\s+uses:\s*([^\s#]+)/gm,
+)) {
+  if (!/@[0-9a-f]{40}$/.test(match[1])) {
+    errors.push(`release.yml: action is not pinned to a full SHA: ${match[1]}`);
+  }
 }
 
 const gitignore = fs.readFileSync(path.join(ROOT, ".gitignore"), "utf8");

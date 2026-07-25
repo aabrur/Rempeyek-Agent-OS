@@ -22,6 +22,7 @@ test("desktop package pins the reviewed runtime and packages only required app f
   assert.equal(pkg.build.productName, "Rempeyek Agent OS");
   assert.equal(pkg.build.files.includes("preload.cjs"), true);
   assert.equal(pkg.build.files.includes("preload.mjs"), false);
+  assert.equal(pkg.build.files.includes("notification-service.mjs"), true);
   assert.deepEqual(
     pkg.build.win.target.map(target => target.target),
     ["nsis", "portable"],

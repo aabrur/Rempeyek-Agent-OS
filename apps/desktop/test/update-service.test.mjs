@@ -59,6 +59,36 @@ test("stable updater checks, downloads, and waits for approved restart", async (
   assert.equal(emitted.some(state => state.phase === "ready"), true);
 });
 
+test("preview channel allows prereleases while stable channel excludes them", () => {
+  const stableUpdater = new FakeUpdater();
+  createUpdateService({
+    autoUpdater: stableUpdater,
+    settingsStore: stableSettings,
+    lifecycleBusy: () => false,
+    emit: () => {},
+    setIntervalImpl: () => 1,
+    clearIntervalImpl: () => {},
+  }).start();
+  assert.equal(stableUpdater.allowPrerelease, false);
+
+  const previewUpdater = new FakeUpdater();
+  createUpdateService({
+    autoUpdater: previewUpdater,
+    settingsStore: {
+      read: () => ({
+        autoCheck: false,
+        autoDownload: true,
+        updateChannel: "preview",
+      }),
+    },
+    lifecycleBusy: () => false,
+    emit: () => {},
+    setIntervalImpl: () => 1,
+    clearIntervalImpl: () => {},
+  }).start();
+  assert.equal(previewUpdater.allowPrerelease, true);
+});
+
 test("update application is blocked while lifecycle mutation is active", async () => {
   const autoUpdater = new FakeUpdater();
   const service = createUpdateService({
