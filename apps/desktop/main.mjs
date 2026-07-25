@@ -12,6 +12,7 @@ import {
   shell,
   Tray,
 } from "electron";
+import electronUpdater from "electron-updater";
 
 import {
   isAllowedExternalUrl,
@@ -20,6 +21,9 @@ import {
 } from "./security.mjs";
 import { createDesktopSettingsStore } from "./desktop-settings.mjs";
 import { startServerProcess } from "./server-process.mjs";
+import { createUpdateService } from "./update-service.mjs";
+
+const { autoUpdater } = electronUpdater;
 
 const hasSingleInstanceLock = app.requestSingleInstanceLock();
 if (!hasSingleInstanceLock) {
@@ -34,6 +38,7 @@ let isQuitting = false;
 let closeBehavior = "tray";
 let startMinimized = false;
 let settingsStore = null;
+let updateService = null;
 
 const iconPath = path.join(import.meta.dirname, "assets", "icon.ico");
 
@@ -49,6 +54,11 @@ function stopOwnedServer() {
   serverStopped = true;
   ownedServer?.stop();
   ownedServer = null;
+}
+
+function sendUpdateState(state) {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  mainWindow.webContents.send("desktop:update-state", { ...state });
 }
 
 function createTray() {
@@ -221,6 +231,54 @@ function registerIpcHandlers() {
     await shell.openExternal(url);
     return true;
   });
+  ipcMain.handle("desktop:check-for-updates", () => {
+    if (!app.isPackaged) {
+      return { phase: "idle", development: true };
+    }
+    if (!updateService) {
+      return { phase: "idle", initializing: true };
+    }
+    return updateService.checkNow();
+  });
+  ipcMain.handle("desktop:restart-to-update", () => {
+    if (!app.isPackaged) {
+      throw new Error("desktop updates are disabled in development");
+    }
+    if (!updateService) {
+      throw new Error("desktop updater is not ready");
+    }
+    return updateService.restartToUpdate();
+  });
+}
+
+async function lifecycleMutationBusy(origin, desktopToken) {
+  try {
+    const response = await fetch(`${origin}/api/agents/lifecycle`, {
+      headers: { "x-desktop-session": desktopToken },
+    });
+    if (!response.ok) return true;
+    const snapshot = await response.json();
+    return snapshot?.busy !== false;
+  } catch {
+    return true;
+  }
+}
+
+function startUpdateLifecycle(server, desktopToken) {
+  if (!app.isPackaged) {
+    sendUpdateState({ phase: "idle", development: true });
+    return;
+  }
+  updateService = createUpdateService({
+    autoUpdater,
+    settingsStore,
+    lifecycleBusy: () => lifecycleMutationBusy(
+      server.origin,
+      desktopToken,
+    ),
+    emit: sendUpdateState,
+  });
+  updateService.start();
 }
 
 async function startOwnedServer() {
@@ -236,15 +294,19 @@ async function startOwnedServer() {
   ownedServer = server;
   attachServerLogs(server, paths.logsPath);
   registerSessionHeader(server.origin, desktopToken);
-  return server;
+  return { server, desktopToken };
 }
 
 async function startApplication() {
   createTray();
   for (;;) {
     try {
-      const server = await startOwnedServer();
+      const { server, desktopToken } = await startOwnedServer();
       mainWindow = createMainWindow(server.origin);
+      mainWindow.webContents.once(
+        "did-finish-load",
+        () => startUpdateLifecycle(server, desktopToken),
+      );
       await mainWindow.loadURL(server.origin);
       return;
     } catch (error) {
@@ -276,6 +338,7 @@ if (hasSingleInstanceLock) {
   app.on("second-instance", focusMainWindow);
   app.on("before-quit", () => {
     isQuitting = true;
+    updateService?.stop();
     stopOwnedServer();
   });
   app.on("activate", focusMainWindow);
