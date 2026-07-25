@@ -6,7 +6,7 @@ import { ConfirmAgentAction } from "./ConfirmAgentAction";
 
 const operationId = () => crypto.randomUUID();
 
-export function RuntimeSettingsPanel() {
+export function RuntimeSettingsPanel({ desktop = null }) {
   const [snapshot, setSnapshot] = useState(null);
   const [retention, setRetention] = useState(30);
   const [anonymousTelemetry, setAnonymousTelemetry] = useState(false);
@@ -131,6 +131,16 @@ export function RuntimeSettingsPanel() {
     setHint("UI preferences reset. Reload to apply the default theme.");
   };
 
+  const openFolder = async kind => {
+    setHint("");
+    try {
+      const error = await desktop.openPath(kind);
+      if (error) setHint(error);
+    } catch (error) {
+      setHint(error.message);
+    }
+  };
+
   if (!snapshot) {
     return (
       <Panel title="STORAGE & RECOVERY" chip="loading">
@@ -156,6 +166,19 @@ export function RuntimeSettingsPanel() {
           <div><span>OWNED LOG FILES</span><b>{snapshot.logFiles?.length || 0}</b></div>
         </div>
         <div className="aa-actions">
+          {desktop?.desktop && (
+            <>
+              <Btn variant="dim" onClick={() => openFolder("state")}>
+                Open State
+              </Btn>
+              <Btn variant="dim" onClick={() => openFolder("vault")}>
+                Open Vault
+              </Btn>
+              <Btn variant="dim" onClick={() => openFolder("logs")}>
+                Open Logs
+              </Btn>
+            </>
+          )}
           <Btn
             variant="dim"
             disabled={!backup || Boolean(busy)}

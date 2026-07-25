@@ -78,6 +78,9 @@ SUBAGENT_RECORD_MOD.then(m => { subagentLib = m; }).catch(e => console.error("[s
 const RELEASE_MOD = import("./lib/release-check.mjs");
 let releaseLib = null;
 RELEASE_MOD.then(m => { releaseLib = m; }).catch(e => console.error("[release-check]", e.message));
+const SOURCE_UPDATE_MOD = import("./lib/source-update.mjs");
+let sourceUpdateLib = null;
+SOURCE_UPDATE_MOD.then(m => { sourceUpdateLib = m; }).catch(e => console.error("[source-update]", e.message));
 /* PUBLIC = tracked static source. Runtime avatars live in the ignored state root so
    Vite cannot copy a user's uploads into dist during a production build.
    DIST = the built React app (`npm run build`). Requests resolve DIST first, then
@@ -1244,26 +1247,25 @@ const UPDATE_ID = "os-update";   // reserved procs id — the /api/proc/:id/log 
 function startUpdate() {
   const existing = procs.get(UPDATE_ID);
   if (existing && existing.status === "running") return { error: "an update is already running", log: `/api/proc/${UPDATE_ID}/log` };
-  const cmd = "git pull --ff-only && npm install && npm run build";
+  if (!sourceUpdateLib) return { error: "source update service is unavailable" };
   const p = { id: UPDATE_ID, log: [], seq: 0, status: "running", mode: "update", startedAt: new Date().toISOString(), exitCode: null };
-  pushLog(p, "sys", `[agentic-os] self-update: ${cmd}  (cwd: ${ROOT})`);
-  let child;
-  try { child = spawn(cmd, [], { cwd: ROOT, shell: true, windowsHide: true }); }
-  catch (e) { return { error: `spawn failed: ${e.message}` }; }
-  p.child = child; p.pid = child.pid;
-  child.stdout.on("data", d => pushLog(p, "out", d));
-  child.stderr.on("data", d => pushLog(p, "err", d));
-  child.on("exit", code => {
-    p.status = "exited"; p.exitCode = code;
-    versionCache = null;   // version on disk may have changed
-    pushLog(p, "sys", code === 0
-      ? "[agentic-os] update applied — UI assets are live now; restart the server to load backend changes"
-      : `[agentic-os] update failed (exit ${code}) — nothing was overwritten (--ff-only refuses to clobber local work)`);
-    sysEvent(UPDATE_ID, code === 0 ? "ok" : "warn", code === 0 ? "self-update applied" : `self-update failed (exit ${code})`);
-  });
-  child.on("error", err => { p.status = "error"; p.exitCode = -1; pushLog(p, "sys", `[agentic-os] spawn error: ${err.message}`); });
+  pushLog(p, "sys", `[agentic-os] typed source update started (cwd: ${ROOT})`);
   procs.set(UPDATE_ID, p);
-  return { ok: true, pid: child.pid, id: UPDATE_ID, log: `/api/proc/${UPDATE_ID}/log` };
+  sourceUpdateLib.runSourceUpdate({
+    root: ROOT,
+    onLine: line => pushLog(p, "out", line),
+  }).then(() => {
+    p.status = "exited"; p.exitCode = 0;
+    versionCache = null;   // version on disk may have changed
+    pushLog(p, "sys", "[agentic-os] update applied — UI assets are live now; restart the server to load backend changes");
+    sysEvent(UPDATE_ID, "ok", "self-update applied");
+  }).catch(error => {
+    p.status = "error"; p.exitCode = 1;
+    pushLog(p, "err", error?.message || String(error));
+    pushLog(p, "sys", "[agentic-os] update failed — no pull runs unless the checkout is clean; --ff-only refuses divergence");
+    sysEvent(UPDATE_ID, "warn", "self-update failed");
+  });
+  return { ok: true, id: UPDATE_ID, log: `/api/proc/${UPDATE_ID}/log` };
 }
 
 /* ---------------- avatar ---------------- */
@@ -2832,6 +2834,7 @@ if (require.main === module) {
     RUNTIME_SETTINGS_MOD,
     SUBAGENT_RECORD_MOD,
     RELEASE_MOD,
+    SOURCE_UPDATE_MOD,
   ]).then(() => server.listen(PORT, process.env.DASH_HOST || "127.0.0.1", () => {
   const listeningPort = server.address().port;
   if (typeof process.send === "function") {
