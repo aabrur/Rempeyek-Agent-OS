@@ -27,6 +27,21 @@ const ALLOWED_KEYS = new Set([
   ...Object.keys(ENUMS),
 ]);
 
+export function resolveDesktopUserDataPath({
+  platform = process.platform,
+  env = process.env,
+  home,
+} = {}) {
+  if (platform !== "win32") return null;
+  const localRoot = env.LOCALAPPDATA || (
+    home ? path.win32.join(home, "AppData", "Local") : ""
+  );
+  if (!localRoot) {
+    throw new Error("LOCALAPPDATA or home is required on Windows");
+  }
+  return path.win32.join(localRoot, "Rempeyek-Agent-OS");
+}
+
 function validatedPatch(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new TypeError("desktop settings patch must be an object");

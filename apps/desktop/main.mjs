@@ -19,11 +19,19 @@ import {
   isAllowedLocalNavigation,
   withDesktopSessionHeader,
 } from "./security.mjs";
-import { createDesktopSettingsStore } from "./desktop-settings.mjs";
+import {
+  createDesktopSettingsStore,
+  resolveDesktopUserDataPath,
+} from "./desktop-settings.mjs";
 import { startServerProcess } from "./server-process.mjs";
 import { createUpdateService } from "./update-service.mjs";
 
 const { autoUpdater } = electronUpdater;
+
+const desktopUserDataPath = resolveDesktopUserDataPath({
+  home: app.getPath("home"),
+});
+if (desktopUserDataPath) app.setPath("userData", desktopUserDataPath);
 
 const hasSingleInstanceLock = app.requestSingleInstanceLock();
 if (!hasSingleInstanceLock) {

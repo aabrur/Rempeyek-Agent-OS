@@ -4,7 +4,29 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-import { createDesktopSettingsStore } from "../desktop-settings.mjs";
+import {
+  createDesktopSettingsStore,
+  resolveDesktopUserDataPath,
+} from "../desktop-settings.mjs";
+
+test("Windows desktop state resolves under Local AppData", () => {
+  assert.equal(
+    resolveDesktopUserDataPath({
+      platform: "win32",
+      env: { LOCALAPPDATA: "D:\\LocalState" },
+      home: "C:\\Users\\test",
+    }),
+    "D:\\LocalState\\Rempeyek-Agent-OS",
+  );
+  assert.equal(
+    resolveDesktopUserDataPath({
+      platform: "win32",
+      env: {},
+      home: "C:\\Users\\test",
+    }),
+    "C:\\Users\\test\\AppData\\Local\\Rempeyek-Agent-OS",
+  );
+});
 
 test("desktop settings bootstrap and accept only allowlisted values", () => {
   const root = fs.mkdtempSync(
