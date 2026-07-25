@@ -88,9 +88,13 @@
       ]
     },
     "nsis": {
+      "artifactName": "Rempeyek-Agent-OS-Setup-${version}.${ext}",
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "deleteAppDataOnUninstall": false
+    },
+    "portable": {
+      "artifactName": "Rempeyek-Agent-OS-Portable-${version}.${ext}"
     },
     "publish": [
       {

@@ -26,6 +26,14 @@ test("desktop package pins the reviewed runtime and packages only required app f
     pkg.build.win.target.map(target => target.target),
     ["nsis", "portable"],
   );
+  assert.equal(
+    pkg.build.nsis.artifactName,
+    "Rempeyek-Agent-OS-Setup-${version}.${ext}",
+  );
+  assert.equal(
+    pkg.build.portable.artifactName,
+    "Rempeyek-Agent-OS-Portable-${version}.${ext}",
+  );
   assert.equal(JSON.stringify(pkg.build).includes("Obsidian Vault"), false);
   assert.equal(JSON.stringify(pkg.build).includes("telemetry"), false);
 });

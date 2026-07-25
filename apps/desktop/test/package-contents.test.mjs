@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import test from "node:test";
@@ -9,6 +10,7 @@ const desktopRoot = path.resolve(
   "..",
 );
 const root = path.join(desktopRoot, "dist", "win-unpacked", "resources");
+const distRoot = path.join(desktopRoot, "dist");
 
 test("packaged app contains required runtime and excludes user data", {
   skip: fs.existsSync(root)
@@ -63,4 +65,27 @@ test("packaged app contains required runtime and excludes user data", {
     ),
     true,
   );
+});
+
+test("latest.yml names an existing installer with the recorded SHA-512", {
+  skip: fs.existsSync(path.join(distRoot, "latest.yml"))
+    ? false
+    : "desktop release metadata has not been built in this checkout",
+}, () => {
+  const metadata = fs.readFileSync(
+    path.join(distRoot, "latest.yml"),
+    "utf8",
+  );
+  const entry = metadata.match(
+    /^\s*-\s+url:\s*(?<url>[^\r\n]+)\r?\n\s+sha512:\s*(?<sha>[A-Za-z0-9+/=]{40,})\s*$/m,
+  );
+  assert.ok(entry, "latest.yml must contain an installer SHA-512");
+  const artifactName = decodeURIComponent(entry.groups.url.trim());
+  const artifactPath = path.join(distRoot, artifactName);
+  assert.equal(fs.existsSync(artifactPath), true, artifactName);
+  const actual = crypto
+    .createHash("sha512")
+    .update(fs.readFileSync(artifactPath))
+    .digest("base64");
+  assert.equal(actual, entry.groups.sha);
 });
