@@ -473,3 +473,88 @@ the visual design and navigation were not changed.
 
 Phase B begins with the atomic config store, independent software/profile
 lifecycle axes, idempotent operations, backups, and secret-free tombstones.
+
+---
+
+## HT-20260724-RAO - Phases B-C - Public Web Platform Closure (2026-07-26)
+
+**Status:** web Tasks 4–11 are implemented and verified. The Marketplace,
+profile lifecycle, recovery/privacy Settings, and parent-bound subagent flow are
+ready for the approved desktop plan. The existing visual design remains
+unchanged.
+
+### Completed commits
+
+- `1b47169` — atomic lifecycle config store, backups, tombstones, and
+  idempotent operations.
+- `2e7e0fa` — approval-gated lifecycle APIs with independent profile/software
+  state and separate double-approved uninstall.
+- `786ce4e` — existing-style Agents, Plugins, and Skills Marketplace surfaces.
+- `acd14e3` — Settings lifecycle management with child-detach protection.
+- `639306d` — runtime privacy settings, registry recovery, exact owned-log
+  deletion, and redacted diagnostics.
+- `0e8ac73` — safe parent-bound subagent record, API, non-clobbering scaffold,
+  and provenance-backed topology.
+- `b0bb115` — primary-profile `+` form, configured-child display, no nested
+  child creation, and deterministic focus return.
+
+### Delivered invariants
+
+- The dated public curation contains exactly 20 agent projects and is not a
+  ranking. Hypertaks is the featured managed plugin; Crimson Odyssey remains
+  official-link only.
+- Installed software and registered/enabled/active profiles are independent.
+  Remove preserves vault, telemetry, activity, workflows, logs, credentials,
+  installed software, and user files; Restore re-registers the profile.
+- Primary removal never cascades into children. Attached children block removal
+  until the user explicitly chooses detach; detached child data remains.
+- Marketplace process adapters use fixed reviewed program/argument pairs and
+  never execute caller-provided shell text.
+- Subagent allowed paths reject absolute and parent-escaping values. Registry
+  children and observed telemetry remain separate; no synthetic success,
+  session, progress, or activity event is created.
+- Clear Logs deletes only the exact re-reviewed owned `.log` filenames.
+  Diagnostics expose provider variable names/detection only and redact the user
+  home path.
+
+### Fresh closure evidence
+
+- `npm test`: 171/171 pass, zero failures, zero skipped.
+- `npm run build`: Vite production build succeeds with 2,097 modules.
+- `npm run audit:public`: passes across 226 tracked paths with no runtime data,
+  personal path, roster, raster evidence, or high-confidence secret.
+- `git diff --check`: passes.
+- `graphify-out/graph.json` is absent in the public workspace, so no Graphify
+  update was claimed or required.
+- Live loopback probes: state, Marketplace, lifecycle, and detail return 200;
+  unapproved subagent/remove mutations return 403; subagent create returns 201;
+  attached-child removal returns 409; explicit-detach remove and Restore return
+  200.
+- Live Marketplace response contains 20 agents and no secret, executable
+  `program`/`command` field, or owner-specific Windows path.
+- The retained vault note and telemetry JSONL remained SHA-256 byte-identical
+  before removal, after explicit-detach removal, and after Restore.
+- Browser QA covered Marketplace, Settings, typed confirmation, and the
+  primary-profile form in Minimalist, Brutalist, Glassmorph, and Cyberpunk at
+  desktop width. Narrow 375 px checks had no horizontal overflow.
+- Browser submit created one registry child plus five missing scaffold entries;
+  Agent Map showed one real `spawned_subagent` edge; the child profile exposed
+  no nested `+`; focus stayed trapped and returned to the trigger; console
+  errors were empty.
+- Automated interaction coverage confirms reduced-motion gates and keyboard
+  navigation.
+
+### External-effects boundary
+
+No global agent/plugin install, retained-data deletion, push, deployment,
+signing, release, tag, stable update feed, or repository-visibility mutation
+occurred. Temporary QA state and owned QA server processes were removed after
+verification.
+
+### Resume point
+
+Continue Task 1 of
+`docs/superpowers/plans/2026-07-24-electron-desktop-auto-update.md`.
+Desktop work must preserve the same renderer design, keep the session token
+below renderer/preload access, supervise only its owned local server process,
+and treat unsigned packages as test artifacts rather than stable releases.

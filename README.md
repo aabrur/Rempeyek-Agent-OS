@@ -26,10 +26,27 @@ React + Vite, split into components across an npm-workspaces monorepo.
   cosmos default), switched from Settings and persisted per browser; the flat themes
   turn off glow and particles entirely, and the system reduce-motion preference is
   always respected
-- **Marketplace / ＋ Add Agent** — install known agents with one approved click
-  (commands vetted server-side) or register custom agents (auto node-numbering,
-  per-agent accent color, optional summon CLI)
-- **Summon with install-gate** — one click opens an admin terminal at the agent's home folder and runs its CLI; if the CLI isn't installed, you get the install command + page instead
+- **Public Marketplace** — browse separate **Agents**, **Plugins**, and
+  **Skills** filters. The dated 2026-07-24 launch curation contains 20 agent
+  projects for portable discovery; it is maintained product curation, not a
+  ranking or performance claim
+- **Safe install boundary** — reviewed adapters execute fixed programs and
+  argument arrays without a shell. Hypertaks is the featured plugin and its
+  managed bundle targets `%USERPROFILE%\.agents`; Crimson Odyssey remains
+  discoverable through its official project link but has no guessed one-click
+  installer
+- **Agent lifecycle** — installed software and registered profiles are shown
+  separately. Enable/disable, active-agent switching, editable profile fields,
+  non-destructive Remove, and Restore are available in Settings. Advanced
+  software uninstall is separate and requires two scoped approvals
+- **Primary-profile subagents** — open a primary agent and use `+` to create a
+  purpose-specific child with explicit scope, permissions, memory, and
+  activation. Registry topology and the missing vault scaffold are persisted
+  without fabricating activity telemetry
+- **Summon with install-gate** — one click opens an admin terminal at the
+  profile's trusted home folder and runs its persisted CLI trigger; a missing
+  CLI is reported honestly and routes back to the reviewed Marketplace or
+  official project page
 - **Gateway control** — start / stop / restart / status / run agents from the dashboard
 - **Health monitoring** — TCP probes, 24h uptime history, watchdog auto-restart (opt-in), desktop alerts when an agent goes down
 - **Task board** — send tasks to agents (written to the vault), mark them done
@@ -67,6 +84,13 @@ and opens your browser.
 Open **Marketplace → Install** (or **Agents → ＋ Add Agent**) to register only the
 agents you want. A clean installation never copies the maintainer's roster, vault,
 telemetry, or avatars.
+
+Registration is not installation: a profile may exist without its external CLI,
+and installed software may remain after a profile is removed. Removing a profile
+retains vault notes, telemetry, activity, workflows, logs, credentials, installed
+software, and user files. Restore re-registers the retained profile. Removing a
+primary profile never cascades into child data; Settings requires an explicit
+detach choice when children exist.
 
 Port already taken? `set PORT=4322` then `npm run dev` again.
 
@@ -146,6 +170,11 @@ Click any agent card: **Sessions/Activity**, **Subagents/Tasks**, **Telemetry**,
 and **Vault lane — Brains/**. Claude Code activity is parsed from its transcripts;
 other agents report via `telemetry\<id>.jsonl` (one-liner helper: `report.cmd "task name" 50`
 — see `telemetry\README.md`).
+
+For a primary profile, the `+` control opens the subagent form. Required fields are
+name, field/domain, concrete outcome, and workspace scope. Configured children are
+listed separately from observed telemetry, and only primary profiles can create
+children.
 
 ## Memory — the Neural Vault graph
 

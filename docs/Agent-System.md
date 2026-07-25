@@ -1,8 +1,10 @@
 # Agent System
 
-Every agent is a row in `agents.config.json` (repo root, gitignored — start from
-`agents.config.example.json`). The dashboard renders them everywhere (topology,
-cards, sidebar, reports) and controls the ones that expose a gateway CLI.
+Every registered profile is a row in the private `agents.config.json` registry
+(start from `agents.config.example.json`). New installations place it below the
+operating system's local application-data directory unless `AGENTS_CONFIG` is
+set. The dashboard renders profiles in topology, cards, reports, and Settings;
+external CLI installation is tracked independently.
 
 ## Agent schema
 
@@ -26,7 +28,8 @@ cards, sidebar, reports) and controls the ones that expose a gateway CLI.
     "schtask": "Nova Gateway",// Windows Scheduled Task → Schedule panel
     "probe": { "host": "127.0.0.1", "port": 1234 },  // TCP liveness (wins over text)
     "watchdog": false,        // auto-restart on down, max 3×/hour
-    "install": { "cmd": "npm i -g nova", "url": "https://…" },  // summon install-gate
+    "marketplaceId": "nova",  // optional reviewed Marketplace identity
+    "envAllow": ["NOVA_API_KEY"],
     "actions": ["start","stop","restart","status","run"]        // [] = observe-only
   }
 }
@@ -34,18 +37,33 @@ cards, sidebar, reports) and controls the ones that expose a gateway CLI.
 
 ## Ways to add an agent
 
-1. **Dashboard** — Agents view → **＋ ADD AGENT**. Validates the slug, auto-numbers the
-   node, writes the config with a `.bak` backup (`POST /api/agents/add`). Optional
-   trigger + home makes it summonable immediately.
+1. **Dashboard** — Marketplace or Agents view → **＋ ADD AGENT**. The reviewed
+   catalog can install supported software and optionally register its profile;
+   custom registration validates the slug, auto-numbers the node, and writes an
+   atomic registry backup. Optional trigger + home makes a trusted custom
+   profile summonable immediately.
 2. **By hand** — edit `agents.config.json`; the server hot-reloads by mtime and shows a
    banner (not a crash) if the JSON is broken mid-edit.
 
 ## Lifecycle & status
 
+- **Two independent axes** — `installed` describes external software;
+  `registered/enabled/active` describes the local profile. Registering does not
+  claim software is installed, and removing a profile does not uninstall it.
+- **Settings lifecycle** — edit name/role/note, enable or disable a profile,
+  switch the single active profile, Remove, and Restore. Remove stores a
+  restorable tombstone while retaining vault, telemetry, activity, workflows,
+  logs, credentials, software, and user files.
+- **Parent safety** — primary removal is blocked while attached children exist.
+  An explicit detach operation preserves each child and records its former
+  parent; removal never cascades into child data.
+- **Advanced uninstall** — uninstall is distinct from profile removal, available
+  only for reviewed uninstall adapters, and requires two exact scoped approvals.
 - **Status resolution order:** dashboard-owned run process → live summoned terminal →
   gateway status/probe cache → recent telemetry (15 min) → `off`.
-- **Summon** opens an admin Windows Terminal at `home` running `trigger`; an install-gate
-  (`where.exe`) offers `install.cmd`/`install.url` when the CLI is missing. Stop uses a
+- **Summon** opens an admin Windows Terminal at `home` running the persisted
+  trusted `trigger`. Marketplace installation uses server-owned reviewed
+  adapters; request bodies never supply executable shell text. Stop uses a
   pid-file/kill-file handshake so no second UAC prompt is needed.
 - **Down detection** — running→down transitions write an alert note to the vault `Inbox/`
   (appears in Needs Review) + a Windows toast; optional watchdog restarts (max 3×/hour).
@@ -63,7 +81,33 @@ Agents report via `telemetry/<id>.jsonl`, one JSON object per line:
 Claude Code is special-cased: sessions/subagents are parsed from its transcript JSONL
 (`CLAUDE_PROJECTS`) instead.
 
+## Configured subagents
+
+A primary profile can create a child through its `+` form. Required inputs are
+name, field/domain, concrete outcome, and workspace scope. Optional controls cover
+permission profile, relative allowed paths, memory policy, activation, provider,
+tools, skills, cadence/event trigger, checkpoint rule, and instructions.
+
+The server persists `kind: "subagent"` plus `parentId`, assigns the next node,
+and creates only missing files under
+`Brains/<Parent>/Subagents/<Child>/`. Absolute or parent-escaping allowed paths
+are rejected. Configured children appear separately from transcript/telemetry
+activity, and Agent Map draws the parent edge only from the persisted registry
+record with `subagent` provenance. A subagent cannot create another subagent.
+
+## Public Marketplace
+
+The launch catalog is dated 2026-07-24 and contains 20 curated agent projects.
+The number is a maintained discovery set, not a ranking. Marketplace exposes
+Agents, Plugins, and Skills filters while redacting executable adapter details.
+Hypertaks is featured and installs from a hash-verified managed bundle into
+`%USERPROFILE%\.agents`. Crimson Odyssey is listed with its official project
+link and remains link-only until its canonical install boundary is documented;
+the server does not guess a command.
+
 ## Storage
 
-`agents.config.json` on disk is the only store — no database, no cloud mirror. See
-[MCP.md](MCP.md) for why the Supabase experiment was removed.
+The private registry and its `.bak`, tombstones, receipts, telemetry, logs,
+avatars, and vault remain outside tracked source for a clean installation.
+`agents.config.json` is the authoritative profile store; there is no database or
+cloud mirror. See [MCP.md](MCP.md) for why the Supabase experiment was removed.

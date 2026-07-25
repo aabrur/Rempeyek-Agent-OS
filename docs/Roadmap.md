@@ -2,7 +2,7 @@
 
 ## Now (Neural Cosmos Edition — shipped)
 
-- [x] 13-theme engine + swatch switcher
+- [x] Four structural themes: Minimalist, Brutalist, Glassmorph, and Cyberpunk
 - [x] ＋ ADD AGENT (dashboard → config write with backup)
 - [x] Config-driven per-agent accents
 - [x] Brand sting at `/promo.html`
@@ -14,6 +14,17 @@
 - [x] **Workspace front door** — `Projects/<slug>/` workspaces (project.md · decisions.md
       · next.md), Continue hero, decision log, resume-brief dispatch, and telemetry
       `task_done` → decisions.md memory capture (watermarked)
+- [x] **Typed public Marketplace** — dated 20-agent curation plus separate
+      Agents, Plugins, and Skills filters; featured managed Hypertaks and
+      official-link Crimson Odyssey
+- [x] **Complete profile lifecycle** — edit, enable/disable, active switch,
+      non-destructive Remove/Restore, retained children, and separate
+      double-approved reviewed uninstall
+- [x] **Primary-profile subagents** — existing-style `+` form, safe defaults,
+      non-clobbering vault scaffold, and provenance-backed Agent Map edge
+- [x] **Recovery and privacy controls** — atomic registry backup restore, exact
+      owned-log deletion, local retention/telemetry settings, and redacted
+      diagnostics
 
 ## Next
 
@@ -23,8 +34,6 @@
 - [ ] **Theme-aware background layer** — procedural SVG fibers/nebula bound to `--acc`
       per theme, PNGs demoted to optional texture
 - [ ] **Brand mark** — real REMPEYEK logo (Figma/Illustrator → SVG, accent-bound fills)
-- [ ] **Agent edit/disable from dashboard** — extend `/api/agents/add` into full CRUD
-      (`update`, `enable/disable`; delete stays manual by design)
 - [ ] **Workflow cards from config** — derive Primary Workflows from agent entries
       instead of the hardcoded `WORKFLOWS` array in `lib/agents.js`
 - [ ] **Route the views** — the app switches views in state; move to real URLs so
@@ -45,8 +54,9 @@ Constraint: **the server must stay dependency-free** — it has to run with
 
 ## Later
 
-- [ ] `apps/desktop` — Tauri shell around `apps/web` (tray icon, native toasts,
-      auto-start, no browser chrome)
+- [ ] `apps/desktop` — Electron shell around the existing web app with isolated
+      renderer/preload boundaries, supervised local runtime, signed stable
+      updates, tray support, and Windows packaging
 - [ ] HyperFrames promo render (needs macOS/Linux box) — MP4 of the `/promo.html` sting
 - [ ] Vault graph: theme-reactive palette + community coloring from graphify
 - [ ] Multi-machine mesh: read-only remote dashboards over `DASH_TOKEN`

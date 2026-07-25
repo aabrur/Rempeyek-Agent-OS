@@ -4,8 +4,14 @@
   "_readme": [
     "A clean installation starts with zero agents and stores this registry in your local application-data directory.",
     "Start the dashboard, open Agents, then use + Add Agent to register only the agents you choose.",
+    "Installed software and registered profiles are separate. Remove preserves user data and does not uninstall software.",
+    "Primary profiles can create parent-bound subagents; child data is never cascade-deleted.",
     "Set AGENTS_CONFIG only when you want a custom registry path. Set VAULT_PATH to your own Obsidian vault.",
     "gateway.envAllow may list provider variables required by one agent; dashboard secrets are always blocked."
   ],
+  "settings": {
+    "logRetentionDays": 30,
+    "anonymousTelemetry": false
+  },
   "agents": []
 }
