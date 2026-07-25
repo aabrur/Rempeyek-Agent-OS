@@ -112,7 +112,7 @@ function createMainWindow(origin) {
     show: false,
     icon: iconPath,
     webPreferences: {
-      preload: path.join(import.meta.dirname, "preload.mjs"),
+      preload: path.join(import.meta.dirname, "preload.cjs"),
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: true,

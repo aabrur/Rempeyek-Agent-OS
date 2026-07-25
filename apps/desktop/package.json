@@ -31,7 +31,7 @@
     },
     "files": [
       "main.mjs",
-      "preload.mjs",
+      "preload.cjs",
       "server-process.mjs",
       "desktop-settings.mjs",
       "update-service.mjs",

@@ -20,6 +20,8 @@ test("desktop package pins the reviewed runtime and packages only required app f
   assert.equal(pkg.dependencies["electron-updater"], "6.8.9");
   assert.equal(pkg.build.appId, "com.rempeyek.agentos");
   assert.equal(pkg.build.productName, "Rempeyek Agent OS");
+  assert.equal(pkg.build.files.includes("preload.cjs"), true);
+  assert.equal(pkg.build.files.includes("preload.mjs"), false);
   assert.deepEqual(
     pkg.build.win.target.map(target => target.target),
     ["nsis", "portable"],
