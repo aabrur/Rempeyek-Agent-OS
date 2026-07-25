@@ -1,23 +1,134 @@
-# Tag a release as v<version> (matching package.json) and this publishes it.
-# The dashboard's update banner reads /repos/<slug>/releases/latest — publishing here is what
-# makes every user's dashboard show "vX.Y.Z tersedia".
-name: release
+name: desktop-release
+
 on:
+  workflow_dispatch:
   push:
     tags: ["v*"]
+
 jobs:
-  release:
-    runs-on: ubuntu-latest
+  unsigned-desktop-test:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: windows-latest
     permissions:
-      contents: write
+      contents: read
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
       - run: npm ci
       - run: npm test
+      - run: npm run test:desktop
       - run: npm run build
+      - run: npm run audit:public
+      - run: npm run desktop:dist
+      - run: npm run desktop:test-package
+      - name: Mark artifact as unsigned test output
+        shell: pwsh
+        run: |
+          "## TEST ONLY - UNSIGNED" >> $env:GITHUB_STEP_SUMMARY
+          "These files are not a stable release or updater feed." >> $env:GITHUB_STEP_SUMMARY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: unsigned-desktop-test
+          retention-days: 3
+          if-no-files-found: error
+          path: |
+            apps/desktop/dist/*.exe
+            apps/desktop/dist/*.blockmap
+            apps/desktop/dist/latest.yml
+
+  signed-tag-release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    env:
+      CSC_LINK: ${{ secrets.CSC_LINK }}
+      CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+      DESKTOP_PUBLISHER_SUBJECT: ${{ vars.DESKTOP_PUBLISHER_SUBJECT }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Require signing identity before build
+        shell: pwsh
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:CSC_LINK)) {
+            throw "CSC_LINK is required for a signed tag release"
+          }
+          if ([string]::IsNullOrWhiteSpace($env:CSC_KEY_PASSWORD)) {
+            throw "CSC_KEY_PASSWORD is required for a signed tag release"
+          }
+          if ([string]::IsNullOrWhiteSpace($env:DESKTOP_PUBLISHER_SUBJECT)) {
+            throw "DESKTOP_PUBLISHER_SUBJECT repository variable is required"
+          }
+      - run: npm ci
+      - run: npm test
+      - run: npm run test:desktop
+      - run: npm run build
+      - run: npm run audit:public
+      - name: Match tag and workspace versions
+        shell: pwsh
+        run: |
+          $tagVersion = $env:GITHUB_REF_NAME -replace '^v', ''
+          $rootVersion = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          $desktopVersion = (Get-Content apps/desktop/package.json -Raw | ConvertFrom-Json).version
+          if ($tagVersion -ne $rootVersion -or $tagVersion -ne $desktopVersion) {
+            throw "tag, root, and desktop versions must match"
+          }
+      - name: Build signed desktop artifacts
+        shell: pwsh
+        run: |
+          npx electron-builder --projectDir apps/desktop --win --publish never `
+            -c.win.publisherName="$env:DESKTOP_PUBLISHER_SUBJECT"
+      - run: npm run desktop:test-package
+      - name: Verify Authenticode and update metadata
+        shell: pwsh
+        run: |
+          $executables = @(Get-ChildItem apps/desktop/dist/*.exe)
+          if ($executables.Count -ne 2) {
+            throw "expected exactly the NSIS and portable executables"
+          }
+          foreach ($executable in $executables) {
+            $signature = Get-AuthenticodeSignature -LiteralPath $executable.FullName
+            if ($signature.Status -ne "Valid") {
+              throw "$($executable.Name) has invalid Authenticode status: $($signature.Status)"
+            }
+            if ($signature.SignerCertificate.Subject -ne $env:DESKTOP_PUBLISHER_SUBJECT) {
+              throw "$($executable.Name) signer does not match DESKTOP_PUBLISHER_SUBJECT"
+            }
+          }
+
+          $metadataPath = "apps/desktop/dist/latest.yml"
+          if (-not (Test-Path -LiteralPath $metadataPath)) {
+            throw "latest.yml is missing"
+          }
+          $metadata = Get-Content -LiteralPath $metadataPath -Raw
+          $fileEntries = [regex]::Matches(
+            $metadata,
+            '(?m)^\s*-\s+url:\s*(?<url>[^\r\n]+)\r?\n\s+sha512:\s*(?<sha>[A-Za-z0-9+/=]{40,})\s*$'
+          )
+          if ($fileEntries.Count -lt 1) {
+            throw "latest.yml has no file entry with a non-empty SHA-512"
+          }
+          foreach ($entry in $fileEntries) {
+            $artifactName = [Uri]::UnescapeDataString(
+              $entry.Groups["url"].Value.Trim().Trim('"', "'")
+            )
+            $artifactPath = Join-Path "apps/desktop/dist" $artifactName
+            if (-not (Test-Path -LiteralPath $artifactPath)) {
+              throw "latest.yml references a missing artifact: $artifactName"
+            }
+          }
       - uses: softprops/action-gh-release@v2
         with:
+          draft: false
           generate_release_notes: true
+          files: |
+            apps/desktop/dist/*.exe
+            apps/desktop/dist/*.blockmap
+            apps/desktop/dist/latest.yml

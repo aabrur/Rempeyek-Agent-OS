@@ -41,4 +41,8 @@ test("root workspace exposes desktop scripts", () => {
     pkg.scripts["desktop:dist"],
     "npm run dist --workspace @rempeyek/desktop",
   );
+  assert.equal(
+    pkg.scripts["desktop:test-package"],
+    "node --test apps/desktop/test/package-contents.test.mjs",
+  );
 });

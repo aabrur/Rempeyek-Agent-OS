@@ -29,6 +29,69 @@ for (const file of tracked) {
 const example = JSON.parse(fs.readFileSync(path.join(ROOT, "agents.config.example.json"), "utf8"));
 if (!Array.isArray(example.agents) || example.agents.length) errors.push("agents.config.example.json: public roster must be empty");
 
+const desktopPackage = JSON.parse(
+  fs.readFileSync(path.join(ROOT, "apps", "desktop", "package.json"), "utf8"),
+);
+const desktopBuildText = JSON.stringify(desktopPackage.build);
+for (const forbidden of [
+  "agents.config.json",
+  "Obsidian Vault",
+  "telemetry/",
+  ".env",
+  "checkpoint.md",
+]) {
+  if (desktopBuildText.includes(forbidden)) {
+    errors.push(`apps/desktop/package.json: packaged runtime includes ${forbidden}`);
+  }
+}
+if (desktopPackage.build?.nsis?.deleteAppDataOnUninstall !== false) {
+  errors.push("apps/desktop/package.json: uninstall must preserve app data");
+}
+
+const ciWorkflow = fs.readFileSync(
+  path.join(ROOT, ".github", "workflows", "ci.yml"),
+  "utf8",
+);
+for (const gate of [
+  "npm test",
+  "npm run test:desktop",
+  "npm run build",
+  "npm run audit:public",
+  "npm run desktop:pack",
+  "npm run desktop:test-package",
+]) {
+  if (!ciWorkflow.includes(gate)) {
+    errors.push(`ci.yml: missing required gate ${gate}`);
+  }
+}
+
+const releaseWorkflow = fs.readFileSync(
+  path.join(ROOT, ".github", "workflows", "release.yml"),
+  "utf8",
+);
+for (const boundary of [
+  "unsigned-desktop-test",
+  "CSC_LINK",
+  "CSC_KEY_PASSWORD",
+  "DESKTOP_PUBLISHER_SUBJECT",
+  "Get-AuthenticodeSignature",
+  'Status -ne "Valid"',
+  "latest.yml",
+  "sha512",
+]) {
+  if (!releaseWorkflow.includes(boundary)) {
+    errors.push(`release.yml: missing signed-release boundary ${boundary}`);
+  }
+}
+if (!releaseWorkflow.includes("if: startsWith(github.ref, 'refs/tags/v')")) {
+  errors.push("release.yml: public release must be restricted to a v* tag");
+}
+
+const gitignore = fs.readFileSync(path.join(ROOT, ".gitignore"), "utf8");
+if (!gitignore.split(/\r?\n/).includes("apps/desktop/dist/")) {
+  errors.push(".gitignore: generated desktop artifacts must stay untracked");
+}
+
 if (errors.length) {
   console.error(`Public release audit failed (${errors.length} issue${errors.length === 1 ? "" : "s"}):`);
   for (const error of errors) console.error(`- ${error}`);

@@ -1,8 +1,10 @@
 name: ci
+
 on:
   push:
     branches: [main]
   pull_request:
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -11,6 +13,24 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
       - run: npm ci
       - run: npm test
+      - run: npm run test:desktop
       - run: npm run build
+      - run: npm run audit:public
+
+  desktop-package:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run test:desktop
+      - run: npm run build
+      - run: npm run desktop:pack
+      - run: npm run desktop:test-package

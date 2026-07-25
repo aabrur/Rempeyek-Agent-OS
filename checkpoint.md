@@ -625,3 +625,84 @@ existing web renderer and all four structural themes remain unchanged.
 Begin Task 5 of the approved desktop plan: implement the packaged updater as an
 injected, sequential state machine with explicit lifecycle-operation blocking
 and user-approved restart.
+
+---
+
+## HT-20260726-RAO - Phase E - Verified Updates and Windows Packaging
+
+**Status:** desktop Tasks 5-7 are implemented and locally verified. The output
+is an unpacked, unsigned Windows test package, not a public release.
+
+### Delivered update and release boundary
+
+- The packaged updater is an injected state machine with explicit
+  `idle/checking/available/downloading/ready/not-available/error` states.
+  Download never implies installation; restart remains a separate user action.
+- Update restart is rejected unless a verified download is ready. The desktop
+  main process independently queries the owned lifecycle endpoint, and any
+  active mutation, network failure, malformed response, or non-200 response
+  blocks restart.
+- Development Electron never contacts a release feed.
+- The source-checkout updater no longer executes a shell chain. It runs fixed
+  sequential `git status --porcelain`, `git pull --ff-only`, `npm ci`, and
+  build steps with `execFile`; a dirty checkout stops before pull.
+- The existing update banner and Settings structure now select browser,
+  development-desktop, or packaged-desktop behavior through the narrow preload
+  bridge. Native-only controls use the existing Panel, fact-row, and button
+  components; storage/privacy server state is not duplicated.
+- Generated desktop output is ignored and audited. The unpacked package
+  includes the server, Vite build, Hypertaks bundle, and ASAR shell while
+  excluding registry data, vaults, telemetry, `.env`, and checkpoints.
+- CI tests source behavior on Ubuntu and an unpacked Windows package on
+  `windows-latest`. It never publishes.
+- Manual workflow packaging uploads only a three-day
+  `unsigned-desktop-test` Actions artifact and cannot create a GitHub Release.
+- Only a pushed `v*` tag can reach the signed-release job. It requires signing
+  secrets and a configured publisher before build, exact tag/workspace version
+  parity, valid Authenticode on both executables, matching signer subject, and
+  non-empty SHA-512 metadata before a non-draft release upload.
+
+### Commits and fresh evidence
+
+- `ff6debc` - verified packaged updater lifecycle.
+- `b7816e0` - typed source updater plus browser/desktop update and Settings UI.
+- Task 7 packaging/release gates and this checkpoint close Phase E together.
+- Web tests: 178/178 pass.
+- Desktop tests: 13/13 pass after the unpacked package exists; zero skipped.
+- Vite production build: 2,098 modules, pass.
+- `electron-builder --dir --win`: pass with Electron 43.2.0.
+- Package-content test: pass; required app/server/web/bundle files present and
+  every listed user/runtime path absent.
+- Public release audit: 245 tracked paths, pass.
+- Production dependency audit: 0 vulnerabilities.
+- Full dependency audit: 17 high findings in development/build dependencies.
+- Workflow YAML parse, SHA-512 metadata regex with spaced filenames, syntax,
+  and cached diff checks pass.
+- Browser source-mode QA: Minimalist, Brutalist, Glassmorph, and Cyberpunk
+  retained the existing Settings structure; 375 px had no horizontal overflow;
+  console errors were empty.
+
+### Signing and acceptance boundary
+
+- The local unpacked executable reports Authenticode `NotSigned`. It is a test
+  artifact only and is not eligible for the stable updater feed.
+- No NSIS/portable release pair, `.blockmap`, or `latest.yml` has been accepted
+  locally yet; Task 8 owns final artifact and clean-machine checks.
+- The full dependency audit findings remain an explicit release-review
+  blocker. No “safe stable release” claim is made.
+- The non-interactive Electron session still has not proved the packaged
+  renderer/server lifecycle. That remains part of Task 8.
+
+### Preserved boundaries
+
+- No renderer redesign or change to shell, navigation, cards, Agent Map, four
+  themes, typography, palette, spacing, or motion occurred.
+- No release, signature, tag, push, deployment, stable-feed mutation, global
+  install, retained-data deletion, or repository-visibility change occurred.
+- No public Graphify graph exists; no Graphify update is claimed.
+
+### Next task
+
+Execute Task 8 acceptance and closure: fresh package/runtime probes, retained
+data checks, installer/uninstaller behavior where safely available, review,
+documentation, and honest clean-machine certification boundaries.

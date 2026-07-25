@@ -16,6 +16,7 @@ Obsidian Vault/
 # Generated artifacts
 graphify-out/
 apps/web/dist/
+apps/desktop/dist/
 *.log
 
 # Config backup written by the dashboard's Add Agent
