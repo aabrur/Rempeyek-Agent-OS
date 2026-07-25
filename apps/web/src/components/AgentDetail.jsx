@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Avatar, Btn, Empty, Pill } from "@rempeyek/ui";
 import { GatewayControls } from "./GatewayControls";
+import { SubagentModal } from "./SubagentModal";
 import { api } from "../api";
 import { agentAccent, gwState } from "../lib/agents";
 import { obsUri } from "../lib/obsidian";
@@ -59,8 +60,9 @@ function Sessions({ activity, isTele, id }) {
   ));
 }
 
-function Subagents({ activity, isTele }) {
+function Subagents({ activity, isTele, showEmpty = true }) {
   if (!activity.subagents.length) {
+    if (!showEmpty) return null;
     return <Empty>{isTele
       ? <>No subagents/tasks yet. Report via telemetry (type <code>subagent_start/done</code>) → they appear here automatically.</>
       : "No subagents spawned in the last 48 hours. As soon as an Agent/Task spawn happens, it shows up automatically."}</Empty>;
@@ -77,6 +79,7 @@ function Subagents({ activity, isTele }) {
 export function AgentDetail({ id, gw, refresh, onClose }) {
   const [d, setD] = useState(null);
   const [live, setLive] = useState({ lines: [] });
+  const [addingSubagent, setAddingSubagent] = useState(false);
   const { pick, input } = useAvatarUpload(() => { load(); refresh(); });
   const logRef = useRef(null);
 
@@ -84,6 +87,7 @@ export function AgentDetail({ id, gw, refresh, onClose }) {
 
   useEffect(() => {
     setD(null);
+    setAddingSubagent(false);
     load();
     const t = setInterval(() => { if (document.visibilityState === "visible") load(); }, 5000);
     return () => clearInterval(t);
@@ -112,12 +116,29 @@ export function AgentDetail({ id, gw, refresh, onClose }) {
   const acc = agentAccent(d);
   const st = gwState(d.proc);
   const activity = d.activity || { sessions: [], subagents: [] };
+  const configuredSubagents = d.configuredSubagents || [];
   const isTele = d.source === "telemetry";
   const checked = d.proc?.checkedAt ? new Date(d.proc.checkedAt).toLocaleTimeString("en-GB") : null;
+  const addSubagentButtonId = `add-subagent-${d.id}`;
+  const closeSubagentModal = () => {
+    setAddingSubagent(false);
+    requestAnimationFrame(() => {
+      document.getElementById(addSubagentButtonId)?.focus();
+    });
+  };
 
   return (
     <div className="detail" style={{ "--ac": acc }}>
       {input}
+      <SubagentModal
+        open={addingSubagent}
+        parent={d}
+        onClose={closeSubagentModal}
+        onCreated={async () => {
+          await load();
+          refresh();
+        }}
+      />
       <div className="detail-head">
         <Avatar agent={d} accent={acc} large onEdit={pick} />
         <div>
@@ -165,8 +186,38 @@ export function AgentDetail({ id, gw, refresh, onClose }) {
         </div>
 
         <div className="dsec">
-          <h3>Subagents / Tasks <span className="cnt">{activity.subagents.length}</span></h3>
-          <div className="dsec-body"><Subagents activity={activity} isTele={isTele} /></div>
+          <h3>
+            Subagents / Tasks{" "}
+            <span className="cnt">
+              {activity.subagents.length + configuredSubagents.length}
+            </span>{" "}
+            {d.kind !== "subagent" && (
+              <Btn
+                id={addSubagentButtonId}
+                variant="dim"
+                aria-label={`Add subagent under ${d.name}`}
+                onClick={() => setAddingSubagent(true)}
+              >
+                +
+              </Btn>
+            )}
+          </h3>
+          <div className="dsec-body">
+            {configuredSubagents.map(child => (
+              <div key={child.id} className="subrow">
+                <span className="ty">profile</span>
+                <span className="nm">
+                  {child.name}{child.domain ? ` — ${child.domain}` : ""}
+                </span>
+                <span className={`st st-${child.status}`}>{child.status}</span>
+              </div>
+            ))}
+            <Subagents
+              activity={activity}
+              isTele={isTele}
+              showEmpty={!configuredSubagents.length}
+            />
+          </div>
         </div>
 
         <div className="dsec">

@@ -1580,12 +1580,13 @@ function agentDetail(id, services = DEFAULT_RUNTIME_SERVICES) {
   const configuredSubagents = config.agents
     .filter(candidate =>
       candidate.kind === "subagent" &&
-      candidate.parentId === id
+      (candidate.parentId === id || candidate.detachedFrom === id)
     )
     .map(candidate => ({
       id: candidate.id,
       kind: candidate.kind,
       parentId: candidate.parentId,
+      detachedFrom: candidate.detachedFrom || null,
       name: candidate.name,
       domain: candidate.domain,
       role: candidate.role,
@@ -1605,6 +1606,11 @@ function agentDetail(id, services = DEFAULT_RUNTIME_SERVICES) {
       lane: candidate.lane,
       enabled: candidate.enabled,
       createdAt: candidate.createdAt,
+      status: candidate.detachedFrom === id
+        ? "detached"
+        : candidate.enabled === false
+          ? "disabled"
+          : "configured",
     }));
   const p = procs.get(id);
   const files = walkVault();
@@ -1614,7 +1620,8 @@ function agentDetail(id, services = DEFAULT_RUNTIME_SERVICES) {
     .sort((a, b) => b.mtime - a.mtime).slice(0, 8)
     .map(f => ({ rel: f.rel, updated: new Date(f.mtime).toISOString().slice(0, 16).replace("T", " ") }));
   return {
-    id, name: agent.name, icon: agent.icon, role: agent.role, node: agent.node,
+    id, kind: agent.kind || "agent", parentId: agent.parentId || null,
+    name: agent.name, icon: agent.icon, role: agent.role, node: agent.node,
     enabled: agent.enabled, note: agent.note || null, avatar: avatarUrl(id),
     cwd: agent.gateway && agent.gateway.cwd, bin: agent.gateway && agent.gateway.bin, actions: gwActions(agent),
     canSummon: !!(agent.gateway && agent.gateway.home && agent.gateway.trigger),

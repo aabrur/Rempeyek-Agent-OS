@@ -11,7 +11,7 @@ export function setToken(t) {
   try { localStorage.setItem("dashToken", TOKEN); } catch {}
 }
 
-export async function api(path, opts = {}, attempt = 0) {
+async function request(path, opts = {}, attempt = 0) {
   const { timeoutMs = 8000, ...init } = opts;
   try {
     const res = await fetch(path, {
@@ -20,12 +20,27 @@ export async function api(path, opts = {}, attempt = 0) {
       signal: AbortSignal.timeout(timeoutMs),
     });
     if (res.status === 401) {
-      if (TOKEN && attempt < 1) return api(path, opts, attempt + 1);
+      if (TOKEN && attempt < 1) return request(path, opts, attempt + 1);
       onUnauthorized();
-      return { error: "unauthorized" };
+      return { status: 401, body: { error: "unauthorized" } };
     }
-    return await res.json();
+    return { status: res.status, body: await res.json() };
   } catch (e) {
-    return { error: e?.name === "TimeoutError" ? "timeout" : e?.message || "network error" };
+    return {
+      status: 0,
+      body: {
+        error: e?.name === "TimeoutError"
+          ? "timeout"
+          : e?.message || "network error",
+      },
+    };
   }
+}
+
+export async function api(path, opts = {}, attempt = 0) {
+  return (await request(path, opts, attempt)).body;
+}
+
+export function apiResponse(path, opts = {}) {
+  return request(path, opts);
 }
