@@ -32,8 +32,10 @@ async function withServer(run) {
       activeAgentId: "codex",
       agents: [{
         id: "codex",
+        kind: "agent",
         name: "Codex",
         role: "Coding agent",
+        node: "Node-12",
         enabled: true,
         lane: "Codex",
         gateway: {
@@ -413,5 +415,66 @@ test("Clear Logs requires the exact preview and diagnostics are downloadable and
     const diagnosticsText = await diagnostics.text();
     assert.equal(diagnosticsText.includes(process.env.OPENAI_API_KEY || "never"), false);
     assert.equal(diagnosticsText.includes(os.homedir()), false);
+  });
+});
+
+test("creates a primary-bound subagent without inventing telemetry", async () => {
+  await withServer(async ({ base, vaultPath, telemetryDir }) => {
+    const approvalId = await approve(base, "subagent.create", "codex");
+    const response = await mutation(base, "/api/agents/codex/subagents", {
+      approvalId,
+      body: {
+        operationId: "subagent-security-reviewer",
+        name: "Security Reviewer",
+        domain: "Application security",
+        outcome: "Review changed code and report actionable findings",
+        workspaceScope: "current-project",
+      },
+    });
+    assert.equal(response.status, 201);
+    const created = await response.json();
+    assert.equal(created.agent.id, "codex-security-reviewer");
+    assert.equal(created.agent.parentId, "codex");
+    assert.deepEqual(created.event, {
+      type: "subagent.created",
+      agentId: "codex-security-reviewer",
+      parentId: "codex",
+    });
+
+    const detail = await fetch(`${base}/api/agent/codex/detail`).then(value => value.json());
+    assert.deepEqual(
+      detail.configuredSubagents.map(agent => agent.id),
+      ["codex-security-reviewer"],
+    );
+    assert.deepEqual(detail.activity.subagents, []);
+
+    const topology = await fetch(`${base}/api/agent-topology`).then(value => value.json());
+    const relation = topology.edges.find(edge => edge.type === "spawned_subagent");
+    assert.deepEqual(relation, {
+      source: "codex",
+      target: "codex-security-reviewer",
+      type: "spawned_subagent",
+      provenance: {
+        source: "subagent",
+        id: "registry:codex:codex-security-reviewer",
+      },
+      status: "configured",
+      flowing: false,
+    });
+    assert.equal(
+      fs.existsSync(path.join(
+        vaultPath,
+        "Brains",
+        "Codex",
+        "Subagents",
+        "SecurityReviewer",
+        "Identity.md",
+      )),
+      true,
+    );
+    assert.equal(
+      fs.existsSync(path.join(telemetryDir, "codex-security-reviewer.jsonl")),
+      false,
+    );
   });
 });

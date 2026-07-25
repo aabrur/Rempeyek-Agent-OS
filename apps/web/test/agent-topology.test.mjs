@@ -37,6 +37,32 @@ test('includes only provenance-backed edges between configured agents', () => {
   assert.equal(topology.metadata.droppedRelations, 2);
 });
 
+test('projects a persisted parent relation as configured, non-flowing evidence', () => {
+  const topology = buildAgentTopology({
+    agents: [
+      { id: 'codex', name: 'Codex', kind: 'agent' },
+      { id: 'codex-reviewer', name: 'Reviewer', kind: 'subagent', parentId: 'codex' },
+    ],
+    subagents: [{
+      id: 'registry:codex:codex-reviewer',
+      parentAgentId: 'codex',
+      agentId: 'codex-reviewer',
+      status: 'configured',
+    }],
+  });
+  assert.deepEqual(topology.edges, [{
+    source: 'codex',
+    target: 'codex-reviewer',
+    type: 'spawned_subagent',
+    provenance: {
+      source: 'subagent',
+      id: 'registry:codex:codex-reviewer',
+    },
+    status: 'configured',
+    flowing: false,
+  }]);
+});
+
 test('co-assignment yields one symmetric edge per pair, canonicalised by sorted id', () => {
   const topology = buildAgentTopology({ agents, coAssignments: [
     { a: 'pi', b: 'codex', project: 'skill-hypertaks' },       // reversed order → still codex→pi

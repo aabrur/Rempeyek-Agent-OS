@@ -62,6 +62,9 @@ MANAGED_BUNDLE_MOD.then(m => { managedBundleLib = m; }).catch(e => console.error
 const RUNTIME_SETTINGS_MOD = import("./lib/runtime-settings.mjs");
 let runtimeSettingsLib = null;
 RUNTIME_SETTINGS_MOD.then(m => { runtimeSettingsLib = m; }).catch(e => console.error("[runtime-settings]", e.message));
+const SUBAGENT_RECORD_MOD = import("./lib/subagent-record.mjs");
+let subagentLib = null;
+SUBAGENT_RECORD_MOD.then(m => { subagentLib = m; }).catch(e => console.error("[subagent-record]", e.message));
 const RELEASE_MOD = import("./lib/release-check.mjs");
 let releaseLib = null;
 RELEASE_MOD.then(m => { releaseLib = m; }).catch(e => console.error("[release-check]", e.message));
@@ -1345,15 +1348,35 @@ function todayProjectData(files) {
   });
 }
 
-async function buildLiveAgentTopology() {
+async function buildLiveAgentTopology(services = DEFAULT_RUNTIME_SERVICES) {
   const { buildAgentTopology } = await AGENT_TOPOLOGY;
   const { coAssignments } = await AGENT_DETAIL;
-  const state = buildState();
+  const config = services.loadConfig();
+  const state = services === DEFAULT_RUNTIME_SERVICES
+    ? buildState()
+    : {
+        agents: config.agents.map(agent => ({
+          ...agent,
+          gateway: undefined,
+        })),
+      };
   // Verified agent↔agent relationships from the vault: two agents on one project (provenance =
   // the task line). Directed task/subagent/comm edges appear here too once agents report them.
-  const taskFiles = readTaskFiles();
+  const taskFiles = services === DEFAULT_RUNTIME_SERVICES ? readTaskFiles() : [];
   const co = coAssignments(taskFiles, state.agents);
-  return buildAgentTopology({ agents: state.agents, coAssignments: co });
+  const configuredSubagents = config.agents
+    .filter(agent => agent.kind === "subagent" && agent.parentId)
+    .map(agent => ({
+      id: `registry:${agent.parentId}:${agent.id}`,
+      parentAgentId: agent.parentId,
+      agentId: agent.id,
+      status: agent.enabled === false ? "disabled" : "configured",
+    }));
+  return buildAgentTopology({
+    agents: state.agents,
+    coAssignments: co,
+    subagents: configuredSubagents,
+  });
 }
 /* readTaskFiles: raw text of every vault Tasks/*.md, for co-assignment discovery. */
 function readTaskFiles() {
@@ -1550,9 +1573,39 @@ function readTelemetry(id) {
   return agentDetailLib.selectTelemetryWindow(events, { limit: 30 });   // newest-first
 }
 
-function agentDetail(id) {
-  const agent = loadConfig().agents.find(a => a.id === id);
+function agentDetail(id, services = DEFAULT_RUNTIME_SERVICES) {
+  const config = services.loadConfig();
+  const agent = config.agents.find(a => a.id === id);
   if (!agent) return { error: `unknown agent '${id}'` };
+  const configuredSubagents = config.agents
+    .filter(candidate =>
+      candidate.kind === "subagent" &&
+      candidate.parentId === id
+    )
+    .map(candidate => ({
+      id: candidate.id,
+      kind: candidate.kind,
+      parentId: candidate.parentId,
+      name: candidate.name,
+      domain: candidate.domain,
+      role: candidate.role,
+      outcome: candidate.outcome,
+      workspaceScope: candidate.workspaceScope,
+      permissions: candidate.permissions,
+      memoryPolicy: candidate.memoryPolicy,
+      activation: candidate.activation,
+      modelProvider: candidate.modelProvider,
+      toolIds: candidate.toolIds,
+      skillIds: candidate.skillIds,
+      cadence: candidate.cadence,
+      eventTrigger: candidate.eventTrigger,
+      checkpointRule: candidate.checkpointRule,
+      instructions: candidate.instructions,
+      node: candidate.node,
+      lane: candidate.lane,
+      enabled: candidate.enabled,
+      createdAt: candidate.createdAt,
+    }));
   const p = procs.get(id);
   const files = walkVault();
   const tele = readTelemetry(id);
@@ -1571,6 +1624,7 @@ function agentDetail(id) {
     laneFiles, telemetry: tele,
     // uniform activity for all agents: Claude from transcripts, the rest from their own telemetry
     activity: id === "claude-code" ? claudeActivity() : (agentDetailLib ? agentDetailLib.telemetryActivity(tele) : { sessions: [], subagents: [] }),
+    configuredSubagents,
     source: id === "claude-code" ? "transcript" : "telemetry",
   };
 }
@@ -2244,6 +2298,89 @@ function requestHandler(req, res, services = DEFAULT_RUNTIME_SERVICES) {
             res.end(JSON.stringify(body));
           })
           .catch(() => json(res, 503, { error: "diagnostics unavailable" }));
+      const subagentMatch = url.match(
+        /^\/api\/agents\/([a-z0-9][a-z0-9-]{1,63})\/subagents$/,
+      );
+      if (subagentMatch && req.method === "POST")
+        return readBody(req, res, body => {
+          let data;
+          try { data = JSON.parse(body); }
+          catch { return json(res, 400, { error: "body must be JSON" }); }
+          const allowed = new Set([
+            "operationId",
+            "name",
+            "domain",
+            "outcome",
+            "workspaceScope",
+            "permissionProfile",
+            "memoryPolicy",
+            "activation",
+            "modelProvider",
+            "toolIds",
+            "skillIds",
+            "allowedPaths",
+            "cadence",
+            "eventTrigger",
+            "checkpointRule",
+            "instructions",
+          ]);
+          if (
+            !validOperationId(data.operationId) ||
+            Object.keys(data).some(key => !allowed.has(key))
+          ) {
+            return json(res, 400, {
+              error: "valid operationId and supported subagent fields are required",
+            });
+          }
+          const parentId = subagentMatch[1];
+          return withApproval(req, res, "subagent.create", parentId, () =>
+            SUBAGENT_RECORD_MOD
+              .then(() => {
+                const replay = mutationReplay(services, data.operationId);
+                if (replay) return json(res, 200, replay);
+                const config = services.loadConfig();
+                const result = subagentLib.buildSubagentRecord(data, {
+                  parent: config.agents.find(agent => agent.id === parentId),
+                  existingIds: config.agents.map(agent => agent.id),
+                  existingNodeNums: config.agents
+                    .map(agent => Number(
+                      (String(agent.node || "").match(/(\d+)$/) || [])[1],
+                    ))
+                    .filter(Number.isFinite),
+                  now: new Date().toISOString(),
+                });
+                if (result.error) return json(res, 400, result);
+                services.store.commit({
+                  ...config,
+                  agents: [...config.agents, result.agent],
+                }, data.operationId);
+                try {
+                  scaffoldRuntimeVaultLane(result.agent, services.vaultPath);
+                } catch (error) {
+                  console.error("[subagent-scaffold]", error.message);
+                }
+                sysEvent(
+                  result.agent.id,
+                  "ok",
+                  `subagent created under ${parentId}`,
+                );
+                const response = rememberMutation(services, data.operationId, {
+                  operationId: data.operationId,
+                  agent: result.agent,
+                  event: {
+                    type: "subagent.created",
+                    agentId: result.agent.id,
+                    parentId,
+                  },
+                });
+                return json(res, 201, response);
+              })
+              .catch(error => {
+                console.error("[subagent-api]", error.message);
+                return json(res, 503, { error: "subagent service unavailable" });
+              }),
+          );
+        });
       let lifecycleMatch = url.match(/^\/api\/agents\/([a-z0-9][a-z0-9-]{1,63})$/);
       if (lifecycleMatch && req.method === "PATCH")
         return readBody(req, res, body => {
@@ -2534,7 +2671,7 @@ function requestHandler(req, res, services = DEFAULT_RUNTIME_SERVICES) {
         });
       }
       if (url === "/api/graph" || url === "/api/vault/graph") return buildParityGraph().then(data => json(res, 200, data)).catch(error => json(res, 500, { error: error.message }));
-      if (url === "/api/agent-topology") return buildLiveAgentTopology().then(data => json(res, 200, data)).catch(error => json(res, 500, { error: error.message }));
+      if (url === "/api/agent-topology") return buildLiveAgentTopology(services).then(data => json(res, 200, data)).catch(error => json(res, 500, { error: error.message }));
       if (url === "/api/report") return json(res, 200, buildReport());
       if (url === "/api/report/save" && req.method === "POST") return json(res, 200, saveReport());
       if (url === "/api/task" && req.method === "POST")
@@ -2591,7 +2728,7 @@ function requestHandler(req, res, services = DEFAULT_RUNTIME_SERVICES) {
       if (url === "/api/schedule") return buildSchedule(r => json(res, 200, r));      // R#8
       if (url === "/api/vault-health") return buildVaultHealth(r => json(res, 200, r)); // R#9
       m = url.match(/^\/api\/agent\/([\w-]+)\/detail$/);
-      if (m) { const d = agentDetail(m[1]); return json(res, d.error ? 404 : 200, d); }
+      if (m) { const d = agentDetail(m[1], services); return json(res, d.error ? 404 : 200, d); }
       m = url.match(/^\/api\/agent\/([\w-]+)\/avatar$/);
       if (m && req.method === "POST") {
         const id = m[1];
@@ -2676,6 +2813,7 @@ if (require.main === module) {
     AGENT_LIFECYCLE_MOD,
     MANAGED_BUNDLE_MOD,
     RUNTIME_SETTINGS_MOD,
+    SUBAGENT_RECORD_MOD,
     RELEASE_MOD,
   ]).then(() => server.listen(PORT, process.env.DASH_HOST || "127.0.0.1", () => {
   console.log(`\n  Agentic OS running at  http://localhost:${PORT}`);
