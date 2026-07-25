@@ -36,7 +36,11 @@ async function withServer(run) {
         role: "Coding agent",
         enabled: true,
         lane: "Codex",
-        gateway: { marketplaceId: "codex", trigger: "codex" },
+        gateway: {
+          marketplaceId: "codex",
+          trigger: "codex",
+          envAllow: ["OPENAI_API_KEY"],
+        },
       }],
     }),
   );
@@ -324,5 +328,90 @@ test("Hypertaks installs only from the verified embedded bundle and uninstalls m
     assert.equal(uninstalled.status, 200);
     assert.equal(fs.existsSync(plugin), false);
     assert.equal(fs.existsSync(skill), false);
+  });
+});
+
+test("runtime settings patch and backup restore are atomic and recoverable", async () => {
+  await withServer(async ({ base, root }) => {
+    const initial = await fetch(`${base}/api/settings/runtime`);
+    assert.equal(initial.status, 200);
+    const initialBody = await initial.json();
+    assert.equal(initialBody.settings.logRetentionDays, 30);
+    assert.deepEqual(initialBody.providerVariables.map(item => item.name), [
+      "OPENAI_API_KEY",
+    ]);
+    assert.equal(JSON.stringify(initialBody).includes(process.env.OPENAI_API_KEY || "never"), false);
+
+    for (const [days, operation] of [[60, "settings-60"], [90, "settings-90"]]) {
+      const approvalId = await approve(base, "settings.runtime", "runtime");
+      const patched = await mutation(base, "/api/settings/runtime", {
+        method: "PATCH",
+        approvalId,
+        body: {
+          operationId: operation,
+          logRetentionDays: days,
+          anonymousTelemetry: false,
+        },
+      });
+      assert.equal(patched.status, 200);
+      assert.equal((await patched.json()).settings.logRetentionDays, days);
+    }
+
+    const restoreApproval = await approve(
+      base,
+      "settings.restore-backup",
+      "registry",
+    );
+    const restored = await mutation(base, "/api/settings/restore-backup", {
+      approvalId: restoreApproval,
+      body: {
+        operationId: "restore-settings-backup",
+        agencyName: "Test",
+      },
+    });
+    assert.equal(restored.status, 200);
+    assert.equal((await restored.json()).settings.logRetentionDays, 60);
+    const nextBackup = JSON.parse(
+      fs.readFileSync(path.join(root, "agents.config.json.bak"), "utf8"),
+    );
+    assert.equal(nextBackup.settings.logRetentionDays, 90);
+  });
+});
+
+test("Clear Logs requires the exact preview and diagnostics are downloadable and redacted", async () => {
+  await withServer(async ({ base, root }) => {
+    const logDir = path.join(root, "telemetry", "logs");
+    fs.mkdirSync(logDir, { recursive: true });
+    fs.writeFileSync(path.join(logDir, "codex.log"), "one");
+    fs.writeFileSync(path.join(logDir, "reviewer.log"), "two");
+
+    const preview = await fetch(`${base}/api/settings/runtime`).then(value => value.json());
+    assert.deepEqual(preview.logFiles, ["codex.log", "reviewer.log"]);
+
+    const partialApproval = await approve(base, "settings.clear-logs", "owned-logs");
+    const partial = await mutation(base, "/api/settings/clear-logs", {
+      approvalId: partialApproval,
+      body: { operationId: "clear-partial", names: ["codex.log"] },
+    });
+    assert.equal(partial.status, 409);
+    assert.equal(fs.existsSync(path.join(logDir, "codex.log")), true);
+
+    const approvalId = await approve(base, "settings.clear-logs", "owned-logs");
+    const cleared = await mutation(base, "/api/settings/clear-logs", {
+      approvalId,
+      body: { operationId: "clear-exact", names: preview.logFiles },
+    });
+    assert.equal(cleared.status, 200);
+    assert.deepEqual((await cleared.json()).removed, preview.logFiles);
+
+    const diagnostics = await fetch(`${base}/api/diagnostics`);
+    assert.equal(diagnostics.status, 200);
+    assert.match(
+      diagnostics.headers.get("content-disposition"),
+      /attachment; filename="rempeyek-diagnostics\.json"/,
+    );
+    const diagnosticsText = await diagnostics.text();
+    assert.equal(diagnosticsText.includes(process.env.OPENAI_API_KEY || "never"), false);
+    assert.equal(diagnosticsText.includes(os.homedir()), false);
   });
 });

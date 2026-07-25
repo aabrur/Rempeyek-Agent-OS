@@ -59,6 +59,9 @@ AGENT_LIFECYCLE_MOD.then(m => { lifecycleLib = m; }).catch(e => console.error("[
 const MANAGED_BUNDLE_MOD = import("./lib/managed-bundle.mjs");
 let managedBundleLib = null;
 MANAGED_BUNDLE_MOD.then(m => { managedBundleLib = m; }).catch(e => console.error("[managed-bundle]", e.message));
+const RUNTIME_SETTINGS_MOD = import("./lib/runtime-settings.mjs");
+let runtimeSettingsLib = null;
+RUNTIME_SETTINGS_MOD.then(m => { runtimeSettingsLib = m; }).catch(e => console.error("[runtime-settings]", e.message));
 const RELEASE_MOD = import("./lib/release-check.mjs");
 let releaseLib = null;
 RELEASE_MOD.then(m => { releaseLib = m; }).catch(e => console.error("[release-check]", e.message));
@@ -117,6 +120,7 @@ function createRuntimeServices(runtime = {}) {
   const receiptDir = runtime.receiptDir || path.join(stateRoot, "receipts");
   const bundleRoot = runtime.bundleRoot || RUNTIME_PATHS.bundleRoot;
   const userHome = runtime.userHome || os.homedir();
+  const logDir = path.join(telemetryDir, "logs");
   const completedMutations = new Map();
   const ownedMutations = new Map();
 
@@ -141,6 +145,7 @@ function createRuntimeServices(runtime = {}) {
     completedMutations,
     configPath,
     loadConfig: readConfig,
+    logDir,
     ownedMutations,
     receiptDir,
     startResolvedProcess: runtime.startResolvedProcess || null,
@@ -1776,6 +1781,33 @@ function lifecycleSnapshot(services) {
   };
 }
 
+function ownedLogNames(services) {
+  try {
+    return fs.readdirSync(services.logDir, { withFileTypes: true })
+      .filter(entry => entry.isFile() && /^[a-z0-9][a-z0-9-]*\.log$/i.test(entry.name))
+      .map(entry => entry.name)
+      .sort();
+  } catch {
+    return [];
+  }
+}
+
+function runtimeSnapshot(services, approvalAuditCount = 0) {
+  const config = services.loadConfig();
+  return runtimeSettingsLib.runtimeSettingsSnapshot({
+    stateRoot: services.stateRoot,
+    vaultPath: services.vaultPath,
+    logDir: services.logDir,
+    config,
+    env: process.env,
+    tombstones: services.store.listTombstones(),
+    backupExists: fs.existsSync(`${services.configPath}.bak`),
+    backupPath: `${services.configPath}.bak`,
+    logFiles: ownedLogNames(services),
+    approvalAuditCount,
+  });
+}
+
 function marketplaceSnapshot(services) {
   const config = services.loadConfig();
   const registered = new Set();
@@ -2074,6 +2106,144 @@ function requestHandler(req, res, services = DEFAULT_RUNTIME_SERVICES) {
             return json(res, 500, { error: error.message });
           }
         });
+      if (url === "/api/settings/runtime" && req.method === "GET")
+        return Promise.all([RUNTIME_SETTINGS_MOD, APPROVAL_QUEUE])
+          .then(([, queue]) => json(res, 200, runtimeSnapshot(services, queue.audit().length)))
+          .catch(() => json(res, 503, { error: "runtime settings unavailable" }));
+      if (url === "/api/settings/runtime" && req.method === "PATCH")
+        return readBody(req, res, body => {
+          let data;
+          try { data = JSON.parse(body); }
+          catch { return json(res, 400, { error: "body must be JSON" }); }
+          const allowed = new Set(["operationId", "logRetentionDays", "anonymousTelemetry"]);
+          if (
+            !validOperationId(data.operationId) ||
+            Object.keys(data).some(key => !allowed.has(key))
+          ) {
+            return json(res, 400, { error: "unsupported runtime settings field" });
+          }
+          return withApproval(req, res, "settings.runtime", "runtime", () =>
+            Promise.all([RUNTIME_SETTINGS_MOD, APPROVAL_QUEUE])
+              .then(([, queue]) => {
+                try {
+                  const next = runtimeSettingsLib.applyRuntimeSettings(
+                    services.loadConfig(),
+                    data,
+                  );
+                  services.store.commit(next, data.operationId);
+                  return json(res, 200, runtimeSnapshot(services, queue.audit().length));
+                } catch (error) {
+                  return json(res, 400, { error: error.message });
+                }
+              })
+              .catch(() => json(res, 503, { error: "runtime settings unavailable" })),
+          );
+        });
+      if (url === "/api/settings/restore-backup" && req.method === "POST")
+        return readBody(req, res, body => {
+          let data;
+          try { data = JSON.parse(body); }
+          catch { return json(res, 400, { error: "body must be JSON" }); }
+          const allowed = new Set(["operationId", "agencyName"]);
+          if (
+            !validOperationId(data.operationId) ||
+            Object.keys(data).some(key => !allowed.has(key))
+          ) {
+            return json(res, 400, { error: "operationId and agencyName are required" });
+          }
+          return withApproval(req, res, "settings.restore-backup", "registry", () =>
+            Promise.all([RUNTIME_SETTINGS_MOD, APPROVAL_QUEUE])
+              .then(([, queue]) => {
+                try {
+                  const current = services.loadConfig();
+                  if (String(data.agencyName || "") !== String(current.agency || "REMPEYEK AGENT OS")) {
+                    return json(res, 409, { error: "agency name confirmation does not match" });
+                  }
+                  const backupPath = `${services.configPath}.bak`;
+                  if (!fs.existsSync(backupPath)) {
+                    return json(res, 404, { error: "registry backup not found" });
+                  }
+                  const backup = JSON.parse(fs.readFileSync(backupPath, "utf8"));
+                  if (!Array.isArray(backup.agents)) {
+                    return json(res, 400, { error: "registry backup must contain an agents array" });
+                  }
+                  services.store.commit(backup, data.operationId);
+                  return json(res, 200, runtimeSnapshot(services, queue.audit().length));
+                } catch (error) {
+                  return json(res, 400, { error: error.message });
+                }
+              })
+              .catch(() => json(res, 503, { error: "runtime settings unavailable" })),
+          );
+        });
+      if (url === "/api/settings/clear-logs" && req.method === "POST")
+        return readBody(req, res, body => {
+          let data;
+          try { data = JSON.parse(body); }
+          catch { return json(res, 400, { error: "body must be JSON" }); }
+          const allowed = new Set(["operationId", "names"]);
+          if (
+            !validOperationId(data.operationId) ||
+            !Array.isArray(data.names) ||
+            Object.keys(data).some(key => !allowed.has(key))
+          ) {
+            return json(res, 400, { error: "operationId and names are required" });
+          }
+          return withApproval(req, res, "settings.clear-logs", "owned-logs", () =>
+            RUNTIME_SETTINGS_MOD
+              .then(() => {
+                const expected = ownedLogNames(services);
+                if (JSON.stringify(data.names) !== JSON.stringify(expected)) {
+                  return json(res, 409, {
+                    error: "log preview changed; review the exact filenames again",
+                    logFiles: expected,
+                  });
+                }
+                try {
+                  return json(res, 200, runtimeSettingsLib.clearOwnedLogs({
+                    logDir: services.logDir,
+                    confirmedNames: data.names,
+                  }));
+                } catch (error) {
+                  return json(res, 400, { error: error.message });
+                }
+              })
+              .catch(() => json(res, 503, { error: "runtime settings unavailable" })),
+          );
+        });
+      if (url === "/api/diagnostics" && req.method === "GET")
+        return Promise.all([
+          RUNTIME_SETTINGS_MOD,
+          MARKETPLACE_MOD,
+          AGENT_LIFECYCLE_MOD,
+          APPROVAL_QUEUE,
+        ])
+          .then(([, , , queue]) => {
+            const snapshot = runtimeSnapshot(services, queue.audit().length);
+            const body = runtimeSettingsLib.diagnosticsSnapshot({
+              home: services.userHome,
+              version: versionInfo(),
+              platform: process.platform,
+              paths: snapshot.paths,
+              lifecycle: lifecycleSnapshot(services).agents,
+              providerVariables: snapshot.providerVariables,
+              recentErrors: [
+                ...(configError ? [{
+                  level: "error",
+                  type: "config",
+                  message: configError.msg,
+                  at: configError.at,
+                }] : []),
+                ...sysLog,
+              ],
+            });
+            res.writeHead(200, {
+              "Content-Type": "application/json; charset=utf-8",
+              "Content-Disposition": 'attachment; filename="rempeyek-diagnostics.json"',
+            });
+            res.end(JSON.stringify(body));
+          })
+          .catch(() => json(res, 503, { error: "diagnostics unavailable" }));
       let lifecycleMatch = url.match(/^\/api\/agents\/([a-z0-9][a-z0-9-]{1,63})$/);
       if (lifecycleMatch && req.method === "PATCH")
         return readBody(req, res, body => {
@@ -2505,6 +2675,7 @@ if (require.main === module) {
     PROCESS_ADAPTERS_MOD,
     AGENT_LIFECYCLE_MOD,
     MANAGED_BUNDLE_MOD,
+    RUNTIME_SETTINGS_MOD,
     RELEASE_MOD,
   ]).then(() => server.listen(PORT, process.env.DASH_HOST || "127.0.0.1", () => {
   console.log(`\n  Agentic OS running at  http://localhost:${PORT}`);

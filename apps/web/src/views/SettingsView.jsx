@@ -3,6 +3,7 @@ import { PageHead, Panel } from "@rempeyek/ui";
 import { THEMES } from "@rempeyek/theme-engine";
 import { api } from "../api";
 import { AgentManagementPanel } from "../components/AgentManagementPanel";
+import { RuntimeSettingsPanel } from "../components/RuntimeSettingsPanel";
 import { ThemePicker } from "../components/ThemePicker";
 
 /** Settings — appearance (the four structural themes), software version, workspace facts. */
@@ -45,6 +46,8 @@ export function SettingsView({ theme, onTheme, state }) {
         {lifecycle
           ? <AgentManagementPanel state={lifecycle} refresh={loadLifecycle} />
           : null}
+
+        <RuntimeSettingsPanel />
 
         <Panel title="SOFTWARE" chip="auto-update">
           <div className="settings-facts">
