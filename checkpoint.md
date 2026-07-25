@@ -706,3 +706,147 @@ is an unpacked, unsigned Windows test package, not a public release.
 Execute Task 8 acceptance and closure: fresh package/runtime probes, retained
 data checks, installer/uninstaller behavior where safely available, review,
 documentation, and honest clean-machine certification boundaries.
+
+---
+
+## HT-20260726-RAO - Phase F - Desktop Release-Readiness Closure
+
+**Status:** Task 8 local acceptance and documentation are complete. The desktop
+implementation is a verified local Windows release candidate, not a signed,
+published, or clean-machine-certified release. The existing renderer design and
+all four themes remain unchanged.
+
+### Release-candidate corrections
+
+- Desktop `userData` is explicitly rooted at
+  `%LOCALAPPDATA%\Rempeyek-Agent-OS` before the single-instance lock, rather
+  than Electron's default roaming path.
+- The sandbox-compatible preload is CommonJS (`preload.cjs`), and the packaged
+  renderer exposes only the eight reviewed bridge methods.
+- NSIS and portable targets now use deterministic hyphenated artifact names.
+  `latest.yml` names the exact NSIS file, and package tests recompute and compare
+  its SHA-512 before accepting the feed metadata.
+
+### Fresh package evidence
+
+- Host: Microsoft Windows 11 Home Single Language, x64, version 10.0.26200,
+  build 26200.
+- Application/workspace version: `2.2.0`.
+- Installer:
+  `Rempeyek-Agent-OS-Setup-2.2.0.exe`, 101,318,478 bytes,
+  SHA-256
+  `AEBB2B8385C4878D809359C4C46F181567C3BB02735B30DD8DF70D63080BB558`.
+- Portable:
+  `Rempeyek-Agent-OS-Portable-2.2.0.exe`, 100,999,098 bytes,
+  SHA-256
+  `6F88707B32326698C18974658EBF6C4FFF9B0C7ADEA2FEF7AEA1A73AE49649EC`.
+- Both executables report Authenticode `NotSigned`.
+- `latest.yml` references the exact installer and its recorded SHA-512 matches
+  the installer bytes.
+- Package contents include the ASAR shell, server, Vite build, scripts, and
+  reviewed Hypertaks bundle while excluding registry data, vaults, telemetry,
+  `.env`, checkpoints, and user state.
+
+### Isolated packaged-runtime acceptance
+
+- The unpacked executable ran with a temporary Local AppData root outside the
+  repository and outside the user's existing Rempeyek state.
+- Exactly one owned server child and one renderer were observed. The renderer
+  loaded `REMPEYEK AGENT OS — Neural Command Deck` from the random owned
+  loopback origin.
+- Renderer bridge keys were exactly `checkForUpdates`, `getRuntime`,
+  `getSettings`, `onUpdateState`, `openExternal`, `openPath`,
+  `restartToUpdate`, and `updateSettings`; `window.require` and
+  `window.process` were absent.
+- Runtime IPC reported `desktop:true`, `packaged:true`, version `2.2.0`,
+  platform `win32`, and architecture `x64`. Settings persisted across a full
+  shutdown and relaunch under the isolated state root.
+- A second process exited while the original five-process tree stayed alive,
+  proving the single-instance lock. Because the first instance was hidden,
+  visible focus return was not claimed.
+- Settings rendered its existing Appearance, Desktop & Startup, Storage &
+  Recovery, Privacy & Execution, Software, and Workspace sections without
+  horizontal overflow. No renderer exception or error-level console event was
+  recorded.
+- Graceful Browser close stopped the full owned process tree; no acceptance app
+  process remained.
+
+### Design-lock and functional continuity
+
+- Source-mode browser QA covered Cyberpunk, Minimalist, Brutalist, and
+  Glassmorph at desktop width plus 375 px. Navigation and Settings structure
+  remained the existing design, narrow view had no horizontal overflow, and
+  the console was empty.
+- The earlier Phase B-C live acceptance remains the end-to-end evidence for
+  20-agent Marketplace discovery, Hypertaks featured install contract, profile
+  Remove/Restore retention, and parent-bound subagent creation. Task 8 did not
+  repeat those mutations against the user's real state.
+- Mocked/injected updater tests prove check, download, ready, approved restart,
+  and active-mutation blocking. The unpacked package correctly lacks a public
+  release feed, so it was not used to claim a signed update.
+
+### Independent review corrections
+
+- The desktop child now removes inherited `AGENTS_CONFIG`, `VAULT_PATH`, and
+  remote-dashboard overrides before applying its fixed Local AppData, loopback,
+  random-port, and private-session environment.
+- Stable and Preview release channels are separated at publication: prerelease
+  tags are explicitly marked prerelease and cannot become GitHub latest.
+- Release actions are pinned to full commit SHAs. Signing secrets exist only on
+  the validation and build steps, never at job or release-upload scope.
+- The known development audit graph is protected by an exact canonical
+  advisory fingerprint
+  `bb5557c1f85e720856eccf862b88e48a8402d704c8cf9e8685160d006135bcc9`.
+  The policy rejects production findings, Critical severity, advisory/count
+  drift, and use after `2026-08-31`.
+- Update-available and update-ready native notifications now honor the existing
+  user setting and deduplicate repeated milestones.
+- The initial independent review found four Important and one Minor issue. All
+  were verified, fixed test-first, and the final re-review reported no remaining
+  actionable issue.
+
+### Fresh local gates
+
+- `npm ci`: pass; 373 packages installed.
+- Web tests: 180/180 pass, zero skipped.
+- Desktop tests: 21/21 pass, zero skipped.
+- Vite production build: 2,098 modules, pass.
+- Windows unpacked package and full unsigned NSIS/portable build: pass.
+- Package-content/feed-metadata tests: 2/2 pass.
+- Public release audit: 251 tracked paths, pass.
+- Production dependency audit: 0 vulnerabilities.
+- Full dependency audit: 17 high findings in the desktop
+  development/build-tool dependency tree. The exact reviewed graph is
+  temporarily policy-gated through `2026-08-31`; any advisory drift or policy
+  expiry fails CI and the signed-release job. No universal safety claim is made.
+- `git diff --check`: pass.
+- `graphify-out/graph.json` is absent, so no Graphify update is claimed.
+
+### Clean-machine, signing, and authority boundary
+
+- Windows Sandbox was not installed on the acceptance host, and checking the
+  optional feature state required elevation. No disposable Windows user or VM
+  was available.
+- To avoid touching an existing real Rempeyek installation/state, the NSIS
+  installer/uninstaller and real launch-at-login integration were not executed.
+  Retained-state uninstall is configured and tested at the package boundary but
+  is not clean-machine certified.
+- No signed/checksummed remote test feed or signing credential was available.
+  End-to-end Authenticode update acceptance therefore remains external.
+- No push, tag, signature, release, deployment, stable-feed mutation, global
+  agent/plugin install, retained-data deletion, repository-visibility change,
+  or redesign occurred.
+
+### Commits and handoff
+
+- `862275b` - keep desktop state under Local AppData.
+- `b887cc2` - load secure preload in the sandboxed renderer.
+- `372b5bf` - align desktop artifact names and feed metadata validation.
+- `ef681c2` - harden state, release channels, credentials, dependency policy,
+  and native update notifications after independent review.
+- Final documentation/checkpoint commit closes Task 8.
+
+The branch remains `codex/agent-platform-public` for the user's next decision.
+Publication requires a disposable-user/VM acceptance run, resolution or timely
+renewed review of the development audit findings, external signing credentials,
+and new authority to push/tag/release.

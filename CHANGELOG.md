@@ -3,6 +3,51 @@
 All notable changes to Rempeyek Agent OS. The in-app update banner compares the local version
 against the latest GitHub Release of this repository — tag releases as `v<version>`.
 
+## [Unreleased]
+
+### Added
+
+- Windows x64 Electron desktop shell around the existing, unchanged command
+  deck, with a supervised loopback runtime, single-instance behavior, tray
+  controls, launch-at-login, and native runtime/settings facts.
+- Windows x64 NSIS and portable package targets plus a deterministic icon
+  generated from the existing Rempeyek brand asset.
+- Verified packaged-update lifecycle: stable/preview selection, optional
+  automatic checks, explicit download state, and installation only after a
+  user-approved restart.
+
+### Changed
+
+- Source-checkout updates now execute fixed sequential programs and arguments,
+  reject dirty worktrees, and never run a shell command chain.
+- Desktop profile data, vault, telemetry, settings, logs, receipts, and update
+  state resolve under `%LOCALAPPDATA%\Rempeyek-Agent-OS`; application uninstall
+  retains that user-owned state.
+
+### Security
+
+- The Electron renderer has no Node integration, uses context isolation,
+  sandboxing, web security, strict navigation/window guards, and a minimal
+  CommonJS preload bridge. The private desktop session token remains below
+  renderer and preload access.
+- The owned desktop server drops inherited source-path and remote-dashboard
+  overrides before applying fixed Local AppData, loopback, random-port, and
+  private-session values.
+- CI cannot publish. Manual packages are short-retention unsigned test
+  artifacts. Release actions are immutable SHA pins, signing secrets are
+  step-scoped, preview tags cannot become stable latest, and the known
+  build-tool audit graph is exact-fingerprint/expiry gated. A tag release still
+  requires external signing credentials, Authenticode verification, matching
+  publisher identity, version parity, and SHA-512 update metadata.
+- Update-available and update-ready native notifications honor the existing
+  desktop preference and deduplicate repeated milestones.
+
+### Release status
+
+- Local unsigned NSIS and portable artifacts were built on Windows 11 x64 and
+  validated for package contents and update-metadata hash parity. They are not
+  signed, published, or clean-machine certified.
+
 ## [2.2.0] — 2026-07-17
 
 ### Added

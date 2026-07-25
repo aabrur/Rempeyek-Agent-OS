@@ -25,6 +25,10 @@
 - [x] **Recovery and privacy controls** — atomic registry backup restore, exact
       owned-log deletion, local retention/telemetry settings, and redacted
       diagnostics
+- [x] **Windows desktop shell** — hardened Electron runtime around the existing
+      renderer, per-user Local AppData state, single-instance/tray/startup
+      behavior, verified update state machine, and Windows x64 NSIS/portable
+      package targets
 
 ## Next
 
@@ -54,9 +58,12 @@ Constraint: **the server must stay dependency-free** — it has to run with
 
 ## Later
 
-- [ ] `apps/desktop` — Electron shell around the existing web app with isolated
-      renderer/preload boundaries, supervised local runtime, signed stable
-      updates, tray support, and Windows packaging
+- [ ] **Desktop release certification** — resolve the remaining development
+      dependency audit findings before the temporary fingerprint policy
+      expires, run the installer/update/uninstaller flow in a disposable clean
+      Windows user or VM, provision trusted Authenticode credentials, and
+      publish only after the signed tag gate passes
+- [ ] **macOS/Linux desktop ports** — not currently implemented or supported
 - [ ] HyperFrames promo render (needs macOS/Linux box) — MP4 of the `/promo.html` sting
 - [ ] Vault graph: theme-reactive palette + community coloring from graphify
 - [ ] Multi-machine mesh: read-only remote dashboards over `DASH_TOKEN`

@@ -11,7 +11,7 @@ the command deck over both.
 Rempeyek-Agent-OS
 ├── apps/
 │   ├── web/            # server.js (API, zero-dep) + src/ (React) + dist/ (built)
-│   └── desktop/        # future native shell (Tauri/Electron) around apps/web
+│   └── desktop/        # Electron main/preload + Windows package configuration
 ├── packages/
 │   ├── ui/             # ✅ React primitives (Btn, Pill, Panel, Chip, Overlay, Avatar…)
 │   ├── design-system/  # ✅ the global stylesheet: tokens + component classes
@@ -27,9 +27,11 @@ Rempeyek-Agent-OS
 
 ✅ = a real package the app imports · ⏳ = still inside `server.js`, see [Roadmap](Roadmap.md)
 
-**Runtime data stays at the repo root** (`telemetry/`, `agents.config.json`, `.env`,
-`Obsidian Vault/`) — agent CLIs and bridges write there regardless of how the app
-code is organized. `apps/web/server.js` resolves them via `ROOT = __dirname/../..`.
+Source-checkout runtime data can stay at the repo root (`telemetry/`,
+`agents.config.json`, `.env`, `Obsidian Vault/`) for backward compatibility.
+Fresh browser and desktop installations default private state to
+`%LOCALAPPDATA%\Rempeyek-Agent-OS`; `AGENT_STATE_DIR`, `AGENTS_CONFIG`, and
+`VAULT_PATH` can override the browser/server paths.
 
 ## Running it
 
@@ -39,10 +41,53 @@ code is organized. `apps/web/server.js` resolves them via `ROOT = __dirname/../.
 | `npm run dev` | builds the frontend, then starts the server on :4321 |
 | `npm run ui` | Vite dev server on :5173 (HMR), proxying `/api` → :4321 — run `npm run server` alongside |
 | `npm run build` | emits `apps/web/dist/` |
+| `npm run desktop:dev` | starts the Electron shell against an owned local server |
+| `npm run desktop:pack` | creates an unpacked Windows test application |
+| `npm run desktop:dist` | creates unsigned Windows x64 NSIS and portable test artifacts |
 
 The **server itself stays dependency-free** — React/Vite are frontend-only. `server.js`
 serves `dist/`, falling back to `public/`; `/avatars/*` always comes from `public/`, so
 runtime uploads survive a rebuild.
+
+## apps/desktop — native boundary
+
+Electron main owns the desktop lifecycle. It starts exactly one Node child from
+the packaged `apps/web` control plane on an operating-system-assigned loopback
+port, waits for an IPC readiness message, and shuts down only that owned child.
+The existing Vite renderer is reused without a desktop redesign.
+
+The renderer runs with Node integration disabled, context isolation enabled,
+sandboxing enabled, and web security enabled. A narrow CommonJS preload exposes
+only fixed runtime, settings, path-opening, and update methods. A random
+desktop-session token is passed to the owned server through its environment and
+injected by Electron's session layer only for the exact owned origin; it is not
+exposed to renderer JavaScript or preload.
+
+Desktop-native settings, private registry, vault, telemetry, logs, receipts, and
+update state live under `%LOCALAPPDATA%\Rempeyek-Agent-OS`. Packaged application
+assets under `resources\app-root` are read-only inputs. The NSIS configuration
+sets `deleteAppDataOnUninstall: false`, so removing the application does not
+delete the user's retained state.
+
+The server child does not inherit source-checkout path overrides or remote
+dashboard mode. Main removes `AGENTS_CONFIG`, `VAULT_PATH`, `DASH_REMOTE`,
+`DASH_TOKEN`, `DASH_ALLOWED_ORIGINS`, and conflicting host/port/session values
+before applying its fixed desktop environment.
+
+The packaged updater uses `electron-updater` as an injected state machine.
+Stable excludes prereleases; Preview permits them. A check may discover and
+download an update, but installation requires a separate approved restart and
+is blocked while a lifecycle mutation is active. Source checkouts instead run
+fixed sequential `git status --porcelain`, `git pull --ff-only`, `npm ci`, and
+build steps; a dirty checkout fails closed before pull.
+
+CI verifies source behavior and the unpacked Windows package but never
+publishes. Manual package workflow output is explicitly unsigned and
+short-retention. Only the tagged release workflow can publish after external
+signing credentials, version parity, Authenticode publisher checks, and
+SHA-512 update metadata all pass. Release actions are full-SHA pinned, signing
+secrets are step-scoped, prerelease tags cannot become stable latest, and an
+expiring exact advisory fingerprint rejects dependency-audit drift.
 
 ## apps/web — the backend
 

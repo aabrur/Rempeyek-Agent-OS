@@ -43,6 +43,9 @@ React + Vite, split into components across an npm-workspaces monorepo.
   purpose-specific child with explicit scope, permissions, memory, and
   activation. Registry topology and the missing vault scaffold are persisted
   without fabricating activity telemetry
+- **Windows desktop shell** — the existing command deck runs unchanged inside
+  a hardened Electron window with a supervised loopback server, single-instance
+  behavior, tray controls, launch-at-login, and approval-gated verified updates
 - **Summon with install-gate** — one click opens an admin terminal at the
   profile's trusted home folder and runs its persisted CLI trigger; a missing
   CLI is reported honestly and routes back to the reviewed Marketplace or
@@ -81,6 +84,20 @@ Prefer a launcher? After `npm install`, double-click **`start.cmd`** (or run
 `node bin/rempeyek-agent-os.mjs`) — it builds the UI if needed, starts the server,
 and opens your browser.
 
+### Windows desktop test builds
+
+The desktop workspace can produce unsigned Windows x64 NSIS and portable test
+artifacts:
+
+```powershell
+npm run desktop:dist
+```
+
+Outputs are written to `apps\desktop\dist\`. They are local release-candidate
+artifacts, not a signed or published stable release. See
+[`apps/desktop/README.md`](apps/desktop/README.md) for runtime, update, state,
+signing, and acceptance boundaries.
+
 Open **Marketplace → Install** (or **Agents → ＋ Add Agent**) to register only the
 agents you want. A clean installation never copies the maintainer's roster, vault,
 telemetry, or avatars.
@@ -107,7 +124,7 @@ npm run ui       # Vite dev server on :5173 with hot reload (proxies /api → :4
 
 ```
 apps/web/        server.js (zero-dep API) + src/ (React app) + dist/ (built UI)
-apps/desktop/    planned native shell (see its README)
+apps/desktop/    Electron shell + Windows x64 NSIS/portable packaging
 packages/        ui · design-system · theme-engine · neural-engine (live)
                  neural-vault · agent-runtime · workflow-engine · mcp · shared (planned)
 docs/            Design-Bible · Architecture · Neural-Vault · Agent-System · MCP · Theme-System · Roadmap
@@ -117,8 +134,10 @@ telemetry/       per-agent JSONL event streams (runtime data)
 ```
 
 New installations keep configuration, telemetry, avatars, and the optional starter
-vault under the operating system's local application-data directory. Existing ignored
-repository-local configurations remain compatible. See [SECURITY.md](SECURITY.md).
+vault under `%LOCALAPPDATA%\Rempeyek-Agent-OS`. Desktop-native settings and update
+state live there too. Existing ignored repository-local configurations remain
+compatible. Uninstalling the application does not delete this user-owned state.
+See [SECURITY.md](SECURITY.md).
 
 ## Configuration
 
