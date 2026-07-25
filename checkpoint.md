@@ -558,3 +558,70 @@ Continue Task 1 of
 Desktop work must preserve the same renderer design, keep the session token
 below renderer/preload access, supervise only its owned local server process,
 and treat unsigned packages as test artifacts rather than stable releases.
+
+---
+
+## HT-20260726-RAO - Phase D - Isolated Desktop Runtime
+
+**Status:** desktop Tasks 1-4 are implemented and locally verified. The
+existing web renderer and all four structural themes remain unchanged.
+
+### Delivered runtime boundary
+
+- The pinned workspace uses Electron 43.2.0, electron-builder 26.15.3,
+  electron-updater 6.8.9, Sharp 0.35.3, and png-to-ico 3.0.2. The Windows icon
+  is generated only from the existing Rempeyek brand source.
+- Electron starts only its owned Node child on an operating-system-assigned
+  loopback port. Server readiness is an IPC message and shutdown is
+  idempotent.
+- A random 32-byte desktop token is passed only through the owned child's
+  environment and injected below renderer/preload access for the exact owned
+  origin. Cross-origin requests have any case-variant of the private header
+  stripped.
+- BrowserWindow keeps Node integration disabled with context isolation,
+  sandbox, web security, navigation guards, denied child windows, a single
+  instance, and tray/exit behavior.
+- Desktop preferences are allowlisted, validated, fsynced to a sibling file,
+  and atomically renamed. Native IPC exposes only fixed runtime/settings/update
+  methods plus the three mapped `state`, `vault`, and `logs` locations.
+- Login launch receives only the fixed `--hidden` argument. No IPC handler
+  accepts an arbitrary local path, executable, or channel.
+
+### Commits and fresh evidence
+
+- `737e98d` - Electron workspace, package boundary, and brand icon.
+- `8c5f4a7` - isolated local server and desktop-session access policy.
+- `bd44871` - hardened Electron application shell and narrow preload.
+- Task 4 settings/runtime IPC and this checkpoint close Phase D together.
+- Desktop tests: 9/9 pass.
+- Web tests: 173/173 pass.
+- Vite production build: 2,097 modules, pass.
+- Public release audit: 236 tracked paths, pass.
+- Production dependency audit: 0 vulnerabilities.
+- Full dependency audit: 17 high findings, all currently in the desktop
+  development/build toolchain. They remain an explicit release blocker to
+  review during packaging; no stable safety claim is made.
+- `git diff --check` and syntax checks pass.
+- Electron 43.2.0 binary installation and version were verified. A hidden
+  process stayed alive during the non-interactive smoke window, but that tool
+  session did not expose a renderer/server child, so interactive runtime
+  acceptance is not claimed yet.
+
+### Preserved boundaries
+
+- No renderer markup, layout, shell, navigation, card, Agent Map, theme,
+  typography, palette, spacing, or motion was changed.
+- No desktop package, installer, stable feed, signature, release, tag, push,
+  deployment, global install, retained-data deletion, or repository-visibility
+  change occurred.
+- No public Graphify graph exists in this workspace, so no Graphify update is
+  claimed.
+- Any future unsigned package is a local test artifact only. A public stable
+  release still requires verified SHA-512 metadata, valid Authenticode, and
+  clean-machine acceptance.
+
+### Next task
+
+Begin Task 5 of the approved desktop plan: implement the packaged updater as an
+injected, sequential state machine with explicit lifecycle-operation blocking
+and user-approved restart.
