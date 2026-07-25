@@ -1,0 +1,102 @@
+{
+  "name": "@rempeyek/desktop",
+  "version": "2.2.0",
+  "private": true,
+  "type": "module",
+  "main": "main.mjs",
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "dev": "electron .",
+    "build:icon": "node scripts/build-icon.mjs",
+    "pack": "electron-builder --dir --win",
+    "dist": "electron-builder --win --publish never"
+  },
+  "dependencies": {
+    "electron-updater": "6.8.9"
+  },
+  "devDependencies": {
+    "electron": "43.2.0",
+    "electron-builder": "26.15.3",
+    "png-to-ico": "3.0.2",
+    "sharp": "0.35.3"
+  },
+  "build": {
+    "appId": "com.rempeyek.agentos",
+    "productName": "Rempeyek Agent OS",
+    "asar": true,
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.mjs",
+      "preload.mjs",
+      "server-process.mjs",
+      "desktop-settings.mjs",
+      "update-service.mjs",
+      "security.mjs",
+      "assets/**",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "../web",
+        "to": "app-root/apps/web",
+        "filter": [
+          "server.js",
+          "lib/**",
+          "public/**",
+          "dist/**"
+        ]
+      },
+      {
+        "from": "../../scripts",
+        "to": "app-root/scripts",
+        "filter": [
+          "hermes-daily-bridge.cjs",
+          "report.cjs"
+        ]
+      },
+      {
+        "from": "../../marketplace/bundles",
+        "to": "app-root/marketplace/bundles",
+        "filter": [
+          "hypertaks-agent/**"
+        ]
+      },
+      {
+        "from": "../../package.json",
+        "to": "app-root/package.json"
+      }
+    ],
+    "win": {
+      "icon": "assets/icon.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "deleteAppDataOnUninstall": false
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "aabrur",
+        "repo": "Rempeyek-Agent-OS",
+        "releaseType": "release"
+      }
+    ]
+  }
+}

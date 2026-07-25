@@ -8,6 +8,7 @@
   },
   "workspaces": [
     "apps/web",
+    "apps/desktop",
     "packages/*"
   ],
   "scripts": {
@@ -17,6 +18,10 @@
     "build": "npm run build --workspace @rempeyek/web",
     "ui": "npm run dev --workspace @rempeyek/web",
     "server": "node apps/web/server.js",
+    "test:desktop": "npm test --workspace @rempeyek/desktop",
+    "desktop:dev": "npm run dev --workspace @rempeyek/desktop",
+    "desktop:pack": "npm run pack --workspace @rempeyek/desktop",
+    "desktop:dist": "npm run dist --workspace @rempeyek/desktop",
     "audit:public": "node scripts/public-release-audit.mjs"
   }
 }
