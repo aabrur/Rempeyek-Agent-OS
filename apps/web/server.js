@@ -28,7 +28,17 @@ try {
   }
 } catch {}
 
-const PORT = process.env.PORT || 4321;
+const requestedPort = process.env.PORT === undefined
+  ? 4321
+  : Number(process.env.PORT);
+if (
+  !Number.isInteger(requestedPort) ||
+  requestedPort < 0 ||
+  requestedPort > 65535
+) {
+  throw new Error("PORT must be an integer between 0 and 65535");
+}
+const PORT = requestedPort;
 const RUNTIME_PATHS = resolveRuntimePaths({ env: process.env, root: ROOT, home: os.homedir() });
 const VAULT = RUNTIME_PATHS.vaultPath;
 const CONFIG_PATH = RUNTIME_PATHS.configPath;
@@ -2823,7 +2833,11 @@ if (require.main === module) {
     SUBAGENT_RECORD_MOD,
     RELEASE_MOD,
   ]).then(() => server.listen(PORT, process.env.DASH_HOST || "127.0.0.1", () => {
-  console.log(`\n  Agentic OS running at  http://localhost:${PORT}`);
+  const listeningPort = server.address().port;
+  if (typeof process.send === "function") {
+    process.send({ type: "rempeyek:ready", port: listeningPort });
+  }
+  console.log(`\n  Agentic OS running at  http://localhost:${listeningPort}`);
   console.log(`  Vault data source:     ${VAULT}`);
   console.log(`  Agent config:          ${CONFIG_PATH}`);
   console.log(TOKEN ? "  Auth: token ACTIVE (x-dash-token)" : "  Auth: no token (local only). For remote access: set DASH_TOKEN.\n");

@@ -2,13 +2,14 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createAccessPolicy } from "../lib/access-policy.mjs";
 
-const request = ({ method = "GET", host = "127.0.0.1:4321", origin, token, remoteAddress = "127.0.0.1", url = "/api/state" } = {}) => ({
+const request = ({ method = "GET", host = "127.0.0.1:4321", origin, token, desktopToken, remoteAddress = "127.0.0.1", url = "/api/state" } = {}) => ({
   method,
   url,
   headers: {
     host,
     ...(origin ? { origin } : {}),
     ...(token ? { "x-dash-token": token } : {}),
+    ...(desktopToken ? { "x-desktop-session": desktopToken } : {}),
   },
   socket: { remoteAddress },
 });
@@ -61,4 +62,18 @@ test("remote mutations require an exact allowed Origin", () => {
 test("policy never supplies permissive CORS headers", () => {
   const policy = createAccessPolicy({});
   assert.deepEqual(policy.responseHeaders, {});
+});
+
+test("desktop mode requires the session token even on loopback", () => {
+  const policy = createAccessPolicy({
+    DESKTOP_SESSION_TOKEN: "desktop-secret",
+  });
+  const missing = policy.authorize(
+    request({ host: "127.0.0.1:4321" }),
+  );
+  assert.equal(missing.status, 401);
+  assert.equal(policy.authorize(request({
+    host: "127.0.0.1:4321",
+    desktopToken: "desktop-secret",
+  })).allowed, true);
 });

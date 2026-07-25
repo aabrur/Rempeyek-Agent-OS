@@ -1,10 +1,19 @@
 const crypto = require("crypto");
 const MUTATIONS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 const LOOPBACK = new Set(["localhost", "127.0.0.1", "[::1]"]);
-function equal(a, b) { a = Buffer.from(String(a || "")); b = Buffer.from(String(b || "")); return a.length === b.length && crypto.timingSafeEqual(a, b); }
+function equal(a, b) {
+  a = Buffer.from(String(a || ""));
+  b = Buffer.from(String(b || ""));
+  if (a.length !== b.length) {
+    crypto.timingSafeEqual(b, b);
+    return false;
+  }
+  return crypto.timingSafeEqual(a, b);
+}
 function hostname(host) { host = String(host || "").toLowerCase(); return host.startsWith("[") ? host.slice(0, host.indexOf("]") + 1) : host.split(":")[0]; }
 function createAccessPolicy(env = process.env) {
   const remote = env.DASH_REMOTE === "1", token = String(env.DASH_TOKEN || "");
+  const desktopToken = String(env.DESKTOP_SESSION_TOKEN || "");
   const origins = String(env.DASH_ALLOWED_ORIGINS || "").split(",").map(x => x.trim()).filter(Boolean);
   if (remote && !token) throw new Error("DASH_REMOTE=1 requires DASH_TOKEN");
   if (remote && !origins.length) throw new Error("DASH_REMOTE=1 requires DASH_ALLOWED_ORIGINS");
@@ -15,6 +24,9 @@ function createAccessPolicy(env = process.env) {
     allowedOrigins.add(origin); allowedHosts.add(parsed.host.toLowerCase());
   }
   return { remote, responseHeaders: {}, authorize(req) {
+    if (desktopToken && !equal(req.headers && req.headers["x-desktop-session"], desktopToken)) {
+      return { allowed: false, status: 401, error: "invalid or missing desktop session" };
+    }
     const host = String(req.headers && req.headers.host || "").toLowerCase();
     if (!host) return { allowed: false, status: 400, error: "missing Host header" };
     if (remote ? !allowedHosts.has(host) : !LOOPBACK.has(hostname(host))) return { allowed: false, status: 403, error: "Host is not allowed" };
