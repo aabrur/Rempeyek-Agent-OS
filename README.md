@@ -14,23 +14,53 @@ React + Vite, split into components across an npm-workspaces monorepo.
 
 [![Download Rempeyek Agent OS 2.2.1](https://img.shields.io/badge/Download-Rempeyek_Agent_OS_2.2.1-ff8a00?style=for-the-badge&logo=windows&logoColor=white)](./Rempeyek-Agent-OS-Setup-2.2.1.exe?raw=1)
 
-**Most users only need the installer above.** Download
-`Rempeyek-Agent-OS-Setup-2.2.1.exe`, open it, choose the installation folder,
-and launch Rempeyek Agent OS. Git, Node.js, npm, and a repository clone are not
-required for the installed desktop application.
+**The installer and direct download are free.** Most users only need to click
+the button above. No GitHub account, Git, Node.js, npm, or repository clone is
+required.
 
 - **Windows x64** desktop installer
-- **Automatic updates included** — when a newer release is published, checks run
-  at startup and every six hours; downloads are automatic by default, while
-  installation waits for the user's **Restart to update** approval
 - **Private local state** — settings, agents, telemetry, avatars, and the starter
   vault stay under `%LOCALAPPDATA%\Rempeyek-Agent-OS`
 - **User data survives uninstall** — removing the application does not delete
   the user's agent or vault data
 
-This public installer is not yet Authenticode-signed, so Windows may display an
-**Unknown publisher** or SmartScreen warning. SHA-256:
-`A2F6328C6742B66261C8AA1E2E4C885D08A41BED798E6E31DC0FB00B95AE6567`.
+### Install
+
+1. Click **Download Rempeyek Agent OS 2.2.1** above.
+2. Confirm that the downloaded file is named
+   `Rempeyek-Agent-OS-Setup-2.2.1.exe`.
+3. Optional but recommended: verify its SHA-256 in PowerShell:
+
+   ```powershell
+   Get-FileHash "$HOME\Downloads\Rempeyek-Agent-OS-Setup-2.2.1.exe" -Algorithm SHA256
+   ```
+
+   Expected value:
+
+   ```text
+   A2F6328C6742B66261C8AA1E2E4C885D08A41BED798E6E31DC0FB00B95AE6567
+   ```
+
+4. Open the installer, choose the installation folder, and finish the setup.
+5. Launch **Rempeyek Agent OS** from the Start menu or desktop shortcut.
+
+### Windows download warning
+
+The current public installer is not yet Authenticode-signed because a publicly
+trusted publisher certificate is a paid service. Windows or the browser may
+therefore show **Unknown publisher**, **not commonly downloaded**, or a
+SmartScreen warning. Continue only when the filename and SHA-256 match the
+values above and the download came from this official repository. If either
+value differs, delete the file and do not run it.
+
+### Updates
+
+The desktop updater is already implemented, but the public signed update feed
+is not active yet. Version 2.2.1 therefore does not silently install an
+unverified update. Until a signed installer and matching `latest.yml` are
+published in GitHub Releases, install future versions manually from this
+Download section. User settings, installed-agent records, telemetry, avatars,
+and vault data remain in place across application upgrades.
 
 ## Features
 
