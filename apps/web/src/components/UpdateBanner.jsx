@@ -7,6 +7,8 @@ import { releaseState } from "../../lib/release-check.mjs";
 
 const CHECK_KEY = "aos-release-check";
 const CHECK_TTL = 12 * 3600 * 1000;
+const DESKTOP_UPDATE_ERROR =
+  "The desktop updater could not complete this request. Try again from Settings.";
 
 export function UpdateBanner() {
   const [runtime] = useState(() => desktopRuntime(
@@ -28,7 +30,7 @@ export function UpdateBanner() {
         if (alive.current) setDesktopInfo(value);
       }).catch(error => {
         if (alive.current) {
-          setDesktopUpdate({ phase: "error", error: error.message });
+          setDesktopUpdate({ phase: "error", error: DESKTOP_UPDATE_ERROR });
         }
       });
       const unsubscribe = runtime.onUpdateState(value => {
@@ -146,7 +148,7 @@ export function UpdateBanner() {
       setDesktopUpdate({
         ...desktopUpdate,
         phase: "error",
-        error: error.message,
+        error: DESKTOP_UPDATE_ERROR,
       });
     } finally {
       setDesktopBusy(false);
@@ -179,7 +181,7 @@ export function UpdateBanner() {
           ) : updatePhase === "error" ? (
             <span>
               <b>Desktop update check failed.</b>{" "}
-              {desktopUpdate.error || "Try again from Settings."}
+              {DESKTOP_UPDATE_ERROR}
             </span>
           ) : (
             <span>

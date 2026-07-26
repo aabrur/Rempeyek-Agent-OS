@@ -850,3 +850,44 @@ The branch remains `codex/agent-platform-public` for the user's next decision.
 Publication requires a disposable-user/VM acceptance run, resolution or timely
 renewed review of the development audit findings, external signing credentials,
 and new authority to push/tag/release.
+
+## 2026-07-26 - Desktop update-feed 404 hotfix (`v2.2.1`)
+
+### User-visible failure
+
+- The installed `v2.2.0` desktop app found the existing GitHub Release but that
+  release had no `latest.yml`, so the updater returned 404.
+- The renderer displayed the complete updater exception, including HTTP headers,
+  stack frames, and local installation paths.
+
+### Fix and regression boundary
+
+- A `latest.yml` 404 now resolves to `not-available`, meaning no signed desktop
+  update has been published; it is not shown as a fatal error.
+- Unexpected updater failures expose only a fixed, user-safe message.
+- The renderer no longer displays raw bridge or updater error messages.
+- Two focused regression tests cover the exact missing-feed failure and
+  unexpected-error redaction.
+
+### Fresh verification
+
+- Original deterministic 404 repro: red before the fix, green after the fix.
+- Web tests: 180/180 pass.
+- Desktop tests: 23/23 pass.
+- Package tests: 2/2 pass.
+- Vite production build: 2,098 modules, pass.
+- Public and release audits: pass.
+- Graphify update: 1,907 nodes, 2,704 edges, 160 communities.
+- Root installer:
+  `Rempeyek-Agent-OS-Setup-2.2.1.exe`,
+  SHA-256
+  `A2F6328C6742B66261C8AA1E2E4C885D08A41BED798E6E31DC0FB00B95AE6567`.
+
+### Signing and publication boundary
+
+- The `v2.2.1` executable and installer remain `NotSigned`.
+- `latest.yml` is package-tested locally but is not uploaded to the stable
+  release feed. Users update from `v2.2.0` by installing `v2.2.1` manually.
+- Authenticode signing, timestamping, and stable auto-update publication remain
+  blocked on a valid externally verified publisher identity and signing
+  credentials.

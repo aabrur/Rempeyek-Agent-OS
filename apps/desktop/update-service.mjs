@@ -1,7 +1,16 @@
 const SIX_HOURS = 6 * 60 * 60 * 1000;
+const SAFE_UPDATE_ERROR = "The desktop updater could not complete this request. "
+  + "Check your connection and try again.";
 
-function errorMessage(error) {
+function rawErrorMessage(error) {
   return error instanceof Error ? error.message : String(error);
+}
+
+function isMissingReleaseMetadata(error) {
+  const message = rawErrorMessage(error);
+  const status = error?.statusCode ?? error?.status;
+  return /latest\.yml/i.test(message)
+    && (status === 404 || /\b404\b/.test(message));
 }
 
 export function createUpdateService({
@@ -39,6 +48,20 @@ export function createUpdateService({
     emit({ ...state });
   };
 
+  const onNotAvailable = () => publish({
+    phase: "not-available",
+    version: null,
+    error: null,
+    percent: null,
+  });
+  const publishFailure = error => {
+    if (isMissingReleaseMetadata(error)) {
+      onNotAvailable();
+      return;
+    }
+    publish({ phase: "error", error: SAFE_UPDATE_ERROR });
+  };
+
   const checkNow = () => {
     if (checkPromise) return checkPromise;
     autoUpdater.allowPrerelease =
@@ -52,12 +75,12 @@ export function createUpdateService({
     try {
       result = autoUpdater.checkForUpdates();
     } catch (error) {
-      publish({ phase: "error", error: errorMessage(error) });
+      publishFailure(error);
       return Promise.resolve({ ...state });
     }
     checkPromise = Promise.resolve(result)
       .catch(error => {
-        publish({ phase: "error", error: errorMessage(error) });
+        publishFailure(error);
       })
       .then(() => ({ ...state }))
       .finally(() => {
@@ -76,18 +99,12 @@ export function createUpdateService({
     publish({ phase: "downloading", percent: 0 });
     try {
       Promise.resolve(autoUpdater.downloadUpdate()).catch(error => {
-        publish({ phase: "error", error: errorMessage(error) });
+        publishFailure(error);
       });
     } catch (error) {
-      publish({ phase: "error", error: errorMessage(error) });
+      publishFailure(error);
     }
   };
-  const onNotAvailable = () => publish({
-    phase: "not-available",
-    version: null,
-    error: null,
-    percent: null,
-  });
   const onProgress = progress => publish({
     phase: "downloading",
     percent: Math.max(0, Math.min(100, Math.round(progress?.percent || 0))),
@@ -98,10 +115,7 @@ export function createUpdateService({
     error: null,
     percent: 100,
   });
-  const onError = error => publish({
-    phase: "error",
-    error: errorMessage(error),
-  });
+  const onError = error => publishFailure(error);
 
   autoUpdater.on("update-available", onAvailable);
   autoUpdater.on("update-not-available", onNotAvailable);

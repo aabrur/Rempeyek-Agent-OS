@@ -12,10 +12,10 @@ React + Vite, split into components across an npm-workspaces monorepo.
 
 ## Download for Windows
 
-[![Download Rempeyek Agent OS 2.2.0](https://img.shields.io/badge/Download-Rempeyek_Agent_OS_2.2.0-ff8a00?style=for-the-badge&logo=windows&logoColor=white)](./Rempeyek-Agent-OS-Setup-2.2.0.exe?raw=1)
+[![Download Rempeyek Agent OS 2.2.1](https://img.shields.io/badge/Download-Rempeyek_Agent_OS_2.2.1-ff8a00?style=for-the-badge&logo=windows&logoColor=white)](./Rempeyek-Agent-OS-Setup-2.2.1.exe?raw=1)
 
 **Most users only need the installer above.** Download
-`Rempeyek-Agent-OS-Setup-2.2.0.exe`, open it, choose the installation folder,
+`Rempeyek-Agent-OS-Setup-2.2.1.exe`, open it, choose the installation folder,
 and launch Rempeyek Agent OS. Git, Node.js, npm, and a repository clone are not
 required for the installed desktop application.
 
@@ -30,7 +30,7 @@ required for the installed desktop application.
 
 This public installer is not yet Authenticode-signed, so Windows may display an
 **Unknown publisher** or SmartScreen warning. SHA-256:
-`AEBB2B8385C4878D809359C4C46F181567C3BB02735B30DD8DF70D63080BB558`.
+`A2F6328C6742B66261C8AA1E2E4C885D08A41BED798E6E31DC0FB00B95AE6567`.
 
 ## Features
 

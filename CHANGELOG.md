@@ -3,6 +3,15 @@
 All notable changes to Rempeyek Agent OS. The in-app update banner compares the local version
 against the latest GitHub Release of this repository — tag releases as `v<version>`.
 
+## [2.2.1] - 2026-07-26
+
+### Fixed
+
+- A missing `latest.yml` in an unsigned GitHub Release is treated as no
+  published signed update instead of a fatal desktop error.
+- Desktop update failures expose a short user-safe message instead of HTTP
+  headers, stack traces, or local filesystem paths.
+
 ## [Unreleased]
 
 ### Added
