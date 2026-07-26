@@ -10,6 +10,28 @@ React + Vite, split into components across an npm-workspaces monorepo.
 
 ![Platform](https://img.shields.io/badge/platform-Windows-blue) ![Node](https://img.shields.io/badge/node-%E2%89%A518-green) ![Server deps](https://img.shields.io/badge/server%20deps-0-brightgreen) ![UI](https://img.shields.io/badge/ui-React%20%2B%20Vite-61DAFB)
 
+## Download for Windows
+
+[![Download Rempeyek Agent OS 2.2.0](https://img.shields.io/badge/Download-Rempeyek_Agent_OS_2.2.0-ff8a00?style=for-the-badge&logo=windows&logoColor=white)](./Rempeyek-Agent-OS-Setup-2.2.0.exe?raw=1)
+
+**Most users only need the installer above.** Download
+`Rempeyek-Agent-OS-Setup-2.2.0.exe`, open it, choose the installation folder,
+and launch Rempeyek Agent OS. Git, Node.js, npm, and a repository clone are not
+required for the installed desktop application.
+
+- **Windows x64** desktop installer
+- **Automatic updates included** — when a newer release is published, checks run
+  at startup and every six hours; downloads are automatic by default, while
+  installation waits for the user's **Restart to update** approval
+- **Private local state** — settings, agents, telemetry, avatars, and the starter
+  vault stay under `%LOCALAPPDATA%\Rempeyek-Agent-OS`
+- **User data survives uninstall** — removing the application does not delete
+  the user's agent or vault data
+
+This public installer is not yet Authenticode-signed, so Windows may display an
+**Unknown publisher** or SmartScreen warning. SHA-256:
+`AEBB2B8385C4878D809359C4C46F181567C3BB02735B30DD8DF70D63080BB558`.
+
 ## Features
 
 - **Agent Map (the front door)** — a living neural cosmos: every agent orbits the
@@ -61,12 +83,25 @@ React + Vite, split into components across an npm-workspaces monorepo.
 
 ## Requirements
 
+### Desktop users
+
+- **Windows x64**
+- Internet access for Marketplace links and automatic update checks
+- Agent CLIs are optional and only required for the external agents you choose
+  to run
+- An existing Obsidian Vault is optional; a private starter vault is created
+  automatically
+
+### Source contributors
+
 - **Windows** (gateway control uses PowerShell, `schtasks`, and Windows Terminal)
 - **Node.js 18+**
-- An **Obsidian Vault** (or any folder of markdown notes) as the memory layer
-- Your agents' own CLIs installed (Claude Code, or whatever you run)
+- Git and npm
 
-## Quick start
+## Run from source
+
+This section is for contributors. Desktop users should use the
+[installer](#download-for-windows) instead.
 
 ```powershell
 git clone <this-repo> rempeyek-agent-os
@@ -80,11 +115,11 @@ npm install                     # React/Vite + workspace links
 npm run dev                     # builds the UI, then serves http://localhost:4321
 ```
 
-Prefer a launcher? After `npm install`, double-click **`start.cmd`** (or run
+After `npm install`, double-click **`start.cmd`** (or run
 `node bin/rempeyek-agent-os.mjs`) — it builds the UI if needed, starts the server,
 and opens your browser.
 
-### Windows desktop test builds
+### Build the Windows desktop package
 
 The desktop workspace can produce unsigned Windows x64 NSIS and portable test
 artifacts:
