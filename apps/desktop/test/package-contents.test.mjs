@@ -67,6 +67,36 @@ test("packaged app contains required runtime and excludes user data", {
   );
 });
 
+const sourceWebDist = path.resolve(desktopRoot, "..", "web", "dist");
+const packagedWebDist = path.join(
+  root,
+  "app-root",
+  "apps",
+  "web",
+  "dist",
+);
+
+function assetPathsFromHtml(html) {
+  return [...html.matchAll(/(?:src|href)=["']\/(assets\/[^"']+)["']/g)]
+    .map(match => match[1]);
+}
+
+test("packaged renderer exactly matches the built web entry and assets", {
+  skip: fs.existsSync(root)
+    ? false
+    : "desktop package has not been built in this checkout",
+}, () => {
+  const sourceIndex = fs.readFileSync(path.join(sourceWebDist, "index.html"));
+  const packagedIndex = fs.readFileSync(path.join(packagedWebDist, "index.html"));
+  assert.deepEqual(packagedIndex, sourceIndex);
+
+  for (const assetPath of assetPathsFromHtml(sourceIndex.toString("utf8"))) {
+    const sourceAsset = fs.readFileSync(path.join(sourceWebDist, assetPath));
+    const packagedAsset = fs.readFileSync(path.join(packagedWebDist, assetPath));
+    assert.deepEqual(packagedAsset, sourceAsset, assetPath);
+  }
+});
+
 test("latest.yml names an existing installer with the recorded SHA-512", {
   skip: fs.existsSync(path.join(distRoot, "latest.yml"))
     ? false
