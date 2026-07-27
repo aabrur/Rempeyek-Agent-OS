@@ -40,3 +40,12 @@ test("release actions are immutable and signing secrets are step-scoped", () => 
   assert.match(workflow, /Build signed desktop artifacts[\s\S]*?env:[\s\S]*?CSC_LINK:/);
   assert.match(workflow, /npm run audit:release/);
 });
+
+test("signed tag release requires the web workspace version to match", () => {
+  assert.match(
+    workflow,
+    /\$webVersion\s*=\s*\(Get-Content apps\/web\/package\.json -Raw \| ConvertFrom-Json\)\.version/,
+  );
+  assert.match(workflow, /\$tagVersion -ne \$webVersion/);
+});
+

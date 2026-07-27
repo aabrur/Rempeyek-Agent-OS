@@ -78,9 +78,10 @@ jobs:
         run: |
           $tagVersion = $env:GITHUB_REF_NAME -replace '^v', ''
           $rootVersion = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          $webVersion = (Get-Content apps/web/package.json -Raw | ConvertFrom-Json).version
           $desktopVersion = (Get-Content apps/desktop/package.json -Raw | ConvertFrom-Json).version
-          if ($tagVersion -ne $rootVersion -or $tagVersion -ne $desktopVersion) {
-            throw "tag, root, and desktop versions must match"
+          if ($tagVersion -ne $rootVersion -or $tagVersion -ne $webVersion -or $tagVersion -ne $desktopVersion) {
+            throw "tag, root, web, and desktop versions must match"
           }
           $isPrerelease = $tagVersion -match '-'
           "prerelease=$($isPrerelease.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
