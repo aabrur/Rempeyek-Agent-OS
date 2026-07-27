@@ -17,6 +17,8 @@ Obsidian Vault/
 graphify-out/
 apps/web/dist/
 apps/desktop/dist/
+dist-release/
+.commandcode/
 *.log
 
 # Config backup written by the dashboard's Add Agent

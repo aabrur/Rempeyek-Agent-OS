@@ -24,6 +24,7 @@
     "desktop:dist": "npm run build && npm run dist --workspace @rempeyek/desktop",
     "desktop:test-package": "node --test apps/desktop/test/package-contents.test.mjs",
     "audit:public": "node scripts/public-release-audit.mjs",
-    "audit:release": "node scripts/dependency-audit-policy.mjs"
+    "audit:release": "node scripts/dependency-audit-policy.mjs",
+    "export:public": "node scripts/export-public-release.mjs"
   }
 }
