@@ -50,7 +50,15 @@ test("root workspace exposes desktop scripts", () => {
   );
   assert.equal(
     pkg.scripts["desktop:dist"],
-    "npm run dist --workspace @rempeyek/desktop",
+    "npm run build && npm run dist --workspace @rempeyek/desktop",
+  );
+  assert.equal(
+    pkg.scripts["desktop:dev"],
+    "npm run build && npm run dev --workspace @rempeyek/desktop",
+  );
+  assert.equal(
+    pkg.scripts["desktop:pack"],
+    "npm run build && npm run pack --workspace @rempeyek/desktop",
   );
   assert.equal(
     pkg.scripts["desktop:test-package"],
