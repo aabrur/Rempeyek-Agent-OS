@@ -14,14 +14,14 @@ const builtIns = Object.freeze({
   hermes: [path.join(process.env.LOCALAPPDATA || path.join(home, "AppData", "Local"), "hermes"), "hermes"],
 });
 
-function resolveSummonProfile(agent = {}) {
+function resolveSummonProfile(agent = {}, options = {}) {
   const canonical = builtIns[agent.id];
-  const stateRoot = process.env.AGENT_STATE_DIR
+  const stateRoot = options.stateRoot
+    || process.env.AGENT_STATE_DIR
     || path.join(process.env.LOCALAPPDATA || path.join(home, "AppData", "Local"), "Rempeyek-Agent-OS");
-  return {
-    cwd: agent.gateway?.workdir || canonical?.[0] || agent.gateway?.home || stateRoot,
-    command: canonical?.[1] || agent.gateway?.trigger || "",
-  };
+  const command = canonical?.[1] || agent.gateway?.trigger || "";
+  const cwd = agent.gateway?.workdir || canonical?.[0] || agent.gateway?.home || stateRoot;
+  return { cwd, command };
 }
 
 module.exports = { resolveSummonProfile };

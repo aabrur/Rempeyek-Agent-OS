@@ -14,7 +14,7 @@
 - Never execute user-supplied install commands or use a shell for Marketplace adapters.
 - Default launcher location is `%LOCALAPPDATA%\\Rempeyek-Agent-OS`; a supplied Home dir remains the agent working directory.
 - A launcher must validate a bare trigger and must not claim that an unavailable upstream CLI is installed.
-- Commit and push only `C:\\Users\\abrur\\Documents\\Rempeyek-Agent-Os`; commit the local workspace without pushing it.
+- Commit and push only the primary repository workspace; commit the local workspace without pushing it.
 
 ---
 
@@ -70,7 +70,7 @@
 ### Task 4: Mirror the narrow changes and close safely
 
 **Files:**
-- Modify: matching Task 1-3 files in `C:\\Users\\abrur\\Rempeyek-Agent-Os`
+- Modify: matching Task 1-3 files in the local workspace
 - Modify: `checkpoint.md` in both workspaces
 
 **Interfaces:**

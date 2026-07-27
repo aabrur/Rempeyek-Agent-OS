@@ -159,6 +159,10 @@ export const MARKETPLACE_ENTRIES = Object.freeze([
     "aider",
     ".aider",
     "https://github.com/Aider-AI/aider",
+    [
+      { id: "uv", type: "python-tool", package: "aider-chat" },
+      { id: "pipx", type: "pipx", package: "aider-chat" },
+    ],
   ),
   agent(
     "goose",
@@ -168,6 +172,10 @@ export const MARKETPLACE_ENTRIES = Object.freeze([
     "goose",
     ".config/goose",
     "https://github.com/aaif-goose/goose",
+    [
+      { id: "winget", type: "winget", packageId: "Block.Goose", platforms: ["win32"] },
+      { id: "official-url", type: "official-url" },
+    ],
   ),
   agent(
     "openhands",
@@ -177,6 +185,7 @@ export const MARKETPLACE_ENTRIES = Object.freeze([
     "openhands",
     ".openhands",
     "https://github.com/OpenHands/OpenHands",
+    [{ id: "official-url", type: "official-url", note: "OpenHands requires Docker or desktop runner" }],
   ),
   agent(
     "qwen-code",
@@ -196,6 +205,10 @@ export const MARKETPLACE_ENTRIES = Object.freeze([
     "kimi",
     ".kimi",
     "https://github.com/MoonshotAI/kimi-cli",
+    [
+      { id: "uv", type: "python-tool", package: "kimi-cli" },
+      { id: "pipx", type: "pipx", package: "kimi-cli" },
+    ],
   ),
   agent(
     "mistral-vibe",
@@ -215,6 +228,7 @@ export const MARKETPLACE_ENTRIES = Object.freeze([
     "cursor-agent",
     ".cursor",
     "https://docs.cursor.com/en/cli/overview",
+    [{ id: "official-url", type: "official-url", note: "Install Cursor CLI from Cursor Settings" }],
   ),
   agent(
     "crush",

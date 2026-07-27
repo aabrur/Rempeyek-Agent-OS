@@ -52,7 +52,7 @@ export function resolveAdapter({
       probe,
     };
   }
-  if (adapter.type === "python-tool") {
+  if (adapter.type === "python-tool" || adapter.type === "uv-tool") {
     const verb = action === "install" ? "install" : "uninstall";
     const program = executable(platform, "uv.exe", "uv");
     const args = ["tool", verb, adapter.package];
@@ -60,6 +60,52 @@ export function resolveAdapter({
       program,
       args,
       display: `${program.replace(/\.exe$/, "")} ${args.join(" ")}`,
+      probe,
+    };
+  }
+  if (adapter.type === "pipx") {
+    const verb = action === "install" ? "install" : "uninstall";
+    const program = executable(platform, "pipx.exe", "pipx");
+    const args = [verb, adapter.package];
+    return {
+      program,
+      args,
+      display: `pipx ${args.join(" ")}`,
+      probe,
+    };
+  }
+  if (adapter.type === "powershell-script" && platform === "win32") {
+    const program = "powershell.exe";
+    const args = ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", adapter.script || ""];
+    return {
+      program,
+      args,
+      display: `powershell -ExecutionPolicy Bypass -Command "${adapter.displayCommand || adapter.script}"`,
+      probe,
+    };
+  }
+  if (adapter.type === "git-source") {
+    const program = executable(platform, "git.exe", "git");
+    const args = ["clone", adapter.repositoryUrl, adapter.targetDir || "."];
+    return {
+      program,
+      args,
+      display: `git ${args.join(" ")}`,
+      probe,
+    };
+  }
+  if (adapter.type === "managed-bundle") {
+    return {
+      type: "managed-bundle",
+      bundleId: adapter.bundleId || entry.id,
+      display: `[Internal Bundle] Unpack ${entry.name}`,
+      probe,
+    };
+  }
+  if (adapter.type === "official-url" || adapter.type === "wsl-only") {
+    return {
+      externalUrl: entry.officialUrl || entry.sourceUrl,
+      note: adapter.note || entry.availabilityNote || "External setup required",
       probe,
     };
   }

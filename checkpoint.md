@@ -915,7 +915,7 @@ and new authority to push/tag/release.
 ### Repository boundary
 
 - This public repository is the only workspace authorized for `main` push.
-- The local source mirror at `C:\\Users\\abrur\\Rempeyek-Agent-Os` receives the same focused behavior, but is commit-only and must not be pushed.
+- The local state root at `%LOCALAPPDATA%\Rempeyek-Agent-OS` receives the same focused behavior, but is commit-only and must not be pushed.
 - The local mirror remains behind the public Marketplace architecture. Its broader 20-agent Marketplace UI/data parity needs a separately approved, safe source synchronization; this checkpoint does not disguise that divergence.
 
 

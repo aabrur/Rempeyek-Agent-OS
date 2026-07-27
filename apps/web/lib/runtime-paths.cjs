@@ -9,7 +9,9 @@ function resolveRuntimePaths({ env = process.env, root, home, platform = process
     : platform === "darwin"
       ? p.join(home, "Library", "Application Support")
       : (env.XDG_DATA_HOME || p.join(home, ".local", "share"));
-  const defaultStateRoot = p.join(appDataRoot, "Rempeyek-Agent-OS");
+  const defaultStateRoot = platform === "win32" && env.LOCALAPPDATA
+    ? (p.basename(env.LOCALAPPDATA) === "Rempeyek-Agent-OS" ? env.LOCALAPPDATA : p.join(env.LOCALAPPDATA, "Rempeyek-Agent-OS"))
+    : p.join(appDataRoot, "Rempeyek-Agent-OS");
   const legacyPath = p.join(root, "agents.config.json");
   const legacyConfig = !env.AGENTS_CONFIG && exists(legacyPath);
   const stateRoot = env.AGENT_STATE_DIR || (legacyConfig ? root : defaultStateRoot);

@@ -3,6 +3,17 @@
 All notable changes to Rempeyek Agent OS. The in-app update banner compares the local version
 against the latest GitHub Release of this repository — tag releases as `v<version>`.
 
+## [2.2.3] - 2026-07-27
+
+### Added
+- Complete implementation of GitHub Issue #1: terminal-first install & summon, full runtime evidence, Vault + Graphify bootstrap, and end-user auto-update isolation.
+- Comprehensive Playwright and HTTP API test suite for all UI action buttons.
+- Safe non-recursive CMD launcher generation (`kilocode` delegating to `kilo`).
+
+### Fixed
+- Enforced dynamic `%LOCALAPPDATA%\Rempeyek-Agent-OS` state root resolution with zero hardcoded owner paths.
+- Redacted raw desktop updater network exceptions into user-safe error messages.
+
 ## [2.2.2] - 2026-07-27
 
 ### Fixed

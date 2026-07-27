@@ -12,7 +12,7 @@ React + Vite, split into components across an npm-workspaces monorepo.
 
 ## Download for Windows
 
-[![Download Rempeyek Agent OS 2.2.2](https://img.shields.io/badge/Download-Rempeyek_Agent_OS_2.2.2-ff8a00?style=for-the-badge&logo=windows&logoColor=white)](./Rempeyek-Agent-OS-Setup-2.2.2.exe?raw=1)
+[![Download Rempeyek Agent OS 2.2.3](https://img.shields.io/badge/Download-Rempeyek_Agent_OS_2.2.3-ff8a00?style=for-the-badge&logo=windows&logoColor=white)](./Rempeyek-Agent-OS-Setup-2.2.3.exe?raw=1)
 
 **The installer and direct download are free.** Most users only need to click
 the button above. No GitHub account, Git, Node.js, npm, or repository clone is
@@ -26,19 +26,19 @@ required.
 
 ### Install
 
-1. Click **Download Rempeyek Agent OS 2.2.2** above.
+1. Click **Download Rempeyek Agent OS 2.2.3** above.
 2. Confirm that the downloaded file is named
-   `Rempeyek-Agent-OS-Setup-2.2.2.exe`.
+   `Rempeyek-Agent-OS-Setup-2.2.3.exe`.
 3. Optional but recommended: verify its SHA-256 in PowerShell:
 
    ```powershell
-   Get-FileHash "$HOME\Downloads\Rempeyek-Agent-OS-Setup-2.2.2.exe" -Algorithm SHA256
+   Get-FileHash "$HOME\Downloads\Rempeyek-Agent-OS-Setup-2.2.3.exe" -Algorithm SHA256
    ```
 
    Expected value:
 
    ```text
-   8569AF500C333152F3B2D54F80B06E0F020825227C801C180DE4124423FB6B73
+   ACD63432BE50DE5A7FBF36A73698958D0433A4AC866BDC1B7177FCEBD82FB0D6
    ```
 
 4. Open the installer, choose the installation folder, and finish the setup.
@@ -56,7 +56,7 @@ value differs, delete the file and do not run it.
 ### Updates
 
 The desktop updater is already implemented, but the public signed update feed
-is not active yet. Local 2.2.2 artifacts remain unsigned until the signed GitHub
+is not active yet. Local 2.2.3 artifacts remain unsigned until the signed GitHub
 Release gate succeeds, so this version does not silently install an
 unverified update. Until a signed installer and matching `latest.yml` are
 published in GitHub Releases, install future versions manually from this

@@ -137,3 +137,43 @@ export function buildSubagentRecord(input = {}, context = {}) {
     },
   };
 }
+
+export const ALLOWED_EVENT_TYPES = new Set([
+  "session_start",
+  "session_end",
+  "process_start",
+  "process_exit",
+  "install_start",
+  "install_progress",
+  "install_done",
+  "install_failed",
+  "gateway_start",
+  "gateway_stop",
+  "gateway_restart",
+  "gateway_status",
+  "summon_start",
+  "summon_ready",
+  "summon_exit",
+  "update_start",
+  "update_progress",
+  "update_done",
+  "update_failed",
+  "task_start",
+  "task_progress",
+  "task_done",
+  "subagent_start",
+  "subagent_done",
+  "comm",
+  "info",
+]);
+
+export function formatAgentTelemetry({ agentId = "", events = [] } = {}) {
+  const tasks = events.filter(e => e.type && e.type.startsWith("task_"));
+  const subagents = events.filter(e => e.type && e.type.startsWith("subagent_"));
+  return {
+    tasksState: tasks.length ? "active" : "Not reported by this agent",
+    subagentsState: subagents.length ? "active" : "Not reported by this agent",
+    tasks,
+    subagents,
+  };
+}
