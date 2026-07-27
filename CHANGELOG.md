@@ -6,9 +6,14 @@ against the latest GitHub Release of this repository — tag releases as `v<vers
 ## [2.2.3] - 2026-07-27
 
 ### Added
-- Complete implementation of GitHub Issue #1: terminal-first install & summon, full runtime evidence, Vault + Graphify bootstrap, and end-user auto-update isolation.
+- Terminal-first visible Marketplace installation opening in `%LOCALAPPDATA%\Rempeyek-Agent-OS`.
+- Summon terminals default to the same canonical state root.
+- Safe launcher alias delegation (`kilocode` delegating to `kilo` without CMD recursion).
+- Expanded Marketplace catalog (20 agent CLIs + Hypertaks plugin/skill) and 9 typed installer adapters.
+- Truthful lifecycle telemetry with honest `"Not reported by this agent"` status for unsupported task and subagent states.
+- Local Vault scaffolding (`scaffoldVaultStructure`) and Graphify AST index integration.
+- Desktop updater isolation guarding restarts against active lifecycle operations and redacting raw network errors.
 - Comprehensive Playwright and HTTP API test suite for all UI action buttons.
-- Safe non-recursive CMD launcher generation (`kilocode` delegating to `kilo`).
 
 ### Fixed
 - Enforced dynamic `%LOCALAPPDATA%\Rempeyek-Agent-OS` state root resolution with zero hardcoded owner paths.

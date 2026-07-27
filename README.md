@@ -38,7 +38,7 @@ required.
    Expected value:
 
    ```text
-   ACD63432BE50DE5A7FBF36A73698958D0433A4AC866BDC1B7177FCEBD82FB0D6
+   19B77C702A09AE88E2E36AD5EAC4F9F80929527534BA58ED00192580A0C6834B
    ```
 
 4. Open the installer, choose the installation folder, and finish the setup.

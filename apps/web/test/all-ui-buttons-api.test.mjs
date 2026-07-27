@@ -81,7 +81,7 @@ test("API routes cover all UI action button backend contracts", () => withServer
   assert.ok(state.agents);
   assert.equal(state.agents[0].id, "hermes");
 
-  // 2. /api/marketplace/catalog - Marketplace Catalog entries
+  // 2. /api/marketplace - Marketplace Catalog entries
   const catRes = await fetch(`${base}/api/marketplace`);
   assert.equal(catRes.status, 200);
   const cat = await catRes.json();
@@ -105,13 +105,13 @@ test("API routes cover all UI action button backend contracts", () => withServer
   const vh = await vhRes.json();
   assert.ok(vh.vault);
 
-  // 6. Register agent (/api/agents/add)
-  const customId = `custom-test-${Date.now()}`;
+  // 6. Register custom agent (/api/agents/add) - Single valid request body
+  const customId = `custom-agent-${Date.now()}`;
   const addApproval = await approve(base, "agents.add", "registry");
   const addRes = await fetch(`${base}/api/agents/add`, {
     method: "POST",
     headers: { "content-type": "application/json", "x-approval-id": addApproval },
-    body: JSON.stringify({ id: customId, name: "Custom Test Agent", trigger: "custom-cli", home: "C:\\Agents\\Custom" }),
+    body: JSON.stringify({ id: customId, name: "Custom Agent", trigger: "custom-cli", home: "C:\\Agents\\Custom" }),
   });
   const added = await addRes.json();
   assert.equal(addRes.status, 200, `addAgent status: ${addRes.status}, body: ${JSON.stringify(added)}`);
