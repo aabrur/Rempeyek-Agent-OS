@@ -255,7 +255,7 @@ test("uninstall requires two scoped approvals and launches only a reviewed adapt
 });
 
 test("agent install rejects executable input and can atomically register a reviewed profile", async () => {
-  await withServer(async ({ base, launched }) => {
+  await withServer(async ({ base, launched, root }) => {
     const rejected = await mutation(base, "/api/marketplace/opencode/install", {
       body: {
         operationId: "install-rejected",
@@ -288,6 +288,11 @@ test("agent install rejects executable input and can atomically register a revie
 
     const state = await fetch(`${base}/api/state`).then(value => value.json());
     assert.equal(state.agents.some(agent => agent.id === "opencode"), true);
+    const registered = state.agents.find(agent => agent.id === "opencode");
+    assert.equal(registered.gateway, undefined);
+    const config = JSON.parse(fs.readFileSync(path.join(root, "agents.config.json"), "utf8"));
+    assert.equal(config.agents.find(agent => agent.id === "opencode").gateway.workdir, root);
+    assert.equal(fs.existsSync(path.join(root, "opencode.cmd")), true);
   });
 });
 

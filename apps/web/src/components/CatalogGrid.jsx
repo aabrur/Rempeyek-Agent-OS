@@ -95,15 +95,6 @@ export function CatalogGrid({ onAdded, kind = "all" }) {
     if (action.kind === "register") {
       return <Btn onClick={() => registerOnly(entry)}>{action.label}</Btn>;
     }
-    if (action.kind === "official-link") {
-      return (
-        <span className="aa-cat-state">
-          <a href={entry.officialUrl} target="_blank" rel="noopener noreferrer">
-            {action.label}
-          </a>
-        </span>
-      );
-    }
     return (
       <span className={`aa-cat-state ${action.label.includes("ready") ? "ok" : ""}`.trim()}>
         {action.label}

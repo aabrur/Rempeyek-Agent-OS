@@ -26,15 +26,12 @@ export function marketplaceAction(entry, operationState = {}) {
       adapterId: entry.adapterIds[0],
     };
   }
-  if (entry.officialUrl) {
-    return { kind: "official-link", label: "Official page ↗", adapterId: null };
-  }
   if (entry.kind === "agent" && !entry.registered) {
-    return { kind: "register", label: "Register", adapterId: null };
+    return { kind: "register", label: "Register launcher", adapterId: null };
   }
   return {
     kind: "state",
-    label: entry.registered ? "registered" : "unavailable",
+    label: entry.registered ? "registered" : "manual setup required",
     adapterId: null,
   };
 }

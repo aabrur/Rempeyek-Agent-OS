@@ -14,6 +14,7 @@ const { createAccessPolicy } = require("./lib/access-policy.cjs");
 const { createConfigStore } = require("./lib/config-store.cjs");
 const { ensureEmptyConfig, resolveRuntimePaths } = require("./lib/runtime-paths.cjs");
 const { resolveSummonProfile } = require("./lib/summon-profile.cjs");
+const { writeAgentLauncher } = require("./lib/agent-launcher.cjs");
 
 /* Monorepo layout: this file lives in apps/web/, but runtime data (vault, config,
    telemetry, scripts, .env) stays at the repo ROOT so agent CLIs and bridges keep working. */
@@ -225,7 +226,12 @@ function verifyManagedBundle(sourceRoot, entry) {
   return manifest;
 }
 
-function reviewedAgentProfile(config, entry, userHome = os.homedir()) {
+function reviewedAgentProfile(
+  config,
+  entry,
+  userHome = os.homedir(),
+  stateRoot = RUNTIME_PATHS.stateRoot,
+) {
   const catalog = catalogLib?.catalogEntry(entry.id);
   if (!catalog) throw new Error(`unknown catalog agent '${entry.id}'`);
   const nodeNums = config.agents
@@ -238,6 +244,7 @@ function reviewedAgentProfile(config, entry, userHome = os.homedir()) {
     existingNodeNums: nodeNums,
     date: localISO().slice(0, 10),
     homedir: userHome,
+    workdir: stateRoot,
   });
   if (built.error) throw new Error(built.error);
   return built.agent;
@@ -276,11 +283,17 @@ function addAgent(body) {
     existingNodeNums: nodeNums,
     date: localISO().slice(0, 10),
     homedir: os.homedir(),
+    workdir: RUNTIME_PATHS.stateRoot,
   });
   if (r.error) return r;
   cfg.agents.push(r.agent);
   try { saveConfig(cfg); } catch (e) { return { error: `failed to write config: ${e.message}` }; }
   scaffoldVaultLane(r.agent);   // otherwise a dashboard-added agent's Brains/ lane is empty forever
+  writeAgentLauncher({
+    stateRoot: RUNTIME_PATHS.stateRoot,
+    trigger: r.agent.gateway?.trigger,
+    workingDirectory: r.agent.gateway?.workdir,
+  });
   sysEvent(r.agent.id, "ok", `agent registered via dashboard (${r.agent.node})`);
   return { ok: true, agent: r.agent };
 }
@@ -1988,10 +2001,20 @@ function installMarketplace(services, entry, data) {
   if (data.register === true && !config.agents.some(agent =>
     agent.id === entry.id || agent.gateway?.marketplaceId === entry.id
   )) {
-    const agent = reviewedAgentProfile(config, entry, services.userHome);
+    const agent = reviewedAgentProfile(
+      config,
+      entry,
+      services.userHome,
+      services.stateRoot,
+    );
     config = { ...config, agents: [...config.agents, agent] };
     services.store.commit(config, data.operationId);
     scaffoldRuntimeVaultLane(agent, services.vaultPath);
+    writeAgentLauncher({
+      stateRoot: services.stateRoot,
+      trigger: agent.gateway?.trigger,
+      workingDirectory: agent.gateway?.workdir,
+    });
   }
   const body = rememberMutation(services, data.operationId, {
     operationId: data.operationId,

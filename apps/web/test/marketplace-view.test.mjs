@@ -54,8 +54,8 @@ test("actions never expose command text", () => {
     adapterId: "npm",
   });
   assert.deepEqual(marketplaceAction(entries[2]), {
-    kind: "official-link",
-    label: "Official page ↗",
+    kind: "register",
+    label: "Register launcher",
     adapterId: null,
   });
   assert.equal(JSON.stringify(marketplaceAction(entries[0])).includes("cmd"), false);

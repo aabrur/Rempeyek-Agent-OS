@@ -38,3 +38,10 @@ test("custom agents retain their trusted configured summon profile", () => {
     gateway: { home: "C:\\Agents\\Custom", trigger: "custom-cli --interactive" },
   }), { cwd: "C:\\Agents\\Custom", command: "custom-cli --interactive" });
 });
+
+test("registered launchers prefer their explicit app-state workdir", () => {
+  assert.deepEqual(resolveSummonProfile({
+    id: "custom-agent",
+    gateway: { home: "C:\\Agents\\Custom", workdir: "C:\\Users\\test\\AppData\\Local\\Rempeyek-Agent-OS", trigger: "custom-cli" },
+  }), { cwd: "C:\\Users\\test\\AppData\\Local\\Rempeyek-Agent-OS", command: "custom-cli" });
+});

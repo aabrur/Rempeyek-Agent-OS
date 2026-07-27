@@ -81,8 +81,9 @@ export function AddAgentModal({ open, onClose, onAdded }) {
         </div>
         <div className="aa-field">
           <label htmlFor="aaHome">Home dir (optional)</label>
-          <input id="aaHome" maxLength={200} placeholder="C:\Users\you\.nova"
+          <input id="aaHome" maxLength={200} aria-describedby="aaHomeHelp" placeholder="C:\Users\you\Agent Workspace"
             value={f.home} onChange={e => set("home", e.target.value)} />
+          <small id="aaHomeHelp" className="aa-field-hint">Default launch folder: Rempeyek Agent OS state folder.</small>
         </div>
         <div className="aa-field wide aa-actions">
           <span className={`aa-hint ${hint ? "err" : ""}`.trim()} style={{ marginRight: "auto" }}>{hint}</span>

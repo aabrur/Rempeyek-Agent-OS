@@ -16,10 +16,11 @@ const builtIns = Object.freeze({
 
 function resolveSummonProfile(agent = {}) {
   const canonical = builtIns[agent.id];
-  if (canonical) return { cwd: canonical[0], command: canonical[1] };
+  const stateRoot = process.env.AGENT_STATE_DIR
+    || path.join(process.env.LOCALAPPDATA || path.join(home, "AppData", "Local"), "Rempeyek-Agent-OS");
   return {
-    cwd: agent.gateway?.home || home,
-    command: agent.gateway?.trigger || "",
+    cwd: agent.gateway?.workdir || canonical?.[0] || agent.gateway?.home || stateRoot,
+    command: canonical?.[1] || agent.gateway?.trigger || "",
   };
 }
 

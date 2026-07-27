@@ -891,3 +891,29 @@ and new authority to push/tag/release.
 - Authenticode signing, timestamping, and stable auto-update publication remain
   blocked on a valid externally verified publisher identity and signing
   credentials.
+
+---
+
+## 2026-07-27 - Agent Launcher UI Parity
+
+### Completed
+
+- Preserved the existing UI while making the Add Agent overlay vertically scrollable.
+- Added a native Trakteer control above Settings, linking to `https://trakteer.id/aabrur`.
+- Added reviewed Windows launchers at `%LOCALAPPDATA%\\Rempeyek-Agent-OS\\<agent>.cmd` after custom or Marketplace registration.
+- Adapterless Marketplace agents now register a launcher locally; they do not open an external install page automatically.
+- A configured Home directory remains the launcher working directory. Existing built-in and custom summon profiles remain compatible.
+
+### Fresh verification
+
+- Web tests: 185/185 pass.
+- Vite production build: pass.
+- Desktop tests: 23/23 pass.
+- Package tests: 2/2 pass.
+- Public audit, release audit, `git diff --check`, and Graphify update: pass.
+
+### Repository boundary
+
+- This public repository is the only workspace authorized for `main` push.
+- The local source mirror at `C:\\Users\\abrur\\Rempeyek-Agent-Os` receives the same focused behavior, but is commit-only and must not be pushed.
+- The local mirror remains behind the public Marketplace architecture. Its broader 20-agent Marketplace UI/data parity needs a separately approved, safe source synchronization; this checkpoint does not disguise that divergence.

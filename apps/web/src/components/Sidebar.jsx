@@ -1,5 +1,5 @@
 import {
-  ChevronRight, Cpu, Database, Eye, Map as MapIcon, Network,
+  ChevronRight, Cpu, Database, Eye, HeartHandshake, Map as MapIcon, Network,
   Settings as SettingsIcon, ShoppingBag, Users,
 } from "lucide-react";
 import { useClock } from "../hooks/useDashboard";
@@ -51,6 +51,13 @@ export function Sidebar({ view, onView, agents = [], agency, vault }) {
       <nav id="nav" aria-label="Primary">
         {NAV.map(item => <NavButton key={item.id} item={item} view={view} onView={onView} />)}
       </nav>
+
+      <div className="side-support">
+        <a className="trakteer-button" href="https://trakteer.id/aabrur" target="_blank" rel="noopener noreferrer">
+          <HeartHandshake size={16} aria-hidden="true" />
+          <span>Dukung Saya di Trakteer</span>
+        </a>
+      </div>
 
       <div className="side-settings">
         <NavButton item={SETTINGS} view={view} onView={onView} />

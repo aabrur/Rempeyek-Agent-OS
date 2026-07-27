@@ -38,6 +38,7 @@ export function buildAgentRecord({
   existingNodeNums = [],
   date = "",
   homedir = "",
+  workdir = "",
 } = {}) {
   if (body.catalogId && !cat) return { error: `unknown catalog agent '${body.catalogId}'` };
   const id = String((cat?.id ?? body.id) || "").trim();
@@ -60,14 +61,16 @@ export function buildAgentRecord({
     .split(/\s+/)[0]
     .slice(0, 60);
   const home = resolveHome(cat?.home ?? body.home, homedir);
+  const workingDirectory = resolveHome(body.home || workdir, homedir);
 
   const gateway = { actions: [] };
   if (home) gateway.home = home;
+  if (workingDirectory) gateway.workdir = workingDirectory;
   if (trigger) gateway.trigger = trigger;
   if (cat) gateway.marketplaceId = cat.id;
   if (cat?.envAllow) gateway.envAllow = [...cat.envAllow];
   const hasGateway =
-    gateway.home || gateway.trigger || gateway.marketplaceId || gateway.envAllow;
+    gateway.home || gateway.workdir || gateway.trigger || gateway.marketplaceId || gateway.envAllow;
 
   const agent = {
     id,
