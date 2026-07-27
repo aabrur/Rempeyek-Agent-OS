@@ -79,7 +79,7 @@
 
 - [x] **Step 1: Apply the same focused files** without rebasing, resetting, deleting, or staging the local packaged application folder.
 - [x] **Step 2: Run** each repository's test command, production build, `git diff --check`, and Graphify update.
-- [ ] **Step 3: Commit** public changes and push `main`; commit matching local changes without a push.
+- [x] **Step 3: Commit** public changes and push `main`; commit matching local changes without a push.
 
 ## Self-Review
 
