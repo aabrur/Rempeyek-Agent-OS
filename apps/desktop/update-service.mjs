@@ -9,7 +9,7 @@ function rawErrorMessage(error) {
 function isMissingReleaseMetadata(error) {
   const message = rawErrorMessage(error);
   const status = error?.statusCode ?? error?.status;
-  return /latest\.yml/i.test(message)
+  return /(?:latest\.yml|releases\.atom|\breleases\b)/i.test(message)
     && (status === 404 || /\b404\b/.test(message));
 }
 
