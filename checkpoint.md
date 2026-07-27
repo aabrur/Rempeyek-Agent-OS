@@ -917,3 +917,59 @@ and new authority to push/tag/release.
 - This public repository is the only workspace authorized for `main` push.
 - The local source mirror at `C:\\Users\\abrur\\Rempeyek-Agent-Os` receives the same focused behavior, but is commit-only and must not be pushed.
 - The local mirror remains behind the public Marketplace architecture. Its broader 20-agent Marketplace UI/data parity needs a separately approved, safe source synchronization; this checkpoint does not disguise that divergence.
+
+
+---
+
+## 2026-07-27 - Desktop UI and Installer Parity 2.2.2
+
+### Status
+
+Tasks 1-3 of the approved desktop UI, installer, and updater-readiness plan are
+implemented on branch `codex/desktop-ui-sync`. Task 1 and Task 2 received clean
+task reviews. The Task 3 reviewer was interrupted before a verdict; Tasks 4-5
+remain unstarted.
+
+### Delivered
+
+- Root `desktop:dev`, `desktop:pack`, and `desktop:dist` now build the
+  current Vite renderer before Electron starts or packages it.
+- Package regression coverage compares the source production `index.html` and
+  each referenced `/assets/` file byte-for-byte with the unpacked Electron
+  renderer.
+- Root, web, and desktop workspace versions are `2.2.2`; the lockfile,
+  changelog, and Windows download instructions were updated.
+- Fresh NSIS and portable Windows artifacts were built locally. The NSIS
+  installer was copied to `Rempeyek-Agent-OS-Setup-2.2.2.exe`.
+
+### Artifact evidence
+
+- Installer SHA-256:
+  `8569AF500C333152F3B2D54F80B06E0F020825227C801C180DE4124423FB6B73`.
+- Package renderer parity test: 3/3 pass.
+- Package metadata/SHA-512 test: 3/3 pass.
+- Authenticode status: `NotSigned`.
+
+### Preserved release boundary
+
+No push, tag, GitHub Release, installer upload, signing, deployment, or stable
+feed mutation occurred. Direct end-user auto-update is not active: it still
+requires a trusted Authenticode signature, a signed `v2.2.2` GitHub Release,
+matching `latest.yml`, and clean-machine update acceptance.
+
+### Resume order
+
+1. Complete the interrupted Task 3 review for commit `7391357`.
+2. Implement Task 4: require root, web, and desktop version parity in the
+   signed-tag release workflow.
+3. Implement Task 5: final test/audit/package verification and Graphify refresh.
+4. Treat the pre-existing `npm test` owner-path failures in `checkpoint.md`
+   and the earlier plan document as out of scope unless separately authorized.
+
+### References
+
+- Design: `docs/superpowers/specs/2026-07-27-desktop-ui-installer-parity-design.md`
+- Plan: `docs/superpowers/plans/2026-07-27-desktop-ui-installer-parity.md`
+- Task reports: `.superpowers/sdd/task-1-report.md`,
+  `.superpowers/sdd/task-2-report.md`, and `.superpowers/sdd/task-3-report.md`
+- Commits: `79e3fc0`, `5a3e7b9`, and `7391357`
