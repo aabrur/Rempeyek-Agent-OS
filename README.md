@@ -12,7 +12,7 @@ React + Vite, split into components across an npm-workspaces monorepo.
 
 ## Download for Windows
 
-[![Download Rempeyek Agent OS 2.2.1](https://img.shields.io/badge/Download-Rempeyek_Agent_OS_2.2.1-ff8a00?style=for-the-badge&logo=windows&logoColor=white)](./Rempeyek-Agent-OS-Setup-2.2.1.exe?raw=1)
+[![Download Rempeyek Agent OS 2.2.2](https://img.shields.io/badge/Download-Rempeyek_Agent_OS_2.2.2-ff8a00?style=for-the-badge&logo=windows&logoColor=white)](./Rempeyek-Agent-OS-Setup-2.2.2.exe?raw=1)
 
 **The installer and direct download are free.** Most users only need to click
 the button above. No GitHub account, Git, Node.js, npm, or repository clone is
@@ -26,19 +26,19 @@ required.
 
 ### Install
 
-1. Click **Download Rempeyek Agent OS 2.2.1** above.
+1. Click **Download Rempeyek Agent OS 2.2.2** above.
 2. Confirm that the downloaded file is named
-   `Rempeyek-Agent-OS-Setup-2.2.1.exe`.
+   `Rempeyek-Agent-OS-Setup-2.2.2.exe`.
 3. Optional but recommended: verify its SHA-256 in PowerShell:
 
    ```powershell
-   Get-FileHash "$HOME\Downloads\Rempeyek-Agent-OS-Setup-2.2.1.exe" -Algorithm SHA256
+   Get-FileHash "$HOME\Downloads\Rempeyek-Agent-OS-Setup-2.2.2.exe" -Algorithm SHA256
    ```
 
    Expected value:
 
    ```text
-   A2F6328C6742B66261C8AA1E2E4C885D08A41BED798E6E31DC0FB00B95AE6567
+   8569AF500C333152F3B2D54F80B06E0F020825227C801C180DE4124423FB6B73
    ```
 
 4. Open the installer, choose the installation folder, and finish the setup.
@@ -56,7 +56,8 @@ value differs, delete the file and do not run it.
 ### Updates
 
 The desktop updater is already implemented, but the public signed update feed
-is not active yet. Version 2.2.1 therefore does not silently install an
+is not active yet. Local 2.2.2 artifacts remain unsigned until the signed GitHub
+Release gate succeeds, so this version does not silently install an
 unverified update. Until a signed installer and matching `latest.yml` are
 published in GitHub Releases, install future versions manually from this
 Download section. User settings, installed-agent records, telemetry, avatars,

@@ -7,6 +7,21 @@ import { fileURLToPath } from "node:url";
 const DESKTOP = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const ROOT = path.resolve(DESKTOP, "..", "..");
 
+test("root, web, and desktop report the same release version", () => {
+  const rootPackage = JSON.parse(
+    fs.readFileSync(path.join(ROOT, "package.json"), "utf8"),
+  );
+  const webPackage = JSON.parse(
+    fs.readFileSync(path.join(ROOT, "apps", "web", "package.json"), "utf8"),
+  );
+  const desktopPackage = JSON.parse(
+    fs.readFileSync(path.join(DESKTOP, "package.json"), "utf8"),
+  );
+  assert.equal(rootPackage.version, "2.2.2");
+  assert.equal(webPackage.version, rootPackage.version);
+  assert.equal(desktopPackage.version, rootPackage.version);
+});
+
 test("desktop package pins the reviewed runtime and packages only required app files", () => {
   const pkg = JSON.parse(
     fs.readFileSync(path.join(DESKTOP, "package.json"), "utf8"),

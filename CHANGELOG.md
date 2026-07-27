@@ -3,6 +3,13 @@
 All notable changes to Rempeyek Agent OS. The in-app update banner compares the local version
 against the latest GitHub Release of this repository — tag releases as `v<version>`.
 
+## [2.2.2] - 2026-07-27
+
+### Fixed
+
+- Desktop development and packaging now build the current React renderer before Electron starts or creates an installer.
+- Package verification rejects an installer whose embedded UI differs from the current production build.
+
 ## [2.2.1] - 2026-07-26
 
 ### Fixed
