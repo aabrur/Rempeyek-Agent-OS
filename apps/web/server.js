@@ -45,6 +45,32 @@ const VAULT = RUNTIME_PATHS.vaultPath;
 const CONFIG_PATH = RUNTIME_PATHS.configPath;
 const TOKEN = process.env.DASH_TOKEN || "";
 const ACCESS_POLICY = createAccessPolicy(process.env);
+
+/* Bootstrap: auto-initialize Vault, registries, and runtime state on first run */
+const BOOTSTRAP_MOD = import("./lib/bootstrap.mjs");
+let bootstrapInstance = null;
+BOOTSTRAP_MOD.then(({ createBootstrap }) => {
+  try {
+    const configDir = path.join(RUNTIME_PATHS.runtimeRoot || path.dirname(VAULT), 'Config');
+    bootstrapInstance = createBootstrap({
+      configDir,
+      vaultPath: VAULT,
+      agentsDir: RUNTIME_PATHS.agentsDir || path.join(path.dirname(VAULT), 'Agents'),
+      backupsDir: path.join(path.dirname(VAULT), 'Backups')
+    });
+    if (!bootstrapInstance.isBootstrapped()) {
+      const result = bootstrapInstance.run();
+      console.log(`  Bootstrap: ${result.success ? 'completed' : 'completed with errors'} (${result.warnings.length} warnings, ${result.errors.length} errors)`);
+    }
+  } catch (e) {
+    console.error('[bootstrap]', e.message);
+  }
+}).catch(e => console.error('[bootstrap]', e.message));
+
+const UNIFIED_MEMORY_MOD = import("./lib/unified-memory-graph.mjs");
+let unifiedMemoryLib = null;
+UNIFIED_MEMORY_MOD.then(m => { unifiedMemoryLib = m; }).catch(e => console.error("[unified-memory]", e.message));
+
 const TODAY_PROJECTION = import("./lib/today-projection.mjs");
 const APPROVAL_QUEUE = import("./lib/approval-queue.mjs").then(({ createApprovalQueue }) => createApprovalQueue());
 const VAULT_GRAPH = import("./lib/vault-graph.mjs");
@@ -1332,6 +1358,14 @@ let graphCache = { t: 0, data: null };
 let parityGraphCache = { t: 0, data: null };
 async function buildParityGraph() {
   if (parityGraphCache.data && Date.now() - parityGraphCache.t < 60000) return parityGraphCache.data;
+  if (unifiedMemoryLib?.buildUnifiedMemoryGraph) {
+    try {
+      const configDir = path.join(RUNTIME_PATHS.runtimeRoot || path.dirname(VAULT), 'Config');
+      const data = unifiedMemoryLib.buildUnifiedMemoryGraph({ vaultPath: VAULT, rootDir: ROOT, configDir });
+      parityGraphCache = { t: Date.now(), data };
+      return data;
+    } catch (e) { console.error('[buildParityGraph]', e.message); }
+  }
   const { buildVaultGraph } = await VAULT_GRAPH;
   // Full fidelity: every vault file (only .md gets read + link-parsed) + repo source as `code`.
   const files = walkVaultAll().map((file) => {
@@ -2712,6 +2746,39 @@ function requestHandler(req, res, services = DEFAULT_RUNTIME_SERVICES) {
           list.forEach(a => gwCtl(a.id, "start", r => { results[a.id] = r; if (--pending === 0) json(res, 200, results); }));
         });
       }
+      /* Memory API endpoints */
+      if (url.startsWith("/api/memory/")) {
+        return buildParityGraph().then(memoryGraph => {
+          if (url === "/api/memory/graph" && req.method === "GET") return json(res, 200, memoryGraph);
+          if (url === "/api/memory/graph/stats" && req.method === "GET") return json(res, 200, memoryGraph.stats || {});
+          if (url === "/api/memory/health" && req.method === "GET") return json(res, 200, memoryGraph.health || { status: "healthy" });
+          if (url === "/api/memory/activity" && req.method === "GET") {
+            const activity = (memoryGraph.nodes || []).filter(n => n.updatedAt).sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt)).slice(0, 50);
+            return json(res, 200, { activity });
+          }
+          let mId = url.match(/^\/api\/memory\/node\/(.+)$/);
+          if (mId && req.method === "GET") {
+            const nodeId = decodeURIComponent(mId[1]);
+            const node = (memoryGraph.nodes || []).find(n => n.id === nodeId);
+            if (!node) return json(res, 404, { error: "Node not found" });
+            return json(res, 200, node);
+          }
+          mId = url.match(/^\/api\/memory\/neighborhood\/(.+)$/);
+          if (mId && req.method === "GET") {
+            const nodeId = decodeURIComponent(mId[1]);
+            const neighbors = (memoryGraph.edges || []).filter(e => e.source === nodeId || e.target === nodeId).map(e => e.source === nodeId ? e.target : e.source);
+            const nodes = (memoryGraph.nodes || []).filter(n => n.id === nodeId || neighbors.includes(n.id));
+            return json(res, 200, { focusId: nodeId, nodes, edgeCount: neighbors.length });
+          }
+          if (url.startsWith("/api/memory/search") && req.method === "GET") {
+            const u = new URL(req.url, `http://${req.headers.host || "localhost"}`);
+            const q = (u.searchParams.get("q") || "").toLowerCase();
+            const results = (memoryGraph.nodes || []).filter(n => (n.label || "").toLowerCase().includes(q) || (n.id || "").toLowerCase().includes(q)).slice(0, 100);
+            return json(res, 200, { query: q, count: results.length, results });
+          }
+          return json(res, 404, { error: "Memory endpoint not found" });
+        }).catch(err => json(res, 500, { error: err.message }));
+      }
       if (url === "/api/graph" || url === "/api/vault/graph") return buildParityGraph().then(data => json(res, 200, data)).catch(error => json(res, 500, { error: error.message }));
       if (url === "/api/agent-topology") return buildLiveAgentTopology(services).then(data => json(res, 200, data)).catch(error => json(res, 500, { error: error.message }));
       if (url === "/api/report") return json(res, 200, buildReport());
@@ -2769,6 +2836,15 @@ function requestHandler(req, res, services = DEFAULT_RUNTIME_SERVICES) {
         });
       if (url === "/api/schedule") return buildSchedule(r => json(res, 200, r));      // R#8
       if (url === "/api/vault-health") return buildVaultHealth(r => json(res, 200, r)); // R#9
+      if (url === "/api/bootstrap/status" && req.method === "GET") {
+        if (!bootstrapInstance) return json(res, 503, { error: "Bootstrap module not loaded" });
+        return json(res, 200, bootstrapInstance.getStatus());
+      }
+      if (url === "/api/bootstrap/run" && req.method === "POST") {
+        if (!bootstrapInstance) return json(res, 503, { error: "Bootstrap module not loaded" });
+        try { const result = bootstrapInstance.run(); return json(res, result.success ? 200 : 207, result); }
+        catch (e) { return json(res, 500, { error: e.message }); }
+      }
       m = url.match(/^\/api\/agent\/([\w-]+)\/detail$/);
       if (m) { const d = agentDetail(m[1], services); return json(res, d.error ? 404 : 200, d); }
       m = url.match(/^\/api\/agent\/([\w-]+)\/avatar$/);

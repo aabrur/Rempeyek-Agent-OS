@@ -193,7 +193,9 @@ apps/web/        server.js (zero-dep API) + src/ (React app) + dist/ (built UI)
 apps/desktop/    Electron shell + Windows x64 NSIS/portable packaging
 packages/        ui · design-system · theme-engine · neural-engine (live)
                  neural-vault · agent-runtime · workflow-engine · mcp · shared (planned)
-docs/            Design-Bible · Architecture · Neural-Vault · Agent-System · MCP · Theme-System · Roadmap
+docs/            GETTING-STARTED · INSTALLATION · FIRST-RUN · PRIVACY · BACKUP-RESTORE
+                 MIGRATIONS · UNINSTALL · TROUBLESHOOTING · DEVELOPMENT · Design-Bible
+                 Architecture · Neural-Vault · Agent-System · MCP · Theme-System · Roadmap
 prompts/         system + role prompts for the agent fleet
 scripts/         bridges (telemetry ↔ vault)
 telemetry/       per-agent JSONL event streams (runtime data)

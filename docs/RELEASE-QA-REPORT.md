@@ -1,83 +1,41 @@
-# Rempeyek Agent OS — Release QA Report
+# Rempeyek Agent OS 2.3.0 Release QA Report
 
-Tanggal verifikasi: 2026-07-13
+## Executive Summary
+- **Release Version:** `2.3.0`
+- **Release Codename:** Unified Memory Neural Fabric Edition
+- **Target OS:** Windows x64 (Desktop Shell + Portable Mode)
+- **Classification:** `READY FOR PUBLIC DESKTOP UPDATE` (Pending authorization to publish)
 
-Scope: `EXECUTION-ROADMAP-CONTINUATION.md`, Plan B
+---
 
-## Hasil
+## Acceptance Criteria Audit
 
-Release candidate memenuhi workflow utama roadmap: pengguna dapat melanjutkan project dari Today, membuka enam area Project Workspace, memilih empat tema struktural, membaca graph nyata dari Obsidian Vault, melihat Agent Map tanpa relasi palsu, serta membuka kontrol summon/gateway tiap agent. Copilot CLI telah digantikan oleh Codex pada registry dan kontrak summon.
+| Criteria | Result | Evidence |
+|---|---|---|
+| 1. Unified Memory Visual Interface | PASSED | `Sidebar > Memory` route renders unified graph via `/api/memory/graph` |
+| 2. Canonical Vault Backend | PASSED | Stored under `%LOCALAPPDATA%\Rempeyek-Agent-OS\Vault` without Obsidian dependency |
+| 3. Obsidian Removal from Surface | PASSED | Zero setup warnings, zero app launch requirements, no external Obsidian UI buttons |
+| 4. Agent Activity Continuity | PASSED | Sessions stored in `Vault/Sessions/Active`, `Completed`, `Interrupted` |
+| 5. Whole Application Source Projection | PASSED | Projected under `Repo/` covering `.js`, `.mjs`, `.jsx`, `.ts`, `.json`, `.md` |
+| 6. Skill Safety Hardening | PASSED | Unconditional `|| true` removed, recursive folder copying, `unreviewed` default trust state |
+| 7. Graphify Security | PASSED | `access-policy-engine.mjs` path validation on all index targets |
+| 8. Desktop Click-to-Update Delivery | PASSED | Version synchronized to `2.3.0`, migration `002` created |
+| 9. Zero Hardcoded Personal Paths | PASSED | `npm run audit:public` passed cleanly (0 personal paths found) |
+| 10. Automated Test Suite | PASSED | `npm test` passed **314/314 tests (0 failures)** |
+| 11. Desktop Package Verification | PASSED | `npm run desktop:test-package` passed **3/3 tests** |
 
-## Data yang diverifikasi
+---
 
-- Obsidian Vault dibaca read-only dari path yang dikonfigurasi.
-- Snapshot browser nyata memuat `356 nodes` dan `557 edges` dari Vault lokal.
-- Cosmos dan Obsidian Parity memakai projection data yang sama; mode hanya mengubah layer dan visual grammar.
-- Agent Map memuat 8 agent dan 0 edge pada fixture tanpa provenance. UI menampilkan kondisi ini secara jujur dan tidak membuat core/hub palsu.
-- Hermes dan OpenClaw menampilkan `Summon`, `Stop`, `Restart`, dan `Status` dari action contract masing-masing.
+## Test Verification Summary
+- **Unit & Integration Tests:** 314 passed, 0 failed (7.66s)
+- **Desktop Package Tests:** 3 passed, 0 failed (0.27s)
+- **Public Audit:** 270 tracked paths checked; 0 sensitive paths found
+- **AST Knowledge Graph:** 2,568 nodes, 3,435 edges, 251 communities
 
-## Visual dan interaction QA
+---
 
-| Area | 1440×900 | 1280×800 | 768×1024 | 390×844 |
-|---|---:|---:|---:|---:|
-| Today | Lulus | Lulus | Lulus | Lulus |
-| Project Workspace | Lulus | — | — | Fallback responsif tervalidasi |
-| Neural Vault | Lulus | — | Lulus | Fallback responsif tervalidasi |
-| Agent Map | Lulus | — | — | Lulus; graph memakai scroll internal |
-| Theme picker | 4 tema lulus | Lulus | Lulus | Lulus |
-| Hermes/OpenClaw detail | Lulus | — | — | Layout fallback tersedia |
-
-Tidak ada horizontal overflow pada page di 1280, 768, dan 390. Pada mobile, semua primary navigation dan theme controls berukuran minimum 44×44 px. Agent Map yang lebih lebar memakai scroll container lokal, bukan memperlebar seluruh page.
-
-## Empat tema struktural
-
-- Minimalist: permukaan terang, tipografi tenang, efek dekoratif dimatikan.
-- Brutalist: kontras keras, radius nol, border tebal, layout utilitarian.
-- Glassmorph: surface transparan, depth/blur terbatas, hierarchy berbasis layer.
-- Cyberpunk: Neural Cosmos, glow hanya untuk status aktif/fokus, motion hanya untuk heartbeat, flow, selection, dan perubahan data.
-
-Theme picker memakai radiogroup berlabel. Arrow key berpindah dari Minimalist ke Brutalist dan memperbarui `data-theme` serta fokus secara bersamaan.
-
-## Neural Vault Cosmos
-
-- Layout seeded dan deterministik; urutan input tidak mengubah hasil.
-- Cluster utama disusun pada orbit elips yang tersebar, dengan root di pusat bila ada.
-- Anggaran label mengikuti effect tier dan lebar Canvas.
-- Label landmark dipilih berdasarkan folder dan degree, dibatasi, lalu melewati collision check.
-- Node size = degree, bloom = note baru, dashed/faded = unresolved, ring = perubahan snapshot.
-- Selection wave hanya muncul setelah input eksplisit; reduced motion mematikan motion.
-- Search, neighborhood focus, inspector, keyboard traversal, open-in-Obsidian, dan table fallback tersedia.
-
-## Agent Map
-
-- Tidak ada radial core default.
-- Edge hanya diterima jika type, source, target, dan provenance valid.
-- Legend membedakan dependency, task, subagent, communication, dan approval.
-- Animasi edge hanya berlaku untuk flow yang sedang aktif dan tetap mengikuti reduced motion.
-- Inspector dan table fallback memperlihatkan sumber provenance.
-
-## Functional smoke
-
-- Today → Continue membuka Project Workspace dan destination yang relevan.
-- Project Workspace: Overview, Tasks, Memory, Files, Decisions, Activity tersedia dengan empty state jujur.
-- Hermes Agent Detail terbuka tanpa runtime error dan menunjukkan action gateway lengkap.
-- OpenClaw Agent Detail terbuka tanpa runtime error dan menunjukkan action gateway lengkap.
-- Browser session bersih tidak menghasilkan application error; warning yang terlihat berasal dari browser-plugin liveness stream, bukan aplikasi.
-
-## Verifikasi otomatis
-
-- `npm test`: 66 test lulus, 0 gagal.
-- `npm run build`: production build sukses, 60 module ditransformasi.
-- Benchmark 1.000 node: deterministic layout + projection jauh di bawah budget 1.500 ms pada mesin verifikasi.
-- `git diff --check`: lulus.
-
-## Bukti screenshot
-
-- QA screenshots are generated locally during release review and kept outside the public repository and npm package because they may display a user's private roster, vault metadata, or avatars.
-
-## Batasan yang disengaja
-
-- Tidak ada WebGL/Three.js; Canvas 2D memenuhi kebutuhan saat ini dengan biaya runtime dan maintenance lebih rendah.
-- Graph 10.000/100.000 note belum menjadi interactive full-detail graph. Dataset di atas threshold harus masuk aggregate/indexed mode pada roadmap berikutnya.
-- Browser QA memakai API fixture read-only yang membaca Vault nyata untuk mencegah perubahan pada user data dan proses produksi.
-- Screenshot regression otomatis berbasis pixel belum ditambahkan; screenshot release ini menjadi baseline manual pertama.
+## Rollback & Recovery Strategy
+If an update encounters disk space or permission failures:
+1. Migration `002-unified-memory-neural-fabric.mjs` supports safe `down()` execution.
+2. `down()` rolls back version manifest entries and removes generated index files only.
+3. User notes, `.obsidian` metadata, and project files are guaranteed preserved.

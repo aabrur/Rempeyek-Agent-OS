@@ -92,6 +92,11 @@ function clusterName(node) {
   if (node.type === "ghost") return "(unresolved)";
   if (node.type === "tag") return "(tags)";
   if (node.type === "folder") return node.id.replace(/^folder:/, "").split("/")[0] || "(root)";
+  if (node.type === "agent") return "(agents)";
+  if (node.type === "project") return "(projects)";
+  if (node.type === "session") return "(sessions)";
+  if (node.type === "task") return "(tasks)";
+  if (node.type === "shared-memory") return "(memory)";
   return (node.folder || "(root)").split("/")[0];
 }
 
@@ -165,7 +170,7 @@ export function layoutGraph(data = {}, { width = 800, height = 600, iterations =
 export function layersForMode(mode) {
   return mode === "parity"
     ? { link: true, ghost: true, tag: false, folder: false, asset: false, code: false }
-    : { link: true, ghost: true, tag: true, folder: true, asset: true, code: true };
+    : { link: true, ghost: true, tag: true, folder: true, asset: true, code: true, agent: true, project: true, session: true, task: true, memory: true };
 }
 
 export function nodeSemantics(node, { generatedAt, changedNodeIds: changed = [], recentDays = 7 } = {}) {
@@ -175,7 +180,7 @@ export function nodeSemantics(node, { generatedAt, changedNodeIds: changed = [],
   return {
     mass: 1 + Math.log2(degree + 1),
     halo: degree >= 8,
-    recent: node.type === "note" && Number.isFinite(snapshotTime) && modifiedTime > 0
+    recent: (node.type === "note" || node.type === "vault-note") && Number.isFinite(snapshotTime) && modifiedTime > 0
       && snapshotTime >= modifiedTime && snapshotTime - modifiedTime <= recentDays * 86400000,
     unresolved: node.type === "ghost",
     changed: (changed instanceof Set ? changed : new Set(changed)).has(node.id),
@@ -183,9 +188,20 @@ export function nodeSemantics(node, { generatedAt, changedNodeIds: changed = [],
 }
 
 export function projectGraph(data = {}, { mode = "cosmos", layers = layersForMode(mode), focusId = null } = {}) {
-  const nodeAllowed = node => node.type === "note" || (node.type === "ghost" && layers.ghost) || (node.type === "tag" && layers.tag) || (node.type === "folder" && layers.folder) || (node.type === "asset" && layers.asset) || (node.type === "code" && layers.code);
+  const nodeAllowed = node => {
+    if (layers[node.type] === false) return false;
+    if (mode === "parity") {
+      return node.type === "note" || node.type === "vault-note" || (node.type === "ghost" && layers.ghost);
+    }
+    if (node.type === "ghost") return Boolean(layers.ghost);
+    if (node.type === "tag") return Boolean(layers.tag);
+    if (node.type === "folder") return Boolean(layers.folder);
+    if (node.type === "asset") return Boolean(layers.asset);
+    if (node.type === "code") return Boolean(layers.code);
+    return true; // Allow all unified memory graph nodes in cosmos mode
+  };
   const allowed = new Set((data.nodes || []).filter(nodeAllowed).map(node => node.id));
-  let edges = (data.edges || []).filter(edge => layers[edge.type || "link"] && allowed.has(edge.source ?? edge.s) && allowed.has(edge.target ?? edge.t));
+  let edges = (data.edges || []).filter(edge => (layers[edge.type] !== false) && allowed.has(edge.source ?? edge.s) && allowed.has(edge.target ?? edge.t));
   let visible = allowed;
   const appliedFocusId = focusId && allowed.has(focusId) ? focusId : null;
   if (appliedFocusId) {
@@ -203,7 +219,7 @@ export function projectGraph(data = {}, { mode = "cosmos", layers = layersForMod
     const source = edge.source ?? edge.s, target = edge.target ?? edge.t;
     adjacency[source]?.push(target); adjacency[target]?.push(source);
   }
-  const count = type => nodes.filter(node => node.type === type).length;
+  const count = type => nodes.filter(node => node.type === type || (type === "note" && node.type === "vault-note")).length;
   return {
     nodes, edges, adjacency,
     counts: { nodes: nodes.length, edges: edges.length, notes: count("note"), ghosts: count("ghost"), tags: count("tag"), folders: count("folder"), assets: count("asset"), codeFiles: count("code") },
@@ -225,7 +241,7 @@ export function nextNodeId(nodes = [], currentId, delta = 1) {
 
 export function breadcrumbFor(node) {
   if (!node) return [];
-  if (node.type === "note") return node.id.replace(/\.md$/i, "").split("/");
+  if (node.type === "note" || node.type === "vault-note") return node.id.replace(/\.md$/i, "").split("/");
   if (node.type === "folder") return node.id.replace(/^folder:/, "").split("/");
   return [node.folder, node.label].filter(Boolean);
 }

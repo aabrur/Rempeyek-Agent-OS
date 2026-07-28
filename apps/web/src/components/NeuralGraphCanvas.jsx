@@ -4,13 +4,12 @@ import {
   projectGraph, resolveMotionState,
 } from "@rempeyek/neural-engine";
 import { api } from "../api";
-import { obsUri } from "../lib/obsidian";
 
 const LAYERS = [
-  { id: "link", label: "LINKS", title: "Resolved [[wikilinks]] between notes" },
-  { id: "ghost", label: "GHOSTS", title: "Unresolved wikilinks shown as faded, dashed relationships" },
-  { id: "tag", label: "TAGS", title: "Optional tag overlay; not part of Obsidian parity defaults" },
-  { id: "folder", label: "FOLDERS", title: "Optional folder structure overlay; not part of Obsidian parity defaults" },
+  { id: "link", label: "LINKS", title: "Resolved wikilinks and memory relationships" },
+  { id: "ghost", label: "GHOSTS", title: "Unresolved wikilinks shown as faded relationships" },
+  { id: "tag", label: "TAGS", title: "Tag overlay" },
+  { id: "folder", label: "FOLDERS", title: "Folder structure overlay" },
 ];
 
 export function NeuralGraphCanvas({ active, theme }) {
@@ -36,7 +35,7 @@ export function NeuralGraphCanvas({ active, theme }) {
 
   useEffect(() => {
     graphRef.current = NeuralGraph(canvasRef.current, {
-      onOpen: node => { location.href = obsUri(node.id); },
+      onOpen: node => { setSelectedId(node?.id || null); setFocusId(node?.id || null); },
       onSelect: node => setSelectedId(node?.id || null),
       onFocus: node => setFocusId(node.id),
       onEscape: () => setFocusId(null),
@@ -59,9 +58,12 @@ export function NeuralGraphCanvas({ active, theme }) {
     if (!active) return;
     let alive = true;
     const load = async () => {
-      const next = await api("/api/vault/graph", { timeoutMs: 20000 });
+      let next = await api("/api/memory/graph", { timeoutMs: 20000 });
+      if (!next || next.error || !Array.isArray(next.nodes)) {
+        next = await api("/api/vault/graph", { timeoutMs: 20000 });
+      }
       if (!alive) return;
-      if (next.error || !Array.isArray(next.nodes)) { setError(next.error || "Invalid Vault graph response"); return; }
+      if (next.error || !Array.isArray(next.nodes)) { setError(next.error || "Invalid Memory graph response"); return; }
       const changed = previousSnapshotRef.current ? [...changedNodeIds(previousSnapshotRef.current, next)] : [];
       previousSnapshotRef.current = next;
       setError(""); setData({ ...next, metadata: { ...next.metadata, changedNodeIds: changed } });
@@ -89,46 +91,46 @@ export function NeuralGraphCanvas({ active, theme }) {
     const match = projection.nodes.find(node => node.label?.toLowerCase().includes(term) || node.id.toLowerCase().includes(term));
     if (match) { setSelectedId(match.id); graphRef.current?.select(match.id); }
   };
-  const openSelected = () => { if (selected?.type === "note") location.href = obsUri(selected.id); };
+  const focusSelected = () => { if (selected) setFocusId(selected.id); };
 
   return (
     <div className="neural-vault-v2">
       <header className="graph-bar">
         <div className="graph-heading">
-          <span className="graph-title">NEURAL VAULT</span>
+          <span className="graph-title">UNIFIED NEURAL MEMORY</span>
           <span className="graph-counts" aria-live="polite">{projection.counts.nodes} nodes · {projection.counts.edges} edges</span>
         </div>
-        <input aria-label="Search Vault graph nodes" className="graph-search" type="search" placeholder="Search notes or paths…"
+        <input aria-label="Search Vault graph nodes" className="graph-search" type="search" placeholder="Search knowledge, notes or modules…"
           value={query} onChange={event => setQuery(event.target.value)} onKeyDown={event => { if (event.key === "Enter") selectFirstMatch(); }} />
         <div className="graph-layers" aria-label="Graph relationship layers">
           {LAYERS.map(layer => <button key={layer.id} className={`lyr ${layers[layer.id] ? "on" : ""}`.trim()} title={layer.title}
             aria-pressed={layers[layer.id]} onClick={() => toggleLayer(layer.id)}>{layer.label}</button>)}
         </div>
         <div className="graph-modes" aria-label="Graph appearance">
-          <button className={`lyr ${mode === "parity" ? "on" : ""}`} aria-pressed={mode === "parity"} onClick={() => chooseMode("parity")}>OBSIDIAN PARITY</button>
+          <button className={`lyr ${mode === "parity" ? "on" : ""}`} aria-pressed={mode === "parity"} onClick={() => chooseMode("parity")}>VAULT PARITY</button>
           <button className={`lyr ${mode === "cosmos" ? "on" : ""}`} aria-pressed={mode === "cosmos"} onClick={() => chooseMode("cosmos")}>COSMOS</button>
           <button className={`lyr ${motionState.enabled ? "on" : ""}`} aria-pressed={motionState.enabled}
             disabled={motionState.disabled} title={motionState.disabled ? "Motion is disabled by your operating system preference" : undefined}
             onClick={() => setMotionRequested(value => !value)}>{motionState.label}</button>
           <button className={`lyr ${tableOpen ? "on" : ""}`} aria-expanded={tableOpen} onClick={() => setTableOpen(value => !value)}>TABLE</button>
         </div>
-        <a className="graph-open" href={obsUri("INDEX.md")}>OPEN VAULT</a>
+        <button className="graph-open" onClick={() => { setSelectedId(null); setFocusId(null); setQuery(""); }}>RESET VIEW</button>
       </header>
 
-      {error && <div className="graph-error" role="alert">Vault graph unavailable: {error}</div>}
+      {error && <div className="graph-error" role="alert">Memory graph unavailable: {error}</div>}
       {focusId && <div className="graph-focus-bar" role="status">Neighborhood focus: {focusLabel} · {projection.counts.nodes} nodes <button onClick={() => setFocusId(null)}>Clear focus</button></div>}
 
       <div className="graph-workspace">
         <section className="graph-stage" aria-label="Interactive Vault graph">
           <div className="graph-wrap">
             <canvas ref={canvasRef} id="graphCanvas" tabIndex="0"
-              aria-label={`Vault knowledge graph in ${mode} mode. Arrow keys select nodes, Enter opens a note, F focuses neighbors, Escape clears focus.`} />
-            <div className="graph-hint">drag to pan · wheel to zoom · click to inspect · double-click to open</div>
+              aria-label={`Unified Memory knowledge graph in ${mode} mode. Arrow keys select nodes, Enter inspects, F focuses neighbors, Escape clears focus.`} />
+            <div className="graph-hint">drag to pan · wheel to zoom · click to inspect · double-click to focus</div>
           </div>
           <GraphLegend mode={mode} layers={layers} />
         </section>
         <GraphInspector node={selected} breadcrumbs={breadcrumbs} focused={focusId === selected?.id}
-          onOpen={openSelected} onFocus={() => selected && setFocusId(selected.id)} onClear={() => setFocusId(null)} />
+          onOpen={focusSelected} onFocus={() => selected && setFocusId(selected.id)} onClear={() => setFocusId(null)} />
       </div>
 
       {tableOpen && <GraphTable data={projection} selectedId={selectedId} onSelect={id => { setSelectedId(id); graphRef.current?.select(id); }} />}
@@ -146,7 +148,7 @@ function GraphLegend({ mode, layers }) {
   </div>;
 }
 
-function GraphInspector({ node, breadcrumbs, focused, onOpen, onFocus, onClear }) {
+function GraphInspector({ node, breadcrumbs, focused, onFocus, onClear }) {
   return <aside className="graph-inspector" aria-label="Selected graph node" aria-live="polite">
     <div className="graph-inspector-label">INSPECTOR</div>
     {!node ? <p>Select a node with pointer or arrow keys.</p> : <>
@@ -158,9 +160,8 @@ function GraphInspector({ node, breadcrumbs, focused, onOpen, onFocus, onClear }
         <div className="wide"><dt>Path</dt><dd>{node.id}</dd></div>
       </dl>
       <div className="graph-inspector-actions">
-        <button className="btn btn-primary" disabled={node.type !== "note"} onClick={onOpen}>Open in Obsidian</button>
-        <button className="btn btn-dim" onClick={onFocus}>Focus neighbors</button>
-        {focused && <button className="btn btn-dim" onClick={onClear}>Clear focus</button>}
+        <button className="btn btn-primary" onClick={onFocus}>Focus Neighbors</button>
+        {focused && <button className="btn btn-dim" onClick={onClear}>Clear Focus</button>}
       </div>
     </>}
   </aside>;
@@ -168,14 +169,14 @@ function GraphInspector({ node, breadcrumbs, focused, onOpen, onFocus, onClear }
 
 function GraphTable({ data, selectedId, onSelect }) {
   const degree = new Map(data.nodes.map(node => [node.id, data.adjacency[node.id]?.length || 0]));
-  return <div className="graph-table-wrap" tabIndex="0" aria-label={`${data.counts.nodes} Vault graph nodes and ${data.counts.edges} edges`}>
+  return <div className="graph-table-wrap" tabIndex="0" aria-label={`${data.counts.nodes} Memory graph nodes and ${data.counts.edges} edges`}>
     <table className="graph-table">
       <caption>Same filtered dataset as the Canvas: {data.counts.nodes} nodes and {data.counts.edges} edges.</caption>
       <thead><tr><th scope="col">Node</th><th scope="col">Type</th><th scope="col">Folder</th><th scope="col">Connections</th><th scope="col">Action</th></tr></thead>
       <tbody>{data.nodes.map(node => <tr key={node.id} className={node.id === selectedId ? "selected" : ""}>
         <th scope="row"><button className="graph-table-node" onClick={() => onSelect(node.id)}>{node.label}</button></th>
         <td>{node.type}</td><td>{node.folder}</td><td>{degree.get(node.id)}</td>
-        <td>{node.type === "note" ? <a href={obsUri(node.id)}>Open in Obsidian</a> : <span>Structural node</span>}</td>
+        <td><button className="btn btn-dim btn-sm" onClick={() => onSelect(node.id)}>Focus Node</button></td>
       </tr>)}</tbody>
     </table>
   </div>;

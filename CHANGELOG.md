@@ -3,6 +3,19 @@
 All notable changes to Rempeyek Agent OS. The in-app update banner compares the local version
 against the latest GitHub Release of this repository — tag releases as `v<version>`.
 
+## [2.3.0] - 2026-07-28
+
+### Added
+- **Unified Memory Neural Fabric**: The `Sidebar > Memory` view now displays connected states for agents, projects, tasks, sessions, handoffs, decisions, shared/project memory, skills, evidence, artifacts, and whole-application source modules under `Repo/`.
+- **Vault Backend & Activity System of Record**: Local Vault (`%LOCALAPPDATA%\Rempeyek-Agent-OS\Vault`) is the canonical data store. Active sessions are tracked in `Vault/Sessions/Active` and finalized upon completion.
+- **Memory Graph API**: Introduced `/api/memory/graph`, `/api/memory/graph/stats`, `/api/memory/node/:id`, `/api/memory/neighborhood/:id`, `/api/memory/search`, `/api/memory/activity`, and `/api/memory/health`.
+- **Migration 002**: Forward migration establishing v2.3.0 directory trees and indexes (`002-unified-memory-neural-fabric.mjs`).
+
+### Fixed & Hardened
+- **Zero Obsidian Dependency**: Obsidian is strictly an optional Markdown file format layer; removed all Obsidian app launcher requirements, prompts, and external buttons.
+- **Skills Safety**: Removed unconditional `|| true` capability matching; added recursive copying for skill `references`, `assets`, `scripts`, and defaulted skills to `unreviewed` / `restricted`.
+- **Graphify Access Enforcement**: Integrated `access-policy-engine.mjs` path validation across all Graphify index target files.
+
 ## [2.2.3] - 2026-07-27
 
 ### Added

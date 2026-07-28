@@ -17,8 +17,31 @@ import { mkdirSync, existsSync, writeFileSync, unlinkSync, statSync, readdirSync
 
 export function scaffoldVaultStructure(vaultPath, { agents = [] } = {}) {
   if (!vaultPath) return;
+
+  // Existing top-level directories (preserve for dashboard compatibility)
   const rootDirs = ["Brains", "Projects", "Tasks", "Inbox", "Reports", "Memory", "Attachments", ".obsidian"];
   for (const dir of rootDirs) {
+    try { mkdirSync(path.join(vaultPath, dir), { recursive: true }); } catch {}
+  }
+
+  // Extended subsystem directories
+  const subsystemDirs = [
+    // Memory subsystem
+    "Memory/Shared", "Memory/Decisions", "Memory/Lessons",
+    "Memory/Preferences", "Memory/Entities", "Memory/Procedures", "Memory/Handoffs",
+    // Sessions subsystem
+    "Sessions/Active", "Sessions/Completed", "Sessions/Failed", "Sessions/Interrupted",
+    // System subsystem
+    "System/AI-Family", "System/Commands", "System/Schemas",
+    "System/Policies", "System/Migrations", "System/Health",
+    // Skills subsystem
+    "Skills/Registry", "Skills/Assignments", "Skills/Reports",
+    // Graph subsystem
+    "Graph/Nodes", "Graph/Edges", "Graph/Indexes", "Graph/Reports",
+    // Additional
+    "Imports", "Quarantine"
+  ];
+  for (const dir of subsystemDirs) {
     try { mkdirSync(path.join(vaultPath, dir), { recursive: true }); } catch {}
   }
 
@@ -26,6 +49,21 @@ export function scaffoldVaultStructure(vaultPath, { agents = [] } = {}) {
   const obsConfig = path.join(vaultPath, ".obsidian", "app.json");
   if (!existsSync(obsConfig)) {
     try { writeFileSync(obsConfig, JSON.stringify({ legacyEditor: false, livePreview: true }, null, 2), "utf8"); } catch {}
+  }
+
+  // Create index markdown files (non-destructive)
+  const indexFiles = [
+    { path: "Home.md", content: "# Rempeyek Agent OS Vault\n\nWelcome to your Rempeyek Agent OS Vault. This is your central knowledge base.\n\n## Quick Links\n- [[System/AI-Family/AI-Family|AI Family]]\n- [[Memory/Shared-Memory-Index|Shared Memory]]\n- [[Graph/Graph-Index|Knowledge Graph]]\n- [[Sessions/Session-Index|Sessions]]\n- [[Skills/Skill-Index|Skills]]\n- [[Projects|Projects]]\n" },
+    { path: "Memory/Shared-Memory-Index.md", content: "# Shared Memory Index\n\nCentral index of shared memories across all agents.\n\n## Recent Memories\n*Auto-populated by Rempeyek Agent OS.*\n" },
+    { path: "Graph/Graph-Index.md", content: "# Knowledge Graph Index\n\nGraphify knowledge graph status and navigation.\n\n## Graph Stats\n*Auto-populated by Rempeyek Agent OS.*\n" },
+    { path: "Sessions/Session-Index.md", content: "# Session Index\n\nAgent session history and handoff records.\n\n## Recent Sessions\n*Auto-populated by Rempeyek Agent OS.*\n" },
+    { path: "Skills/Skill-Index.md", content: "# Skill Index\n\nDiscovered and synchronized skills.\n\n## Registered Skills\n*Auto-populated by Rempeyek Agent OS.*\n" }
+  ];
+  for (const file of indexFiles) {
+    const filePath = path.join(vaultPath, file.path);
+    if (!existsSync(filePath)) {
+      try { writeFileSync(filePath, file.content, "utf8"); } catch {}
+    }
   }
 
   // Scaffold Brains lanes for agents

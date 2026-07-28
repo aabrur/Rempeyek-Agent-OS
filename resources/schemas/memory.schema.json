@@ -1,0 +1,83 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://rempeyek.org/schemas/memory.schema.json",
+  "title": "Memory Record",
+  "description": "Schema for Rempeyek Agent OS memory records",
+  "type": "object",
+  "properties": {
+    "memory_id": {
+      "type": "string"
+    },
+    "title": {
+      "type": "string"
+    },
+    "type": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["candidate", "reviewed", "accepted", "active", "deprecated", "superseded", "rejected"]
+    },
+    "created_by": {
+      "type": "string"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "content": {
+      "type": "string"
+    },
+    "reviewed_by": {
+      "type": "string"
+    },
+    "source_sessions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "source_files": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "project_id": {
+      "type": "string"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "expires_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "supersedes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "conflicts_with": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "confidence": {
+      "type": "string",
+      "enum": ["verified", "inferred", "uncertain"]
+    }
+  },
+  "required": [
+    "memory_id",
+    "title",
+    "type",
+    "status",
+    "created_by",
+    "created_at",
+    "content"
+  ]
+}

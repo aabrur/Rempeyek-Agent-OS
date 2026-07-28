@@ -1,0 +1,68 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://rempeyek.org/schemas/runtime-manifest.schema.json",
+  "title": "Runtime Manifest",
+  "description": "Schema for the Rempeyek Agent OS runtime manifest",
+  "type": "object",
+  "properties": {
+    "product": {
+      "type": "string",
+      "const": "Rempeyek Agent OS"
+    },
+    "installationId": {
+      "type": "string"
+    },
+    "runtimeSchemaVersion": {
+      "type": "string"
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "mode": {
+      "type": "string",
+      "enum": ["installed", "portable", "development", "test"]
+    },
+    "platform": {
+      "type": "string",
+      "enum": ["win32", "darwin", "linux"]
+    },
+    "applicationVersion": {
+      "type": "string"
+    },
+    "vaultPath": {
+      "type": "string"
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "architecture": {
+      "type": "string"
+    },
+    "bootstrapCompleted": {
+      "type": "boolean"
+    },
+    "lastStartupAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "lastShutdownAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "migrationVersion": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "product",
+    "installationId",
+    "runtimeSchemaVersion",
+    "createdAt",
+    "mode",
+    "platform",
+    "applicationVersion",
+    "vaultPath"
+  ]
+}
