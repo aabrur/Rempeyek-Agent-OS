@@ -210,7 +210,7 @@ export function createUnifiedCommandRouter({ env = process.env, agents = [] } = 
             // Gather comprehensive system status
             const configDir = paths.systemConfig;
             const status = {
-              application: { version: '2.2.3', mode: 'installed' },
+              application: { version: '2.3.0', mode: 'installed' },
               runtime: { status: 'healthy', path: paths.runtimeRoot },
               vault: { status: 'unknown', path: vaultPath },
               agents: { total: 0, active: 0, nodes: [] },
@@ -226,7 +226,7 @@ export function createUnifiedCommandRouter({ env = process.env, agents = [] } = 
               const manifestPath = path.join(configDir, 'runtime-manifest.json');
               if (fs.existsSync(manifestPath)) {
                 const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-                status.application.version = manifest.applicationVersion || '2.2.3';
+                status.application.version = manifest.applicationVersion || '2.3.0';
                 status.application.mode = manifest.mode || 'installed';
                 status.runtime.status = manifest.bootstrapCompleted ? 'healthy' : 'uninitialized';
               } else {

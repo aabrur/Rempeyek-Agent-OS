@@ -20,7 +20,7 @@
 - **Redaction Engine:** Automatic regex pattern matching for API keys (`sk-*`, `AIzaSy*`, `ghp_*`, `xox*`) and passwords before persisting logs or session records.
 
 ### 4. Skill Validation & Integrity
-- **Checksum Verification:** Every skill in `C:\Users\abrur\.skills` is checksummed using SHA-256 before synchronization.
+- **Checksum Verification:** Every skill in `%USERPROFILE%\.skills` is checksummed using SHA-256 before synchronization.
 - **Isolation:** Executable skills require explicit trust status before assignment to agent nodes.
 
 ### 5. Document Ingestion Security

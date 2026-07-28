@@ -1,7 +1,7 @@
 # Rempeyek Agent OS Vault Architecture
 
 ## Vault Root Location
-`C:\Users\abrur\AppData\Local\Rempeyek-Agent-OS\Vault`
+`%USERPROFILE%\AppData\Local\Rempeyek-Agent-OS\Vault`
 
 ## Structural Hierarchy
 ```text

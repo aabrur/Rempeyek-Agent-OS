@@ -150,7 +150,7 @@ export function isPathAllowed(targetPath, accessPolicy = {}) {
     }
   }
 
-  if (accessPolicy.allowed_roots && Array.isArray(accessPolicy.allowed_roots) && accessPolicy.allowed_roots.length > 0) {
+  if (Array.isArray(accessPolicy.allowed_roots) && accessPolicy.allowed_roots.length > 0) {
     let matchesAllowed = false;
     for (const allowedRoot of accessPolicy.allowed_roots) {
       const canonicalAllowed = resolveCanonicalPath(allowedRoot);

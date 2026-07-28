@@ -2,7 +2,7 @@
 
 ## Overview
 This report details the non-destructive migration and initialization of the unified Vault structure at:
-`C:\Users\abrur\AppData\Local\Rempeyek-Agent-OS\Vault`
+`%USERPROFILE%\AppData\Local\Rempeyek-Agent-OS\Vault`
 
 ## Directory Normalization
 The Vault directory structure was normalized into the canonical 2026 format:

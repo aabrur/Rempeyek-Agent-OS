@@ -5,7 +5,7 @@ Each recognized agent receives a permanent, deterministic identity (`Node-1`, `N
 
 ## Node Storage Structure
 ```text
-C:\Users\abrur\AppData\Local\Rempeyek-Agent-OS\Agents\
+%USERPROFILE%\AppData\Local\Rempeyek-Agent-OS\Agents\
   Node-1\
     identity.json          # Node identity metadata
     config.json            # Node configuration

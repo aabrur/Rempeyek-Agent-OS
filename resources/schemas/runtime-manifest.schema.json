@@ -13,7 +13,7 @@
       "type": "string"
     },
     "runtimeSchemaVersion": {
-      "type": "string"
+      "type": ["integer", "number", "string"]
     },
     "createdAt": {
       "type": "string",

@@ -94,7 +94,7 @@ export function createBootstrap({ configDir, vaultPath, agentsDir, backupsDir, a
             mode: process.env.REMPEYEK_MODE || 'installed',
             platform: process.platform,
             architecture: process.arch,
-            applicationVersion: '2.2.3',
+            applicationVersion: '2.3.0',
             vaultPath
           });
           result.steps.manifest = { status: 'created' };

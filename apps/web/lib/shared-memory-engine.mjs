@@ -29,7 +29,7 @@ export function createSharedMemoryEngine({ vaultPath, agentsDir } = {}) {
   }
 
   return {
-    startSession({ nodeId, agentId, taskId, taskSummary, projectId = 'default' } = {}) {
+    startSession({ nodeId, agentId, taskId, taskSummary, projectId = 'default', filesAllowed, approvalState } = {}) {
       if (!nodeId || !agentId || !taskId) {
         throw new TypeError('nodeId, agentId, and taskId are required');
       }
@@ -49,9 +49,9 @@ export function createSharedMemoryEngine({ vaultPath, agentsDir } = {}) {
         skills_loaded: [],
         memory_sources: ['Vault/Memory/Shared', 'Vault/Memory/Decisions'],
         graph_context: [],
-        files_allowed: ['*'],
+        files_allowed: filesAllowed || ['Vault', 'Config', 'Projects'],
         files_denied: ['.ssh', '.gnupg', 'Credentials'],
-        approval_state: 'approved',
+        approval_state: approvalState || 'policy-resolved',
         decisions: [],
         files_changed: [],
         validation_results: []
@@ -161,7 +161,7 @@ ${securityNotes || 'Access policy enforced. No credentials exposed.'}
       return { session, handoffPath };
     },
 
-    promoteMemory({ title, type = 'lesson', content, createdBy, projectId = 'default' }) {
+    promoteMemory({ title, type = 'lesson', content, createdBy, projectId = 'default', status = 'candidate', reviewedBy = null, confidence = 'unverified' }) {
       const memoryId = `mem-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
       const now = new Date().toISOString();
 
@@ -169,13 +169,13 @@ ${securityNotes || 'Access policy enforced. No credentials exposed.'}
         memory_id: memoryId,
         title,
         type,
-        status: 'active',
+        status,
         created_by: createdBy,
-        reviewed_by: 'system',
+        reviewed_by: reviewedBy,
         project_id: projectId,
         created_at: now,
         updated_at: now,
-        confidence: 'verified',
+        confidence,
         content
       };
 

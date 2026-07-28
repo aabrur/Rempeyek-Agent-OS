@@ -50,7 +50,7 @@ export function initializeHypertaksUnifiedSystem({ env = process.env, agents = [
   if (!fs.existsSync(runtimeConfigFile)) {
     fs.writeFileSync(runtimeConfigFile, JSON.stringify({
       system_name: 'Rempeyek Agent OS',
-      version: '2.2.3',
+      version: '2.3.0',
       unified_system_enabled: true,
       vault_path: paths.sharedVault,
       skills_warehouse: paths.centralSkillsWarehouse,

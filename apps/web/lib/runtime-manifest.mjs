@@ -73,7 +73,7 @@ export function createRuntimeManifest(configDir) {
     const errors = [];
     const warnings = [];
 
-    if (current.runtimeSchemaVersion !== 1) {
+    if (current.runtimeSchemaVersion !== 1 && current.runtimeSchemaVersion !== 2) {
       errors.push(`Unsupported runtimeSchemaVersion: ${current.runtimeSchemaVersion}`);
     }
 

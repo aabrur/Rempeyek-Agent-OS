@@ -112,8 +112,9 @@ export function createGraphifyUnifiedEngine({ vaultPath } = {}) {
 
       // Scan directory if exists and path is allowed & safe
       if (fs.existsSync(project.source_path)) {
-        const pathCheck = isPathAllowed(project.source_path);
-        const symCheck = isSymlinkSafe(project.source_path);
+        const projectPolicy = { allowed_roots: [project.source_path] };
+        const pathCheck = isPathAllowed(project.source_path, projectPolicy);
+        const symCheck = isSymlinkSafe(project.source_path, [project.source_path]);
         if (!pathCheck.allowed || !symCheck.safe) {
           warnings.push(`Project path access denied: ${project.source_path} (${pathCheck.reason || symCheck.reason})`);
         } else {
@@ -126,7 +127,7 @@ export function createGraphifyUnifiedEngine({ vaultPath } = {}) {
                 const fullPath = path.join(dirPath, item.name);
 
                 // Access policy verification per file
-                const fileCheck = isPathAllowed(fullPath);
+                const fileCheck = isPathAllowed(fullPath, projectPolicy);
                 if (!fileCheck.allowed) continue;
 
                 if (item.isDirectory()) {

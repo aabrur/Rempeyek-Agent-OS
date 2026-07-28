@@ -3,9 +3,9 @@
 ## Executive Summary
 - **System Version:** Rempeyek Agent OS v2.2.3 (Unified AI Family & Neural Vault Edition)
 - **Status:** `READY` (All 205 unit and integration tests passed)
-- **Runtime Root:** `C:\Users\abrur\AppData\Local\Rempeyek-Agent-OS`
-- **Shared Vault Root:** `C:\Users\abrur\AppData\Local\Rempeyek-Agent-OS\Vault`
-- **Skills Warehouse:** `C:\Users\abrur\.skills`
+- **Runtime Root:** `%USERPROFILE%\AppData\Local\Rempeyek-Agent-OS`
+- **Shared Vault Root:** `%USERPROFILE%\AppData\Local\Rempeyek-Agent-OS\Vault`
+- **Skills Warehouse:** `%USERPROFILE%\.skills`
 
 ## Architecture Implemented
 1. **AI Family Registry (`ai-family-registry.mjs`)**: Deterministic identity assignment (`Node-1`, `Node-2`, ...) for all recognized agents. Isolated node directories under `Agents/<Node-ID>/` with `identity.json`, `config.json`, `skills/`, `memory/`, `cache/`, `sessions/`, `logs/`, and `checkpoints/`.
@@ -13,7 +13,7 @@
    - Phase A: Session start (`Vault/Sessions/Active/<session-id>.json`).
    - Phase B: Work execution checkpoints and decision logs.
    - Phase C: Session completion and handoffs (`Vault/Memory/Handoffs/<timestamp>-<node-id>-<task-id>.md`).
-3. **Skills Sync Engine (`skills-sync-engine.mjs`)**: Discovers skills from `C:\Users\abrur\.skills`, calculates SHA-256 checksums, matches node capabilities, assigns to `Agents/<Node-ID>/skills`, and records in `Vault/Skills/Registry/skills-registry.json`.
+3. **Skills Sync Engine (`skills-sync-engine.mjs`)**: Discovers skills from `%USERPROFILE%\.skills`, calculates SHA-256 checksums, matches node capabilities, assigns to `Agents/<Node-ID>/skills`, and records in `Vault/Skills/Registry/skills-registry.json`.
 4. **Graphify Unified Engine (`graphify-unified-engine.mjs`)**: Structured knowledge graph engine managing nodes, edges, project indexing (reference, mirror, snapshot, generated modes), source provenance, and report generation in `Vault/Graph/Reports/GRAPH_REPORT.md` and `.graphify/graph.json`.
 5. **Unified Command Router (`unified-command-router.mjs`)**: Operational router for slash commands: `/obsidian`, `/obsidian-vault`, `/shared-memory`, `/graphify`, `/skills`.
 6. **Access Policy Engine (`access-policy-engine.mjs`)**: Enforces path canonicalization, default deny for sensitive locations (`.ssh`, `.gnupg`, Chrome user data, credentials), and secret redaction.

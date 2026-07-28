@@ -27,10 +27,13 @@ export async function down({ configDir, vaultPath }) {
     const dirPath = path.join(vaultPath, d);
     if (fs.existsSync(dirPath)) {
       try {
-        fs.rmSync(dirPath, { recursive: true, force: true });
-        removed.push(dirPath);
+        const files = fs.readdirSync(dirPath);
+        if (files.length === 0) {
+          fs.rmdirSync(dirPath);
+          removed.push(dirPath);
+        }
       } catch (e) {
-        // ignore
+        // preserve
       }
     }
   }

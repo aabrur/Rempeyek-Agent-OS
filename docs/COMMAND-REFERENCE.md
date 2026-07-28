@@ -1,6 +1,6 @@
 # Rempeyek Agent OS Command Reference
 
-All slash commands operate against canonical Vault: `C:\Users\abrur\AppData\Local\Rempeyek-Agent-OS\Vault`
+All slash commands operate against canonical Vault: `%USERPROFILE%\AppData\Local\Rempeyek-Agent-OS\Vault`
 
 ## 1. `/obsidian`
 - **Purpose:** Opens or checks initialization status of canonical Rempeyek Vault for Obsidian.
@@ -29,5 +29,5 @@ All slash commands operate against canonical Vault: `C:\Users\abrur\AppData\Loca
 ## 5. `/skills`
 - **Operations:**
   - `/skills status` — View synchronized skills.
-  - `/skills discover` — Scan central warehouse `C:\Users\abrur\.skills`.
+  - `/skills discover` — Scan central warehouse `%USERPROFILE%\.skills`.
   - `/skills sync` — Synchronize skills to agent nodes.
