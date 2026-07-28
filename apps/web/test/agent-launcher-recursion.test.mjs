@@ -8,8 +8,23 @@ import { resolveRuntimePaths } from "../lib/runtime-paths.cjs";
 
 test("resolveRuntimePaths resolves state root dynamically without hardcoded user paths", () => {
   const env = { LOCALAPPDATA: "C:\\CustomAppData\\Local\\Rempeyek-Agent-OS" };
-  const paths = resolveRuntimePaths({ env, root: "C:\\repo", home: "C:\\Users\\custom" });
+  const paths = resolveRuntimePaths({
+    env,
+    root: "C:\\repo",
+    home: "C:\\Users\\custom",
+    platform: "win32",
+  });
   assert.equal(paths.stateRoot, "C:\\CustomAppData\\Local\\Rempeyek-Agent-OS");
+});
+
+test("resolveRuntimePaths uses POSIX data roots for Ubuntu/Linux input", () => {
+  const paths = resolveRuntimePaths({
+    env: { XDG_DATA_HOME: "/srv/data" },
+    root: "/repo",
+    home: "/home/custom",
+    platform: "linux",
+  });
+  assert.equal(paths.stateRoot, "/srv/data/Rempeyek-Agent-OS");
 });
 
 test("writeAgentLauncher creates safe non-recursive launcher for standard agent", () => {
