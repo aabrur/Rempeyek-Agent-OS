@@ -20,14 +20,13 @@ const CORE_Y = 308;
    stays on the edge for the inspector and evidence table. */
 export const TIER_BY_TYPE = {
   dependency: "strong",
-  spawned_subagent: "strong",
   task_assignment: "data",
   communication: "data",
   co_assignment: "weak",
 };
 
 export const TIER_LEGEND = [
-  { tier: "strong", label: "STRONG", description: "dependency · subagent" },
+  { tier: "strong", label: "STRONG", description: "configured dependency" },
   { tier: "data", label: "DATA", description: "task · communication" },
   { tier: "weak", label: "WEAK", description: "co-assignment" },
   { tier: "lane", label: "VAULT LANE", description: "observed vault activity" },
@@ -142,7 +141,7 @@ export function buildCosmosMap(topology = {}, agents = [], { reducedMotion = fal
       ...edge,
       tier,
       path: curvePath(source.x, source.y, target.x, target.y),
-      particle: tier !== "weak" && !reducedMotion,
+      particle: edge.animated === true && !reducedMotion,
     };
   });
 

@@ -16,6 +16,22 @@ test('renders an honest unconnected fleet when no relationship evidence exists',
   assert.deepEqual(topology.metadata, { nodeCount: 3, edgeCount: 0, droppedRelations: 0, hasRelationships: false });
 });
 
+test('keeps spawned subagents inside their parent profile instead of top-level topology', () => {
+  const topology = buildAgentTopology({
+    agents: [
+      { id: 'codex', name: 'Codex', kind: 'agent' },
+      { id: 'codex-reviewer', name: 'Reviewer', kind: 'subagent', parentId: 'codex' },
+    ],
+    subagents: [{
+      id: 'registry:codex:codex-reviewer',
+      parentAgentId: 'codex',
+      agentId: 'codex-reviewer',
+    }],
+  });
+  assert.deepEqual(topology.nodes.map(node => node.id), ['codex']);
+  assert.deepEqual(topology.edges, []);
+});
+
 test('includes only provenance-backed edges between configured agents', () => {
   const topology = buildAgentTopology({
     agents,
@@ -29,15 +45,14 @@ test('includes only provenance-backed edges between configured agents', () => {
 
   assert.deepEqual(topology.edges.map((edge) => ({ source: edge.source, target: edge.target, type: edge.type, provenance: edge.provenance })), [
     { source: 'codex', target: 'hermes', type: 'dependency', provenance: { source: 'configuration', id: 'hermes:codex' } },
-    { source: 'codex', target: 'pi', type: 'spawned_subagent', provenance: { source: 'subagent', id: 'spawn-1' } },
     { source: 'pi', target: 'hermes', type: 'communication', provenance: { source: 'communication', id: 'msg-1' } },
   ]);
-  assert.equal(topology.edges[2].flowing, true);
-  assert.deepEqual(topology.edges.map((edge) => edge.status), ["configured", "recorded", "running"]);
+  assert.equal(topology.edges[1].flowing, true);
+  assert.deepEqual(topology.edges.map((edge) => edge.status), ["configured", "running"]);
   assert.equal(topology.metadata.droppedRelations, 2);
 });
 
-test('projects a persisted parent relation as configured, non-flowing evidence', () => {
+test('drops persisted parent relations from the top-level map', () => {
   const topology = buildAgentTopology({
     agents: [
       { id: 'codex', name: 'Codex', kind: 'agent' },
@@ -50,17 +65,8 @@ test('projects a persisted parent relation as configured, non-flowing evidence',
       status: 'configured',
     }],
   });
-  assert.deepEqual(topology.edges, [{
-    source: 'codex',
-    target: 'codex-reviewer',
-    type: 'spawned_subagent',
-    provenance: {
-      source: 'subagent',
-      id: 'registry:codex:codex-reviewer',
-    },
-    status: 'configured',
-    flowing: false,
-  }]);
+  assert.deepEqual(topology.nodes.map(node => node.id), ['codex']);
+  assert.deepEqual(topology.edges, []);
 });
 
 test('co-assignment yields one symmetric edge per pair, canonicalised by sorted id', () => {

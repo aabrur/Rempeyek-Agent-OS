@@ -6,7 +6,7 @@ import test from "node:test";
 
 import launcher from "../lib/agent-launcher.cjs";
 
-const { writeAgentLauncher } = launcher;
+const { removeOwnedAgentLauncher, writeAgentLauncher } = launcher;
 
 test("writes a state-root launcher for a safe bare trigger", () => {
   const stateRoot = fs.mkdtempSync(path.join(os.tmpdir(), "rempeyek-launcher-"));
@@ -36,6 +36,22 @@ test("uses an approved custom working directory and rejects unsafe triggers", ()
     });
     assert.match(fs.readFileSync(result.path, "utf8"), new RegExp(`cd /d "${custom.replace(/[\\^$.*+?()[\]{}|]/g, "\\$&")}"`));
     assert.equal(writeAgentLauncher({ stateRoot, trigger: "codex & whoami" }), null);
+  } finally {
+    fs.rmSync(stateRoot, { recursive: true, force: true });
+  }
+});
+
+test("removes only an unchanged Rempeyek-owned launcher", () => {
+  const stateRoot = fs.mkdtempSync(path.join(os.tmpdir(), "rempeyek-launcher-"));
+  try {
+    const owned = writeAgentLauncher({ stateRoot, trigger: "codex" });
+    assert.equal(removeOwnedAgentLauncher({ stateRoot, trigger: "codex" }), true);
+    assert.equal(fs.existsSync(owned.path), false);
+
+    const changed = writeAgentLauncher({ stateRoot, trigger: "codex" });
+    fs.appendFileSync(changed.path, "rem user customization\r\n");
+    assert.equal(removeOwnedAgentLauncher({ stateRoot, trigger: "codex" }), false);
+    assert.equal(fs.existsSync(changed.path), true);
   } finally {
     fs.rmSync(stateRoot, { recursive: true, force: true });
   }

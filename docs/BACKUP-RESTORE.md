@@ -66,7 +66,7 @@ Every backup directory contains a JSON manifest detailing the backup metadata an
   "backupId": "2026-07-28T12-00-00-000Z-manual-backup",
   "createdAt": "2026-07-28T12:00:00.000Z",
   "label": "manual-backup",
-  "applicationVersion": "2.3.1",
+  "applicationVersion": "2.3.2",
   "files": [
     {
       "type": "config",

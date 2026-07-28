@@ -14,7 +14,16 @@ const { createAccessPolicy } = require("./lib/access-policy.cjs");
 const { createConfigStore } = require("./lib/config-store.cjs");
 const { ensureEmptyConfig, resolveRuntimePaths } = require("./lib/runtime-paths.cjs");
 const { resolveSummonProfile } = require("./lib/summon-profile.cjs");
-const { writeAgentLauncher } = require("./lib/agent-launcher.cjs");
+const {
+  removeOwnedAgentLauncher,
+  writeAgentLauncher,
+} = require("./lib/agent-launcher.cjs");
+const {
+  PROMPT_VERSION,
+  dispatchOperationalSyncPrompt,
+  registeredPrimaryAgents,
+  renderOperationalSyncPrompt,
+} = require("./lib/operational-sync-prompt.cjs");
 
 /* Monorepo layout: this file lives in apps/web/, but runtime data (vault, config,
    telemetry, scripts, .env) stays at the repo ROOT so agent CLIs and bridges keep working. */
@@ -190,6 +199,7 @@ function createRuntimeServices(runtime = {}) {
     loadConfig: readConfig,
     logDir,
     ownedMutations,
+    probeCatalogInstalled: runtime.probeCatalogInstalled || null,
     receiptDir,
     startResolvedProcess: runtime.startResolvedProcess || null,
     stateRoot,
@@ -298,25 +308,41 @@ function scaffoldRuntimeVaultLane(agent, vaultPath) {
                                           PERSISTED as a gateway (the bug that shipped: they were
                                           silently dropped). No install.cmd is ever taken from the
                                           body — auto-install runs only vetted catalog commands. */
-function addAgent(body) {
+function addAgent(body, services = DEFAULT_RUNTIME_SERVICES) {
   if (!catalogLib) return { error: "catalog module still loading — retry in a moment" };
   const cat = body.catalogId ? catalogLib.catalogEntry(body.catalogId) : null;
-  const cfg = loadConfig();
+  if (body.catalogId) {
+    if (!marketplaceLib) return { error: "marketplace module still loading — retry in a moment" };
+    const marketplaceEntry = marketplaceLib.marketplaceEntry(body.catalogId);
+    if (marketplaceEntry && !catalogInstalled(marketplaceEntry, services, { fresh: true })) {
+      return {
+        error: `${marketplaceEntry.name} is not detected on this computer; install it before registration`,
+      };
+    }
+  }
+  const cfg = services.loadConfig();
   const nodeNums = cfg.agents.map(a => Number((String(a.node || "").match(/(\d+)$/) || [])[1])).filter(n => !Number.isNaN(n));
   const r = catalogLib.buildAgentRecord({
     body, cat,
     existingIds: cfg.agents.map(a => a.id),
     existingNodeNums: nodeNums,
     date: localISO().slice(0, 10),
-    homedir: os.homedir(),
-    workdir: RUNTIME_PATHS.stateRoot,
+    homedir: services.userHome,
+    workdir: services.stateRoot,
   });
   if (r.error) return r;
+  if (Array.isArray(cfg.removedAgentIds)) {
+    cfg.removedAgentIds = cfg.removedAgentIds.filter(id => id !== r.agent.id);
+  }
   cfg.agents.push(r.agent);
-  try { saveConfig(cfg); } catch (e) { return { error: `failed to write config: ${e.message}` }; }
-  scaffoldVaultLane(r.agent);   // otherwise a dashboard-added agent's Brains/ lane is empty forever
+  try {
+    services.store.commit(cfg, `agent-add-${crypto.randomUUID()}`);
+  } catch (e) {
+    return { error: `failed to write config: ${e.message}` };
+  }
+  scaffoldRuntimeVaultLane(r.agent, services.vaultPath);
   writeAgentLauncher({
-    stateRoot: RUNTIME_PATHS.stateRoot,
+    stateRoot: services.stateRoot,
     trigger: r.agent.gateway?.trigger,
     workingDirectory: r.agent.gateway?.workdir,
   });
@@ -675,7 +701,9 @@ function buildState() {
       openTasks: { value: tasks.length, label: "Open checkboxes in Tasks/" },
       projects: { value: projects.length, label: "Projects in the workspace" },
     },
-    agents: cfg.agents.map(a => ({ ...a, gateway: undefined, actions: gwActions(a), canSummon: !!(a.gateway && a.gateway.home && a.gateway.trigger), installed: installedState(a.id), hasInstaller: !!(a.gateway && a.gateway.install && a.gateway.install.cmd), ...agentVaultStatus(files, a), proc: procInfo(a.id), term: termInfo(a.id), avatar: avatarUrl(a.id), uptime: um[a.id] || null })),
+    agents: cfg.agents
+      .filter(a => a.kind !== "subagent")
+      .map(a => ({ ...a, gateway: undefined, actions: gwActions(a), canSummon: !!(a.gateway && a.gateway.home && a.gateway.trigger), installed: installedState(a.id), hasInstaller: !!(a.gateway && a.gateway.install && a.gateway.install.cmd), ...agentVaultStatus(files, a), proc: procInfo(a.id), term: termInfo(a.id), avatar: avatarUrl(a.id), uptime: um[a.id] || null })),
     review: [
       ...inbox.map(f => ({ title: f.rel.split("/").pop().replace(".md", ""), meta: f.rel, kind: "inbox" })),
       ...tasks.slice(0, 6).map(t => ({ title: t.text, meta: t.source, kind: "task" })),
@@ -1188,9 +1216,12 @@ function installedState(id) {
   return c ? c.installed : null;   // null = not yet probed
 }
 /* catalogInstalled: installed-probe for a CATALOG entry (registered or not), 60s cache. */
-function catalogInstalled(entry) {
+function catalogInstalled(entry, services = DEFAULT_RUNTIME_SERVICES, { fresh = false } = {}) {
+  if (typeof services.probeCatalogInstalled === "function") {
+    return Boolean(services.probeCatalogInstalled(entry));
+  }
   const c = installedCache.get(entry.id);
-  if (c && Date.now() - c.at < 60000) return c.installed;
+  if (!fresh && c && Date.now() - c.at < 60000) return c.installed;
   const manifestEntry = marketplaceLib?.marketplaceEntry(entry.id);
   const probe = processAdaptersLib?.resolveProbe({
     entry: manifestEntry,
@@ -1799,6 +1830,44 @@ function createTask(agentId, title, detail) {
   } catch (e) { return { error: `failed to write task: ${e.message}` }; }
 }
 
+function operationalSyncPrompt(services = DEFAULT_RUNTIME_SERVICES) {
+  const templatePath = path.join(
+    ROOT,
+    "prompts",
+    "operational-synchronization.md",
+  );
+  const template = fs.readFileSync(templatePath, "utf8");
+  const config = services.loadConfig();
+  const recipients = registeredPrimaryAgents(config);
+  return {
+    schemaVersion: 1,
+    promptVersion: PROMPT_VERSION,
+    prompt: renderOperationalSyncPrompt(template, {
+      runtimeRoot: services.stateRoot,
+      vaultPath: services.vaultPath,
+      skillWarehouse: path.join(services.userHome, ".skills"),
+    }),
+    recipients: recipients.length,
+    agentIds: recipients.map(agent => agent.id),
+  };
+}
+
+function sendOperationalSyncPrompt(services, operationId) {
+  const prior = mutationReplay(services, operationId);
+  if (prior) return prior;
+  const snapshot = operationalSyncPrompt(services);
+  const result = dispatchOperationalSyncPrompt({
+    vaultPath: services.vaultPath,
+    config: services.loadConfig(),
+    prompt: snapshot.prompt,
+  });
+  return rememberMutation(services, operationId, {
+    ...result,
+    operationId,
+    promptVersion: snapshot.promptVersion,
+  });
+}
+
 /* R#8: schedule panel — read each agent's Windows Scheduled Task (next run, last run, last result). */
 function querySchtask(name, cb) {
   execFile("schtasks", ["/query", "/tn", name, "/fo", "LIST", "/v"], { windowsHide: true }, (e, out) => {
@@ -1854,7 +1923,7 @@ function lifecycleState(services, id, config = services.loadConfig()) {
     candidate.id === id || candidate.gateway?.marketplaceId === id,
   ) || null;
   const installed = entry?.kind === "agent"
-    ? catalogInstalled(entry)
+    ? catalogInstalled(entry, services)
     : entry
       ? receiptInstalled(services, entry.id)
       : null;
@@ -1870,6 +1939,7 @@ function lifecycleState(services, id, config = services.loadConfig()) {
     role: agent?.role || entry?.agent?.role || entry?.summary || "",
     note: agent?.note || "",
     enabled: agent ? agent.enabled !== false : false,
+    kind: agent?.kind || "agent",
     parentId: agent?.parentId || null,
     uninstallable: Boolean(entry?.uninstallers?.some(adapter =>
       !adapter.platforms || adapter.platforms.includes(process.platform)
@@ -1884,20 +1954,16 @@ function lifecycleSnapshot(services) {
       .filter(entry => entry.kind === "agent")
       .map(entry => entry.id),
   );
-  for (const agent of config.agents) ids.add(agent.id);
+  for (const agent of config.agents) {
+    if (agent.kind !== "subagent") ids.add(agent.id);
+  }
   return {
     schemaVersion: 1,
     activeAgentId: config.activeAgentId || null,
     busy: [...services.ownedMutations.values()]
       .some(operation => operation.status === "running"),
     agents: [...ids].map(id => lifecycleState(services, id, config)),
-    tombstones: services.store.listTombstones().map(tombstone => ({
-      id: tombstone.id,
-      agentId: tombstone.agent?.id || "",
-      name: tombstone.agent?.name || tombstone.agent?.id || "",
-      removedAt: tombstone.removedAt,
-      retained: Array.isArray(tombstone.retained) ? tombstone.retained : [],
-    })),
+    tombstones: [],
   };
 }
 
@@ -1940,7 +2006,7 @@ function marketplaceSnapshot(services) {
       platform: process.platform,
       registered: registered.has(entry.id),
       installed: entry.kind === "agent"
-        ? catalogInstalled(entry)
+        ? catalogInstalled(entry, services)
         : receiptInstalled(services, entry.id),
     }),
   );
@@ -2108,6 +2174,13 @@ function installMarketplace(services, entry, data) {
           );
           return;
         }
+        if (!catalogInstalled(entry, services, { fresh: true })) {
+          rememberInstallOutcome(
+            { type: "agent.install_unverified", agentId: entry.id },
+            { error: "installer completed but the agent executable was not detected" },
+          );
+          return;
+        }
         const config = services.loadConfig();
         const registered = config.agents.find(agent =>
           agent.id === entry.id || agent.gateway?.marketplaceId === entry.id
@@ -2182,12 +2255,76 @@ function uninstallMarketplace(services, entry, data) {
   const available = entry.uninstallers.filter(adapter =>
     !adapter.platforms || adapter.platforms.includes(process.platform));
   const adapterId = String(data.adapterId || available[0]?.id || "");
+  const rememberUninstallOutcome = (event, extra = {}) => {
+    let state = null;
+    try { state = lifecycleState(services, entry.id); } catch {}
+    return rememberMutation(services, data.operationId, {
+      operationId: data.operationId,
+      state,
+      event,
+      ...extra,
+    });
+  };
   const operation = startMarketplaceProcess(
     services,
     entry,
     adapterId,
     "uninstall",
     data.operationId,
+    {
+      onExit(code) {
+        if (code !== 0) {
+          rememberUninstallOutcome(
+            { type: "agent.uninstall_failed", agentId: entry.id, exitCode: code },
+            { error: "agent uninstaller exited with a non-zero status" },
+          );
+          return;
+        }
+        if (catalogInstalled(entry, services, { fresh: true })) {
+          rememberUninstallOutcome(
+            { type: "agent.uninstall_unverified", agentId: entry.id },
+            { error: "uninstaller completed but the agent executable is still detected" },
+          );
+          return;
+        }
+        const config = services.loadConfig();
+        const agent = config.agents.find(candidate =>
+          candidate.id === entry.id || candidate.gateway?.marketplaceId === entry.id
+        );
+        if (agent) {
+          try {
+            services.store.removeProfile(
+              config,
+              agent.id,
+              { detachChildren: false },
+              `${data.operationId}.remove-profile`,
+            );
+            removeOwnedAgentLauncher({
+              stateRoot: services.stateRoot,
+              trigger: agent.gateway?.trigger,
+              workingDirectory: agent.gateway?.workdir,
+            });
+          } catch (error) {
+            rememberUninstallOutcome(
+              { type: "agent.uninstall_profile_removal_failed", agentId: entry.id },
+              { error: error.message },
+            );
+            return;
+          }
+        }
+        rememberUninstallOutcome({
+          type: "agent.uninstall_completed",
+          agentId: entry.id,
+          profileRemoved: Boolean(agent),
+        });
+      },
+      onError(_operation, error) {
+        rememberUninstallOutcome(
+          { type: "agent.uninstall_failed", agentId: entry.id },
+          { error: error.message },
+        );
+      },
+    },
   );
   const body = rememberMutation(services, data.operationId, {
     operationId: data.operationId,
@@ -2392,7 +2529,24 @@ function requestHandler(req, res, services = DEFAULT_RUNTIME_SERVICES) {
                   if (!Array.isArray(backup.agents)) {
                     return json(res, 400, { error: "registry backup must contain an agents array" });
                   }
-                  services.store.commit(backup, data.operationId);
+                  const removedAgentIds = [
+                    ...new Set(
+                      Array.isArray(current.removedAgentIds)
+                        ? current.removedAgentIds
+                        : [],
+                    ),
+                  ];
+                  const restored = {
+                    ...backup,
+                    removedAgentIds,
+                    agents: backup.agents.filter(
+                      agent => !removedAgentIds.includes(agent.id),
+                    ),
+                  };
+                  if (removedAgentIds.includes(restored.activeAgentId)) {
+                    restored.activeAgentId = null;
+                  }
+                  services.store.commit(restored, data.operationId);
                   return json(res, 200, runtimeSnapshot(services, queue.audit().length));
                 } catch (error) {
                   return json(res, 400, { error: error.message });
@@ -2644,7 +2798,12 @@ function requestHandler(req, res, services = DEFAULT_RUNTIME_SERVICES) {
           ) {
             return json(res, 400, { error: "valid operationId is required" });
           }
-          return withApproval(req, res, "agent.remove", id, () =>
+          return withTwoApprovals(
+            req,
+            res,
+            { type: "agent.remove", target: id },
+            { type: "agent.remove.confirm", target: id },
+            () =>
             withLifecycleModules(res, () => {
               const config = services.loadConfig();
               const childIds = config.agents
@@ -2667,7 +2826,6 @@ function requestHandler(req, res, services = DEFAULT_RUNTIME_SERVICES) {
                   operationId: data.operationId,
                   state: lifecycleState(services, id, result.config),
                   event: { type: "agent.profile_removed", agentId: id },
-                  tombstone: result.tombstone,
                   retained: result.retained,
                   replayed: result.replayed,
                 });
@@ -2680,55 +2838,9 @@ function requestHandler(req, res, services = DEFAULT_RUNTIME_SERVICES) {
           );
         });
       lifecycleMatch = url.match(/^\/api\/agents\/([a-z0-9][a-z0-9-]{1,63})\/restore$/);
-      if (lifecycleMatch && req.method === "POST")
-        return readBody(req, res, body => {
-          let data;
-          try { data = JSON.parse(body); }
-          catch { return json(res, 400, { error: "body must be JSON" }); }
-          const id = lifecycleMatch[1];
-          const allowed = new Set(["operationId", "tombstoneId"]);
-          if (
-            !validOperationId(data.operationId) ||
-            !String(data.tombstoneId || "") ||
-            Object.keys(data).some(key => !allowed.has(key))
-          ) {
-            return json(res, 400, { error: "operationId and tombstoneId are required" });
-          }
-          return withApproval(req, res, "agent.restore", id, () =>
-            withLifecycleModules(res, () => {
-              try {
-                const tombstone = services.store
-                  .listTombstones()
-                  .find(candidate => candidate.id === data.tombstoneId);
-                if (tombstone && tombstone.agent?.id !== id) {
-                  return json(res, 409, {
-                    error: "tombstone profile does not match route id",
-                  });
-                }
-                const result = services.store.restoreProfile(
-                  services.loadConfig(),
-                  data.tombstoneId,
-                  data.operationId,
-                );
-                if (result.restoredAgentId !== id) {
-                  return json(res, 409, {
-                    error: "restored profile does not match route id",
-                  });
-                }
-                return json(res, 200, {
-                  operationId: data.operationId,
-                  state: lifecycleState(services, id, result.config),
-                  event: { type: "agent.profile_restored", agentId: id },
-                  replayed: result.replayed,
-                });
-              } catch (error) {
-                return json(res, /not found/i.test(error.message) ? 404 : 409, {
-                  error: error.message,
-                });
-              }
-            }),
-          );
-        });
+      if (lifecycleMatch) {
+        return json(res, 410, { error: "removed agent profiles are final and cannot be restored" });
+      }
       lifecycleMatch = url.match(/^\/api\/marketplace\/([a-z0-9][a-z0-9-]{1,63})\/install$/);
       if (lifecycleMatch && req.method === "POST")
         return readBody(req, res, body => {
@@ -2778,6 +2890,21 @@ function requestHandler(req, res, services = DEFAULT_RUNTIME_SERVICES) {
             () => withLifecycleModules(res, () => {
               const entry = marketplaceLib.marketplaceEntry(id);
               if (!entry) return json(res, 404, { error: "unknown Marketplace entity" });
+              const config = services.loadConfig();
+              const profile = config.agents.find(agent =>
+                agent.id === id || agent.gateway?.marketplaceId === id
+              );
+              const childIds = profile
+                ? config.agents
+                    .filter(agent => agent.parentId === profile.id)
+                    .map(agent => agent.id)
+                : [];
+              if (childIds.length) {
+                return json(res, 409, {
+                  error: "agent has child profiles; remove or detach them before uninstall",
+                  childIds,
+                });
+              }
               try {
                 const result = uninstallMarketplace(services, entry, data);
                 return json(res, result.code, result.body);
@@ -2799,7 +2926,9 @@ function requestHandler(req, res, services = DEFAULT_RUNTIME_SERVICES) {
           agency: config.agency || "AGENTIC//OS",
           activeAgentId: config.activeAgentId || null,
           generatedAt: new Date().toISOString(),
-          agents: config.agents.map(agent => ({ ...agent, gateway: undefined })),
+          agents: config.agents
+            .filter(agent => agent.kind !== "subagent")
+            .map(agent => ({ ...agent, gateway: undefined })),
           stats: {},
           events: [],
           review: [],
@@ -2808,12 +2937,23 @@ function requestHandler(req, res, services = DEFAULT_RUNTIME_SERVICES) {
         });
       }
       if (url === "/api/procs") {
-        const cfg = loadConfig();
-        return json(res, 200, cfg.agents.map(a => ({ id: a.id, name: a.name, icon: a.icon, enabled: a.enabled, note: a.note || null, cwd: a.gateway && a.gateway.cwd, bin: a.gateway && a.gateway.bin, actions: gwActions(a), ...procInfo(a.id) })));
+        const cfg = services.loadConfig();
+        return json(res, 200, cfg.agents
+          .filter(a => a.kind !== "subagent")
+          .map(a => ({ id: a.id, name: a.name, icon: a.icon, enabled: a.enabled, note: a.note || null, cwd: a.gateway && a.gateway.cwd, bin: a.gateway && a.gateway.bin, actions: gwActions(a), ...procInfo(a.id) })));
       }
       let m = url.match(/^\/api\/proc\/([\w-]+)\/(start|stop|restart|status|run|log|terminal|stop-term)$/);
       if (m) {
         const [, id, action] = m;
+        const routeAgent = services.loadConfig().agents.find(agent => agent.id === id);
+        if (!routeAgent || routeAgent.kind === "subagent") {
+          return json(res, 404, { error: "top-level agent not found" });
+        }
+        if (services !== DEFAULT_RUNTIME_SERVICES) {
+          return json(res, 409, {
+            error: "process control is unavailable in an isolated runtime",
+          });
+        }
         if (action === "log") {
           const p = procs.get(id);
           const since = Number(new URL(req.url, "http://x").searchParams.get("since") || 0);
@@ -2834,7 +2974,17 @@ function requestHandler(req, res, services = DEFAULT_RUNTIME_SERVICES) {
       }
       if (url === "/api/proc/start-all" && req.method === "POST") {
         return withApproval(req, res, "process.start-all", "enabled-agents", () => {
-          const list = loadConfig().agents.filter(a => a.enabled && a.gateway && gwActions(a).includes("start"));
+          if (services !== DEFAULT_RUNTIME_SERVICES) {
+            return json(res, 409, {
+              error: "process control is unavailable in an isolated runtime",
+            });
+          }
+          const list = services.loadConfig().agents.filter(
+            a => a.kind !== "subagent"
+              && a.enabled
+              && a.gateway
+              && gwActions(a).includes("start"),
+          );
           if (!list.length) return json(res, 200, {});
           const results = {};
           let pending = list.length;
@@ -2878,6 +3028,33 @@ function requestHandler(req, res, services = DEFAULT_RUNTIME_SERVICES) {
       if (url === "/api/agent-topology") return buildLiveAgentTopology(services).then(data => json(res, 200, data)).catch(error => json(res, 500, { error: error.message }));
       if (url === "/api/report") return json(res, 200, buildReport());
       if (url === "/api/report/save" && req.method === "POST") return json(res, 200, saveReport());
+      if (url === "/api/agents/synchronization-prompt" && req.method === "GET") {
+        try {
+          return json(res, 200, operationalSyncPrompt(services));
+        } catch (error) {
+          return json(res, 500, { error: error.message });
+        }
+      }
+      if (url === "/api/agents/synchronization-prompt/send" && req.method === "POST")
+        return readBody(req, res, body => {
+          let data;
+          try { data = JSON.parse(body); }
+          catch { return json(res, 400, { error: "body must be JSON {operationId}" }); }
+          if (
+            Object.keys(data).some(key => key !== "operationId") ||
+            !validOperationId(data.operationId)
+          ) {
+            return json(res, 400, { error: "valid operationId is required" });
+          }
+          try {
+            return json(res, 200, sendOperationalSyncPrompt(
+              services,
+              data.operationId,
+            ));
+          } catch (error) {
+            return json(res, 409, { error: error.message });
+          }
+        });
       if (url === "/api/task" && req.method === "POST")
         return readBody(req, res, body => {
           let d; try { d = JSON.parse(body); } catch { return json(res, 400, { error: "body must be JSON {agent,title,detail?}" }); }
@@ -2913,8 +3090,10 @@ function requestHandler(req, res, services = DEFAULT_RUNTIME_SERVICES) {
       if (url === "/api/agents/add" && req.method === "POST")
         return readBody(req, res, body => {
           let d; try { d = JSON.parse(body); } catch { return json(res, 400, { error: "body must be JSON {catalogId} or {id,name,icon?,role?,accent?,trigger?,home?}" }); }
-          const r = addAgent(d);
-          json(res, r.error ? 400 : 200, r);
+          return withApproval(req, res, "agents.add", "registry", () => {
+            const r = addAgent(d, services);
+            json(res, r.error ? 400 : 200, r);
+          });
         });
       if (url === "/api/catalog") {
         return json(res, 405, { error: "GET only" });

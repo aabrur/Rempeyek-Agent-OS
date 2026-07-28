@@ -158,9 +158,14 @@ export function AgentDetail({ id, gw, refresh, onClose }) {
         <div className="dsec" style={{ gridColumn: "1/-1" }}>
           <h3>Gateway control {checked && <span className="cnt" style={{ textTransform: "none", letterSpacing: 0 }}>· checked {checked}</span>}</h3>
           <div className="gw-ctl">
-            {(d.actions?.length || d.canSummon)
-              ? <GatewayControls agent={d} gw={gw} />
-              : <span className="muted">{d.note || "no actions"}</span>}
+            <GatewayControls
+              agent={d}
+              gw={gw}
+              onOpenLog={() => {
+                logRef.current?.scrollIntoView({ block: "center" });
+                logRef.current?.focus();
+              }}
+            />
           </div>
           {d.term?.alive
             ? <div className="gw-note" style={{ color: "var(--ac)" }}>
@@ -254,7 +259,7 @@ export function AgentDetail({ id, gw, refresh, onClose }) {
 
         <div className="dsec" style={{ gridColumn: "1/-1" }}>
           <h3>Gateway run log (owned, live) {live.lines.length > 0 && <span className="cnt" style={{ textTransform: "none", letterSpacing: 0 }}>· streaming</span>}</h3>
-          <pre className="logpane" ref={logRef}>
+          <pre className="logpane" ref={logRef} tabIndex="-1">
             {(() => {
               const lines = live.lines.length ? live.lines : d.log;
               return lines.length

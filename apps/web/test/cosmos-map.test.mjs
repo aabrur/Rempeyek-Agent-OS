@@ -57,7 +57,6 @@ test("every cosmos edge is a verified buildAgentMap edge — nothing is synthesi
 test("relationship types map onto the donor visual tiers", () => {
   assert.deepEqual(TIER_BY_TYPE, {
     dependency: "strong",
-    spawned_subagent: "strong",
     task_assignment: "data",
     communication: "data",
     co_assignment: "weak",

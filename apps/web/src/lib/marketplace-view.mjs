@@ -15,7 +15,7 @@ export function marketplaceAction(entry, operationState = {}) {
     };
   }
   if (entry.installed && entry.kind === "agent" && !entry.registered) {
-    return { kind: "register", label: "Register launcher", adapterId: null };
+    return { kind: "register", label: "Register to Rempeyek Agent OS", adapterId: null };
   }
   if (entry.installed && (entry.kind !== "agent" || entry.registered)) {
     return { kind: "state", label: "✓ ready", adapterId: null };
@@ -39,7 +39,7 @@ export function marketplaceAction(entry, operationState = {}) {
     };
   }
   if (entry.kind === "agent" && !entry.registered) {
-    return { kind: "register", label: "Register launcher", adapterId: null };
+    return { kind: "register", label: "Register to Rempeyek Agent OS", adapterId: null };
   }
   return {
     kind: "state",

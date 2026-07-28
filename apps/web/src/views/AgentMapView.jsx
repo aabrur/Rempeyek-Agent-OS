@@ -15,7 +15,6 @@ const RELATION_LABEL = {
   dependency: "Dependency",
   co_assignment: "Co-assignment",
   task_assignment: "Task assignment",
-  spawned_subagent: "Spawned subagent",
   communication: "Communication",
 };
 

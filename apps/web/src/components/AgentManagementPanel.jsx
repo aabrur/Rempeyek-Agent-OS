@@ -22,10 +22,15 @@ export function AgentManagementPanel({ state, refresh }) {
   const [hint, setHint] = useState("");
   const [editing, setEditing] = useState(null);
   const [confirming, setConfirming] = useState(null);
-  const rows = useMemo(
-    () => agentManagementRows(state?.agents || [])
-      .filter(row => row.profile !== "absent" || row.software === "installed"),
+  const allRows = useMemo(
+    () => agentManagementRows(state?.agents || []),
     [state],
+  );
+  const rows = useMemo(
+    () => allRows
+      .filter(row => row.kind !== "subagent")
+      .filter(row => row.profile !== "absent" || row.software === "installed"),
+    [allRows],
   );
 
   const finish = async response => {
@@ -103,7 +108,7 @@ export function AgentManagementPanel({ state, refresh }) {
   };
 
   const openRemoval = row => {
-    const children = rows.filter(candidate => candidate.parentId === row.id);
+    const children = allRows.filter(candidate => candidate.parentId === row.id);
     const impact = removalImpact(row, children);
     setConfirming({
       kind: "remove",
@@ -111,7 +116,8 @@ export function AgentManagementPanel({ state, refresh }) {
       detachChildren: false,
       impact: [
         `Profile only: ${row.name}.`,
-        `Retained: ${impact.retained.join(", ")}.`,
+        `Retained outside the profile: ${impact.retained.join(", ")}.`,
+        "The profile disappears permanently and no Restore card is created.",
         ...(impact.childIds.length
           ? [`Child profiles block removal: ${impact.childIds.join(", ")}.`]
           : []),
@@ -122,19 +128,27 @@ export function AgentManagementPanel({ state, refresh }) {
   const remove = async action => {
     setConfirming(null);
     const row = action.row;
-    const approvalId = await approveAction(
+    const first = await approveAction(
       "agent.remove",
       row.id,
       `Remove the ${row.name} profile while retaining user data.`,
       noExtraConfirmation,
     );
-    if (!approvalId) return;
+    if (!first) return;
+    const second = await approveAction(
+      "agent.remove.confirm",
+      row.id,
+      `Confirm permanent removal of ${row.name}.`,
+      noExtraConfirmation,
+    );
+    if (!second) return;
     setBusy(`${row.id}:remove`);
     const response = await api(`/api/agents/${row.id}/remove`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-approval-id": approvalId,
+        "x-approval-id": first,
+        "x-confirmation-id": second,
       },
       body: JSON.stringify({
         operationId: operationId(),
@@ -159,13 +173,20 @@ export function AgentManagementPanel({ state, refresh }) {
   };
 
   const openUninstall = row => {
+    const childIds = allRows
+      .filter(candidate => candidate.parentId === row.id)
+      .map(candidate => candidate.id);
+    if (childIds.length) {
+      setHint(`Remove or detach child profiles before uninstall: ${childIds.join(", ")}.`);
+      return;
+    }
     setConfirming({
       kind: "uninstall",
       row,
       impact: [
         `Uninstall software for ${row.name}.`,
-        "The registered profile and user data remain.",
-        "This requires two separately scoped approvals.",
+        "After verified uninstall success, its Rempeyek profile disappears permanently.",
+        "Vault and user-owned data remain outside the profile.",
       ],
     });
   };
@@ -196,27 +217,6 @@ export function AgentManagementPanel({ state, refresh }) {
         "x-confirmation-id": second,
       },
       body: JSON.stringify({ operationId: operationId() }),
-    }));
-  };
-
-  const restore = async tombstone => {
-    const approvalId = await approveAction(
-      "agent.restore",
-      tombstone.agentId,
-      `Restore the ${tombstone.name} profile from its tombstone.`,
-    );
-    if (!approvalId) return;
-    setBusy(`${tombstone.agentId}:restore`);
-    await finish(await api(`/api/agents/${tombstone.agentId}/restore`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-approval-id": approvalId,
-      },
-      body: JSON.stringify({
-        operationId: operationId(),
-        tombstoneId: tombstone.id,
-      }),
     }));
   };
 
@@ -259,21 +259,6 @@ export function AgentManagementPanel({ state, refresh }) {
                   </Btn>
                 ))}
               </div>
-            </div>
-          ))}
-          {(state?.tombstones || []).map(tombstone => (
-            <div className="aa-cat-card" role="listitem" key={tombstone.id}>
-              <span className="aa-cat-icon" aria-hidden="true">↺</span>
-              <div className="aa-cat-body">
-                <b>{tombstone.name}</b>
-                <small>Removed profile · data retained</small>
-              </div>
-              <Btn
-                disabled={Boolean(busy)}
-                onClick={() => restore(tombstone)}
-              >
-                Restore
-              </Btn>
             </div>
           ))}
         </div>

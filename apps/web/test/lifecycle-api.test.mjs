@@ -49,6 +49,7 @@ async function withServer(run) {
   const launched = [];
   const launchOptions = [];
   const children = [];
+  let probeInstalled = true;
   const server = createServer({
     configPath,
     stateRoot: root,
@@ -56,6 +57,7 @@ async function withServer(run) {
     telemetryDir,
     userHome: path.join(root, "home"),
     bundleRoot: path.resolve("marketplace", "bundles"),
+    probeCatalogInstalled: () => probeInstalled,
     startResolvedProcess(spec, options) {
       launched.push(spec);
       launchOptions.push(options);
@@ -67,7 +69,17 @@ async function withServer(run) {
   await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
   const base = `http://127.0.0.1:${server.address().port}`;
   try {
-    await run({ base, root, vaultPath, telemetryDir, launched, launchOptions, children });
+    await run({
+      base,
+      configPath,
+      root,
+      vaultPath,
+      telemetryDir,
+      launched,
+      launchOptions,
+      children,
+      setProbeInstalled(value) { probeInstalled = Boolean(value); },
+    });
   } finally {
     await new Promise(resolve => server.close(resolve));
     fs.rmSync(root, { recursive: true, force: true });
@@ -126,6 +138,109 @@ test("Marketplace response is redacted, aliased, and contains exactly 20 agents"
   });
 });
 
+test("operational synchronization prompt injects runtime paths and dispatches only to primary agents", async () => {
+  await withServer(async ({ base, configPath, root, vaultPath }) => {
+    const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
+    config.agents.push(
+      {
+        id: "cline",
+        kind: "agent",
+        name: "Cline",
+        role: "Coding agent",
+        node: "Node-13",
+        enabled: true,
+        lane: "Cline",
+        gateway: { trigger: "cline" },
+      },
+      {
+        id: "codex-worker",
+        kind: "subagent",
+        ownerAgentId: "codex",
+        name: "Codex Worker",
+        role: "Task worker",
+        node: "Node-12.1",
+        enabled: true,
+        lane: "Codex",
+      },
+    );
+    fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+
+    const promptResponse = await fetch(
+      `${base}/api/agents/synchronization-prompt`,
+    );
+    assert.equal(promptResponse.status, 200);
+    const promptBody = await promptResponse.json();
+    assert.equal(promptBody.recipients, 2);
+    assert.deepEqual(promptBody.agentIds, ["cline", "codex"]);
+    assert.match(promptBody.prompt, new RegExp(
+      root.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+    ));
+    assert.match(promptBody.prompt, new RegExp(
+      vaultPath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+    ));
+    assert.doesNotMatch(promptBody.prompt, /\{\{[A-Z_]+\}\}/);
+
+    const dispatched = await mutation(
+      base,
+      "/api/agents/synchronization-prompt/send",
+      { body: { operationId: "sync-all-1" } },
+    );
+    assert.equal(dispatched.status, 200);
+    const dispatchBody = await dispatched.json();
+    assert.equal(dispatchBody.sent, 2);
+    assert.deepEqual(dispatchBody.agentIds, ["cline", "codex"]);
+
+    const promptPath = path.join(
+      vaultPath,
+      "System",
+      "Operational Synchronization.md",
+    );
+    const taskPath = path.join(vaultPath, "Tasks", "Inbox Tasks.md");
+    assert.equal(fs.existsSync(promptPath), true);
+    assert.equal(fs.existsSync(taskPath), true);
+    assert.match(fs.readFileSync(promptPath, "utf8"), /Rempeyek Agent OS operational synchronization/);
+    const tasks = fs.readFileSync(taskPath, "utf8");
+    assert.match(tasks, /Cline/);
+    assert.match(tasks, /Codex/);
+    assert.doesNotMatch(tasks, /Codex Worker/);
+
+    const replay = await mutation(
+      base,
+      "/api/agents/synchronization-prompt/send",
+      { body: { operationId: "sync-all-1" } },
+    ).then(response => response.json());
+    assert.equal(replay.replayed, true);
+    assert.equal(
+      fs.readFileSync(taskPath, "utf8")
+        .split(/\r?\n/)
+        .filter(line => line.includes("Operational Synchronization")).length,
+      2,
+    );
+  });
+});
+
+test("catalog registration requires a fresh installed-agent probe", async () => {
+  await withServer(async ({ base, setProbeInstalled }) => {
+    setProbeInstalled(false);
+    const deniedApproval = await approve(base, "agents.add", "registry");
+    const denied = await mutation(base, "/api/agents/add", {
+      approvalId: deniedApproval,
+      body: { catalogId: "opencode" },
+    });
+    assert.equal(denied.status, 400);
+    assert.match((await denied.json()).error, /not detected/i);
+
+    setProbeInstalled(true);
+    const allowedApproval = await approve(base, "agents.add", "registry");
+    const allowed = await mutation(base, "/api/agents/add", {
+      approvalId: allowedApproval,
+      body: { catalogId: "opencode" },
+    });
+    assert.equal(allowed.status, 200);
+    assert.equal((await allowed.json()).agent.id, "opencode");
+  });
+});
+
 test("activate and disable mutate only registry state and replay one operation id", async () => {
   await withServer(async ({ base }) => {
     const approvalId = await approve(base, "agent.disable", "codex");
@@ -160,7 +275,7 @@ test("activate and disable mutate only registry state and replay one operation i
   });
 });
 
-test("remove preserves runtime data and restore returns the same profile id", async () => {
+test("remove preserves runtime data but permanently removes the profile", async () => {
   await withServer(async ({ base, vaultPath, telemetryDir }) => {
     const note = path.join(vaultPath, "Codex memory.md");
     const telemetry = path.join(telemetryDir, "codex.jsonl");
@@ -168,8 +283,17 @@ test("remove preserves runtime data and restore returns the same profile id", as
     fs.writeFileSync(telemetry, "{\"type\":\"info\"}\n");
 
     const removeApproval = await approve(base, "agent.remove", "codex");
-    const removedResponse = await mutation(base, "/api/agents/codex/remove", {
+    const denied = await mutation(base, "/api/agents/codex/remove", {
       approvalId: removeApproval,
+      body: { operationId: "remove-denied", detachChildren: false },
+    });
+    assert.equal(denied.status, 403);
+
+    const first = await approve(base, "agent.remove", "codex");
+    const second = await approve(base, "agent.remove.confirm", "codex");
+    const removedResponse = await mutation(base, "/api/agents/codex/remove", {
+      approvalId: first,
+      confirmationId: second,
       body: { operationId: "remove-1", detachChildren: false },
     });
     assert.equal(removedResponse.status, 200);
@@ -187,48 +311,30 @@ test("remove preserves runtime data and restore returns the same profile id", as
     assert.equal(fs.existsSync(note), true);
     assert.equal(fs.existsSync(telemetry), true);
 
-    const wrongApproval = await approve(base, "agent.restore", "pi");
-    const wrongRestore = await mutation(base, "/api/agents/pi/restore", {
-      approvalId: wrongApproval,
-      body: {
-        operationId: "restore-wrong-profile",
-        tombstoneId: removed.tombstone.id,
-      },
-    });
-    assert.equal(wrongRestore.status, 409);
+    assert.equal(Object.hasOwn(removed, "tombstone"), false);
     const afterWrongRestore = await fetch(`${base}/api/state`).then(value => value.json());
     assert.equal(
       afterWrongRestore.agents.some(agent => agent.id === "codex"),
       false,
     );
-
-    const restoreApproval = await approve(base, "agent.restore", "codex");
     const restoredResponse = await mutation(base, "/api/agents/codex/restore", {
-      approvalId: restoreApproval,
-      body: {
-        operationId: "restore-1",
-        tombstoneId: removed.tombstone.id,
-      },
+      body: { operationId: "restore-1", tombstoneId: "removed-profile" },
     });
-    assert.equal(restoredResponse.status, 200);
-    const restored = await restoredResponse.json();
-    assert.equal(restored.state.id, "codex");
-    assert.equal(restored.state.profile, "registered");
+    assert.equal(restoredResponse.status, 410);
 
-    const replayApproval = await approve(base, "agent.restore", "codex");
-    const replay = await mutation(base, "/api/agents/codex/restore", {
-      approvalId: replayApproval,
-      body: {
-        operationId: "restore-1",
-        tombstoneId: removed.tombstone.id,
-      },
-    }).then(value => value.json());
-    assert.equal(replay.replayed, true);
+    const restoreApproval = await approve(base, "settings.restore-backup", "registry");
+    const backupRestore = await mutation(base, "/api/settings/restore-backup", {
+      approvalId: restoreApproval,
+      body: { operationId: "restore-registry-after-removal", agencyName: "Test" },
+    });
+    assert.equal(backupRestore.status, 200);
+    const afterBackupRestore = await fetch(`${base}/api/state`).then(value => value.json());
+    assert.equal(afterBackupRestore.agents.some(agent => agent.id === "codex"), false);
   });
 });
 
-test("uninstall requires two scoped approvals and launches only a reviewed adapter", async () => {
-  await withServer(async ({ base, launched }) => {
+test("uninstall requires two scoped approvals and removes the profile only after verified absence", async () => {
+  await withServer(async ({ base, launched, children, setProbeInstalled }) => {
     const firstOnly = await approve(base, "agent.uninstall", "codex");
     const denied = await mutation(base, "/api/agents/codex/uninstall", {
       approvalId: firstOnly,
@@ -256,6 +362,42 @@ test("uninstall requires two scoped approvals and launches only a reviewed adapt
 
     const lifecycle = await fetch(`${base}/api/agents/lifecycle`).then(value => value.json());
     assert.equal(lifecycle.busy, true);
+
+    setProbeInstalled(false);
+    children[0].emit("exit", 0);
+    await new Promise(resolve => setImmediate(resolve));
+    const state = await fetch(`${base}/api/state`).then(value => value.json());
+    assert.equal(state.agents.some(agent => agent.id === "codex"), false);
+    const finished = await fetch(`${base}/api/agents/lifecycle`).then(value => value.json());
+    assert.equal(finished.busy, false);
+  });
+});
+
+test("uninstall preflights child profiles before launching the irreversible adapter", async () => {
+  await withServer(async ({ base, launched }) => {
+    const createApproval = await approve(base, "subagent.create", "codex");
+    const created = await mutation(base, "/api/agents/codex/subagents", {
+      approvalId: createApproval,
+      body: {
+        operationId: "create-uninstall-child",
+        name: "Child",
+        domain: "Review",
+        outcome: "Review parent work",
+        workspaceScope: "current-project",
+      },
+    });
+    assert.equal(created.status, 201);
+
+    const first = await approve(base, "agent.uninstall", "codex");
+    const second = await approve(base, "agent.uninstall.confirm", "codex");
+    const response = await mutation(base, "/api/agents/codex/uninstall", {
+      approvalId: first,
+      confirmationId: second,
+      body: { operationId: "uninstall-parent-with-child", adapterId: "npm" },
+    });
+    assert.equal(response.status, 409);
+    assert.equal(launched.length, 0);
+    assert.deepEqual((await response.json()).childIds, ["codex-child"]);
   });
 });
 
@@ -522,19 +664,31 @@ test("creates a primary-bound subagent without inventing telemetry", async () =>
     );
     assert.deepEqual(detail.activity.subagents, []);
 
+    const topLevelState = await fetch(`${base}/api/state`).then(value => value.json());
+    assert.equal(
+      topLevelState.agents.some(agent => agent.id === "codex-security-reviewer"),
+      false,
+    );
+    const procs = await fetch(`${base}/api/procs`).then(value => value.json());
+    assert.equal(
+      procs.some(agent => agent.id === "codex-security-reviewer"),
+      false,
+    );
+    const directLog = await fetch(
+      `${base}/api/proc/codex-security-reviewer/log`,
+    );
+    assert.equal(directLog.status, 404);
+    const directStatus = await mutation(
+      base,
+      "/api/proc/codex-security-reviewer/status",
+    );
+    assert.equal(directStatus.status, 404);
     const topology = await fetch(`${base}/api/agent-topology`).then(value => value.json());
-    const relation = topology.edges.find(edge => edge.type === "spawned_subagent");
-    assert.deepEqual(relation, {
-      source: "codex",
-      target: "codex-security-reviewer",
-      type: "spawned_subagent",
-      provenance: {
-        source: "subagent",
-        id: "registry:codex:codex-security-reviewer",
-      },
-      status: "configured",
-      flowing: false,
-    });
+    assert.equal(
+      topology.nodes.some(agent => agent.id === "codex-security-reviewer"),
+      false,
+    );
+    assert.equal(topology.edges.some(edge => edge.type === "spawned_subagent"), false);
     assert.equal(
       fs.existsSync(path.join(
         vaultPath,

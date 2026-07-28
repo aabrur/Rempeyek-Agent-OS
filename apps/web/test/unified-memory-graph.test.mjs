@@ -33,6 +33,15 @@ describe('Unified Memory Graph', () => {
     assert.ok(graph.health);
   });
 
+  it('keeps dataset identity stable when source files do not change', () => {
+    fs.mkdirSync(path.join(tmpDir, 'apps', 'web'), { recursive: true });
+    fs.writeFileSync(path.join(tmpDir, 'apps', 'web', 'index.js'), 'export {};\n');
+    const first = buildUnifiedMemoryGraph({ vaultPath, rootDir: tmpDir, configDir });
+    const second = buildUnifiedMemoryGraph({ vaultPath, rootDir: tmpDir, configDir });
+    assert.equal(second.sourceRevision, first.sourceRevision);
+    assert.equal(second.metadata.datasetIdentity, first.metadata.datasetIdentity);
+  });
+
   it('should include vault notes in graph', () => {
     fs.writeFileSync(path.join(vaultPath, 'TestNote.md'), '# Test Note\n[[TargetNote]]\n', 'utf8');
     fs.writeFileSync(path.join(vaultPath, 'TargetNote.md'), '# Target Note\n', 'utf8');

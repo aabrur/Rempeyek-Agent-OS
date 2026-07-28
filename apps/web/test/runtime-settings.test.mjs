@@ -22,7 +22,6 @@ test("runtime snapshot exposes paths and provider names but never values", () =>
       agents: [{ gateway: { envAllow: ["OPENAI_API_KEY"] } }],
     },
     env: { OPENAI_API_KEY: "must-not-leak" },
-    tombstones: [{ id: "tomb-1", agent: { id: "codex", name: "Codex" } }],
     backupExists: true,
     backupPath: "C:\\state\\agents.config.json.bak",
     logFiles: ["codex.log"],
@@ -35,7 +34,7 @@ test("runtime snapshot exposes paths and provider names but never values", () =>
   }]);
   assert.equal(JSON.stringify(snapshot).includes("must-not-leak"), false);
   assert.equal(snapshot.backups.length, 1);
-  assert.equal(snapshot.tombstones[0].id, "tomb-1");
+  assert.equal(Object.hasOwn(snapshot, "tombstones"), false);
   assert.deepEqual(snapshot.logFiles, ["codex.log"]);
   assert.equal(snapshot.approvalAuditCount, 7);
 });

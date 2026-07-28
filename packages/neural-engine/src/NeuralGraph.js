@@ -3,7 +3,7 @@
    API: const g = NeuralGraph(canvas, {onOpen});
         g.setData({nodes,edges,stats}); g.setQuery(q);
         g.setLayers({link,ghost,tag,folder}); g.reheat(); g.destroy() */
-import { datasetIdentity, graphRenderProfile, hashString, labelBudgetForWidth, layoutGraph, nextNodeId, nodeSemantics, seededRandom, selectLabelNodeIds } from "./graph-view.js";
+import { datasetIdentity, edgeRenderType, graphRenderProfile, hashString, labelBudgetForWidth, layoutGraph, nextNodeId, nodeSemantics, seededRandom, selectLabelNodeIds } from "./graph-view.js";
 export {
   breadcrumbFor, changedNodeIds, graphRenderProfile, labelForNodeId, layersForMode,
   nodeSemantics, projectGraph, resolveMotionState,
@@ -144,7 +144,7 @@ export function NeuralGraph(canvas, opts = {}) {
     allEdges = (data.edges || [])
       .map(e => ({ ...e, s: e.source ?? e.s, t: e.target ?? e.t }))
       .filter(e => idx.has(e.s) && idx.has(e.t))
-      .map(e => ({ a: nodes[idx.get(e.s)], b: nodes[idx.get(e.t)], type: e.type || "link" }));
+      .map(e => ({ a: nodes[idx.get(e.s)], b: nodes[idx.get(e.t)], type: edgeRenderType(e) }));
     selected = selectedId ? nodes.find(node => node.id === selectedId) || null : null;
     applyLayers();
     alpha = 0;
@@ -423,7 +423,7 @@ export function NeuralGraph(canvas, opts = {}) {
       if (event.key === "Home") selectNode(visible[0] || null, { shock: false });
       else if (event.key === "End") selectNode(visible.at(-1) || null, { shock: false });
       else moveSelection(event.key === "ArrowLeft" || event.key === "ArrowUp" ? -1 : 1);
-    } else if (event.key === "Enter" && selected?.type === "note") {
+    } else if (event.key === "Enter" && ["note", "vault-note"].includes(selected?.type)) {
       event.preventDefault(); opts.onOpen?.(selected);
     } else if (event.key.toLowerCase() === "f" && selected) {
       event.preventDefault(); opts.onFocus?.(selected);
@@ -478,7 +478,9 @@ export function NeuralGraph(canvas, opts = {}) {
   canvas.addEventListener("pointerup", onUp);
   canvas.addEventListener("wheel", onWheel, { passive: false });
   canvas.addEventListener("keydown", onKeyDown);
-  const onDoubleClick = () => { if (selected?.type === "note") opts.onOpen?.(selected); };
+  const onDoubleClick = () => {
+    if (["note", "vault-note"].includes(selected?.type)) opts.onOpen?.(selected);
+  };
   canvas.addEventListener("dblclick", onDoubleClick);
   const ro = new ResizeObserver(() => { kick(); });
   ro.observe(canvas);

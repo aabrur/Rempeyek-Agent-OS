@@ -8,7 +8,6 @@ const RELATION_LABEL = {
   dependency: "Dependency",
   co_assignment: "Co-assignment",
   task_assignment: "Task assignment",
-  spawned_subagent: "Spawned subagent",
   communication: "Communication",
 };
 const TIER_OPACITY = { strong: 0.75, data: 0.55, weak: 0.22 };

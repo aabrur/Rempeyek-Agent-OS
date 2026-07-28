@@ -1,7 +1,9 @@
 const validId = (value) => typeof value === 'string' && value.length > 0;
 
 export function buildAgentTopology({ agents = [], tasks = [], subagents = [], communications = [], coAssignments = [] } = {}) {
-  const nodes = agents.filter((agent) => validId(agent?.id)).map((agent) => ({ ...agent }));
+  const nodes = agents
+    .filter((agent) => validId(agent?.id) && agent.kind !== "subagent")
+    .map((agent) => ({ ...agent }));
   const known = new Set(nodes.map((node) => node.id));
   const edges = [];
   const seen = new Set();
@@ -20,11 +22,6 @@ export function buildAgentTopology({ agents = [], tasks = [], subagents = [], co
     source: dependency, target: agent.id, type: 'dependency',
     provenance: { source: 'configuration', id: `${agent.id}:${dependency}` },
     status: 'configured',
-  });
-  for (const relation of subagents) add({
-    source: relation.parentAgentId, target: relation.agentId, type: 'spawned_subagent',
-    provenance: { source: 'subagent', id: relation.id },
-    status: relation.status || 'recorded',
   });
   for (const relation of communications) add({
     source: relation.fromAgentId, target: relation.toAgentId, type: 'communication',

@@ -162,7 +162,6 @@ export function RuntimeSettingsPanel({ desktop = null }) {
           <div><span>VAULT</span><b title={snapshot.paths.vaultPath}>{snapshot.paths.vaultPath}</b></div>
           <div><span>LOG FOLDER</span><b title={snapshot.paths.logDir}>{snapshot.paths.logDir}</b></div>
           <div><span>REGISTRY BACKUP</span><b>{backup ? backup.name : "not available"}</b></div>
-          <div><span>RESTORABLE PROFILES</span><b>{snapshot.tombstones?.length || 0}</b></div>
           <div><span>OWNED LOG FILES</span><b>{snapshot.logFiles?.length || 0}</b></div>
         </div>
         <div className="aa-actions">

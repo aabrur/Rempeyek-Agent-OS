@@ -14,7 +14,6 @@ const RETAINED_AGENT_DATA = Object.freeze([
 ]);
 
 const OPERATION_ID = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$/;
-const TOMBSTONE_ID = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$/;
 
 function copy(value) {
   return JSON.parse(JSON.stringify(value));
@@ -37,50 +36,6 @@ function operationIdFrom(value) {
   return validateOperationId(
     typeof value === "string" ? value : value?.operationId,
   );
-}
-
-function safeGateway(gateway) {
-  if (!gateway || typeof gateway !== "object") return undefined;
-  const safe = {};
-  for (const field of ["home", "trigger", "probe", "marketplaceId"]) {
-    if (typeof gateway[field] === "string") safe[field] = gateway[field];
-  }
-  if (Array.isArray(gateway.actions)) {
-    safe.actions = gateway.actions
-      .filter(action => typeof action === "string")
-      .map(action => action.slice(0, 128));
-  }
-  if (Array.isArray(gateway.envAllow)) {
-    safe.envAllow = gateway.envAllow
-      .filter(name => /^[A-Z][A-Z0-9_]{0,127}$/.test(String(name)))
-      .map(String);
-  }
-  return Object.keys(safe).length ? safe : undefined;
-}
-
-function safeAgent(agent) {
-  const safe = {};
-  for (const field of [
-    "id",
-    "name",
-    "icon",
-    "role",
-    "node",
-    "lane",
-    "accent",
-    "note",
-    "kind",
-    "parentId",
-    "detachedFrom",
-  ]) {
-    if (typeof agent[field] === "string" || agent[field] === null) {
-      safe[field] = agent[field];
-    }
-  }
-  safe.enabled = Boolean(agent.enabled);
-  const gateway = safeGateway(agent.gateway);
-  if (gateway) safe.gateway = gateway;
-  return safe;
 }
 
 function writeJsonAtomic(filePath, value, {
@@ -163,13 +118,6 @@ function createConfigStore({
     return result;
   }
 
-  function tombstonePath(tombstoneId) {
-    if (!TOMBSTONE_ID.test(String(tombstoneId || ""))) {
-      throw new Error("tombstone id is invalid");
-    }
-    return path.join(tombstoneDir, `${tombstoneId}.json`);
-  }
-
   function removeProfile(
     config,
     agentId,
@@ -192,20 +140,15 @@ function createConfigStore({
       );
     }
 
-    const tombstoneId = String(randomId());
-    const filePath = tombstonePath(tombstoneId);
-    if (fsImpl.existsSync(filePath)) {
-      throw new Error(`tombstone '${tombstoneId}' already exists`);
-    }
-    const timestamp = now();
-    const tombstone = {
-      schemaVersion: 1,
-      id: tombstoneId,
-      removedAt: timestamp instanceof Date ? timestamp.toISOString() : String(timestamp),
-      agent: safeAgent(agent),
-      retained: [...RETAINED_AGENT_DATA],
-    };
     const nextConfig = copy(config);
+    nextConfig.removedAgentIds = [
+      ...new Set([
+        ...(Array.isArray(nextConfig.removedAgentIds)
+          ? nextConfig.removedAgentIds
+          : []),
+        agentId,
+      ]),
+    ];
     nextConfig.agents = nextConfig.agents
       .filter(candidate => candidate.id !== agentId)
       .map(candidate => (
@@ -220,55 +163,18 @@ function createConfigStore({
       ));
     if (nextConfig.activeAgentId === agentId) nextConfig.activeAgentId = null;
 
-    writeJsonAtomic(filePath, tombstone, {
-      fsImpl,
-      operationId: id,
-      exclusive: true,
-    });
-    try {
-      commit(nextConfig, id);
-    } catch (error) {
-      if (fsImpl.existsSync(filePath)) fsImpl.unlinkSync(filePath);
-      throw error;
-    }
+    commit(nextConfig, id);
     return remember(id, {
       config: nextConfig,
-      tombstone,
       retained: [...RETAINED_AGENT_DATA],
     });
   }
 
-  function restoreProfile(config, tombstoneId, operation = {}) {
-    const id = operationIdFrom(operation);
-    const prior = replay(id);
-    if (prior) return prior;
-    validateConfig(config);
-    const filePath = tombstonePath(tombstoneId);
-    if (!fsImpl.existsSync(filePath)) {
-      throw new Error(`tombstone '${tombstoneId}' not found`);
-    }
-    const tombstone = JSON.parse(fsImpl.readFileSync(filePath, "utf8"));
-    const agent = safeAgent(tombstone.agent || {});
-    if (!agent.id) throw new Error(`tombstone '${tombstoneId}' has no agent id`);
-    if (config.agents.some(candidate => candidate.id === agent.id)) {
-      throw new Error(`agent '${agent.id}' is already registered`);
-    }
-    const nextConfig = copy(config);
-    nextConfig.agents.push(agent);
-    commit(nextConfig, id);
-    fsImpl.unlinkSync(filePath);
-    return remember(id, { config: nextConfig, restoredAgentId: agent.id });
-  }
-
   function listTombstones() {
-    if (!fsImpl.existsSync(tombstoneDir)) return [];
-    return fsImpl.readdirSync(tombstoneDir)
-      .filter(name => /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}\.json$/.test(name))
-      .map(name => JSON.parse(fsImpl.readFileSync(path.join(tombstoneDir, name), "utf8")))
-      .sort((a, b) => String(b.removedAt).localeCompare(String(a.removedAt)));
+    return [];
   }
 
-  return { commit, listTombstones, removeProfile, restoreProfile };
+  return { commit, listTombstones, removeProfile };
 }
 
 module.exports = { createConfigStore, RETAINED_AGENT_DATA };

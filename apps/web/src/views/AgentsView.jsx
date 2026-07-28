@@ -3,6 +3,7 @@ import { Btn, PageHead, SectionRow } from "@rempeyek/ui";
 import { AgentCard } from "../components/AgentCard";
 import { AgentDetail } from "../components/AgentDetail";
 import { AddAgentModal } from "../components/AddAgentModal";
+import { OperationalSyncPrompt } from "../components/OperationalSyncPrompt";
 
 export function AgentsView({ agents, gw, openAgent, onOpenAgent, refresh }) {
   const [adding, setAdding] = useState(false);
@@ -13,6 +14,8 @@ export function AgentsView({ agents, gw, openAgent, onOpenAgent, refresh }) {
         Click an agent for details: active sessions, spawned subagents, gateway log, telemetry.
         Click the photo to change the avatar.
       </PageHead>
+
+      <OperationalSyncPrompt />
 
       <SectionRow label="REGISTERED NODES">
         <Btn onClick={gw.startAll}>▶ START ALL GATEWAYS</Btn>

@@ -10,15 +10,16 @@ export function ConfirmAgentAction({
   onCancel,
   onConfirm,
 }) {
-  const [typed, setTyped] = useState("");
+  const [stage, setStage] = useState(1);
 
   useEffect(() => {
-    if (open) setTyped("");
+    if (open) setStage(1);
   }, [open, agentName]);
 
   const submit = event => {
     event.preventDefault();
-    if (typed === agentName) onConfirm();
+    if (stage === 1) setStage(2);
+    else onConfirm();
   };
 
   return (
@@ -33,21 +34,17 @@ export function ConfirmAgentAction({
         <div className="token-sub">
           {impact.map((line, index) => <div key={index}>{line}</div>)}
         </div>
-        <div className="aa-field">
-          <label htmlFor="confirmAgentName">
-            Type <b>{agentName}</b> to confirm
-          </label>
-          <input
-            id="confirmAgentName"
-            autoComplete="off"
-            value={typed}
-            onChange={event => setTyped(event.target.value)}
-          />
+        <div className="aa-field wide" role="status" aria-live="polite">
+          <b>
+            {stage === 1
+              ? `Confirm 1 of 2: ${confirmLabel} for ${agentName}?`
+              : "Confirm 2 of 2: this cannot be restored. Continue?"}
+          </b>
         </div>
         <div className="aa-actions">
           <Btn type="button" variant="dim" onClick={onCancel}>Cancel</Btn>
-          <Btn type="submit" variant="stop" disabled={typed !== agentName}>
-            {confirmLabel}
+          <Btn type="submit" variant="stop">
+            {stage === 1 ? "Yes, continue" : `Yes, ${confirmLabel}`}
           </Btn>
         </div>
       </form>

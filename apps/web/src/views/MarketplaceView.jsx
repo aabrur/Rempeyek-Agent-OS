@@ -44,6 +44,8 @@ export function MarketplaceView({ refresh }) {
 
       <AddAgentModal
         open={adding}
+        initialSelection="custom"
+        title="＋ REGISTER CUSTOM AGENT"
         onClose={() => setAdding(false)}
         onAdded={refresh}
       />

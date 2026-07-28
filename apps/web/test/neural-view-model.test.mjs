@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {
   breadcrumbFor, changedNodeIds, datasetIdentity, layersForMode,
   graphRenderProfile, labelForNodeId, layoutGraph, nextNodeId, nodeSemantics,
-  labelBudgetForWidth, projectGraph, resolveMotionState, selectLabelNodeIds,
+  edgeRenderType, labelBudgetForWidth, projectGraph, resolveMotionState, selectLabelNodeIds,
 } from "../../../packages/neural-engine/src/graph-view.js";
 
 const DATA = {
@@ -140,4 +140,19 @@ test("asset and code layers render in cosmos and stay out of parity (Obsidian de
   assert.deepEqual(parity.nodes.map(n => n.id), ["A.md"], "parity mirrors Obsidian: notes+ghosts only");
   assert.equal(layersForMode("cosmos").asset, true);
   assert.equal(layersForMode("parity").code, false);
+});
+
+test("semantic unified-memory edges map to visible renderer layers", () => {
+  assert.equal(edgeRenderType({ type: "LINKS_TO" }), "link");
+  assert.equal(edgeRenderType({ type: "REFERENCES" }), "ghost");
+  assert.equal(edgeRenderType({ type: "CONTAINS" }), "folder");
+  assert.equal(edgeRenderType({ type: "CREATED" }), "link");
+  const data = {
+    nodes: [
+      { id: "folder:Repo", type: "folder" },
+      { id: "Repo/app.js", type: "application-module" },
+    ],
+    edges: [{ source: "folder:Repo", target: "Repo/app.js", type: "CONTAINS" }],
+  };
+  assert.equal(projectGraph(data, { mode: "cosmos" }).edges.length, 1);
 });

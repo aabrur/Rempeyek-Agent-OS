@@ -39,7 +39,6 @@ export function runtimeSettingsSnapshot({
   logDir = "",
   config = {},
   env = {},
-  tombstones = [],
   backupExists = false,
   backupPath = "",
   logFiles = [],
@@ -67,12 +66,6 @@ export function runtimeSettingsSnapshot({
           path: backupPath,
         }]
       : [],
-    tombstones: tombstones.map(tombstone => ({
-      id: tombstone.id,
-      agentId: tombstone.agent?.id || tombstone.agentId || "",
-      name: tombstone.agent?.name || tombstone.name || tombstone.agent?.id || "",
-      removedAt: tombstone.removedAt || null,
-    })),
     logFiles: logFiles
       .filter(name => LOG_NAME.test(String(name)))
       .map(String)

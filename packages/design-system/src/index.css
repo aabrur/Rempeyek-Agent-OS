@@ -711,15 +711,45 @@ body {
 .aa-field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .aa-field.wide { grid-column: 1 / -1; }
 .aa-field label { font-family: var(--mono); font-size: 9px; letter-spacing: .16em; color: var(--muted); text-transform: uppercase; }
-.aa-field input {
+.aa-field input, .aa-field select {
   padding: 8px 10px; border-radius: 7px; border: 1px solid var(--line);
   background: var(--bg); color: var(--text); font: 12px var(--mono); min-width: 0;
 }
-.aa-field input:focus { outline: none; border-color: var(--acc); }
+.aa-field input:focus, .aa-field select:focus { outline: none; border-color: var(--acc); }
 .aa-field input[type="color"] { padding: 2px 4px; height: 34px; cursor: pointer; }
 .aa-actions { display: flex; flex-direction: row; align-items: center; gap: 8px; justify-content: flex-end; margin-top: 4px; }
 .aa-hint { font-size: 10.5px; color: var(--muted); font-family: var(--mono); min-height: 14px; }
 .aa-hint.err { color: var(--red); }
+
+/* ---------------- operational synchronization prompt ---------------- */
+.sync-prompt-card {
+  display: flex; align-items: center; justify-content: space-between; gap: 22px;
+  margin: 0 0 20px; padding: 18px 20px;
+  border: var(--surface-border-width) var(--surface-border-style) color-mix(in srgb, var(--acc) 52%, var(--line));
+  border-radius: var(--surface-radius);
+  background: linear-gradient(145deg, color-mix(in srgb, var(--panel) 88%, var(--acc) 12%), var(--surface-fill));
+  box-shadow: var(--surface-shadow);
+}
+.sync-prompt-card h2 { margin: 0; font: 700 18px var(--font-heading, var(--disp)); letter-spacing: .04em; }
+.sync-prompt-card p { max-width: 760px; margin: 6px 0 0; color: var(--muted); font-size: 11.5px; line-height: 1.5; }
+.sync-prompt-card .btn { flex: none; min-height: 44px; }
+.sync-prompt-box { width: min(980px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); display: flex; flex-direction: column; }
+.sync-prompt-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; }
+.sync-prompt-head h2 { margin: 0; font: 700 20px var(--font-heading, var(--disp)); }
+.sync-prompt-summary { margin: 8px 0 12px; color: var(--muted); font-size: 11px; line-height: 1.5; }
+.sync-prompt-text {
+  width: 100%; min-height: min(58vh, 600px); resize: vertical; padding: 14px;
+  border: 1px solid var(--line); border-radius: var(--control-radius);
+  background: var(--graph-panel); color: var(--text);
+  font: 10.5px/1.6 var(--font-data, var(--mono)); tab-size: 2;
+}
+.sync-prompt-text:focus { outline: 1px solid var(--acc); border-color: var(--acc); }
+.sync-prompt-actions { margin-top: 12px; }
+@media (max-width: 720px) {
+  .sync-prompt-card { align-items: stretch; flex-direction: column; }
+  .sync-prompt-card .btn { width: 100%; }
+  .sync-prompt-actions .btn { flex: 1 1 100%; }
+}
 
 /* ---------------- workspace (the front door) ----------------
    Hero = the project you continue; everything on it is live data:

@@ -103,27 +103,23 @@ test("removing a parent blocks by default and can explicitly detach its children
       parentId: null,
       detachedFrom: "primary",
     }]);
+    assert.deepEqual(result.config.removedAgentIds, ["primary"]);
     assert.deepEqual(result.retained, RETAINED_AGENT_DATA);
-    assert.equal(result.tombstone.id, "tomb-1");
-    assert.deepEqual(result.tombstone.agent.gateway.envAllow, ["OPENAI_API_KEY"]);
-    assert.equal(JSON.stringify(result.tombstone).includes("sk-must-never-survive"), false);
-    assert.equal(
-      Object.hasOwn(result.tombstone.agent.gateway, "credentials"),
-      false,
-    );
-    assert.deepEqual(store.listTombstones(), [result.tombstone]);
+    assert.equal(Object.hasOwn(result, "tombstone"), false);
+    assert.deepEqual(store.listTombstones(), []);
+    assert.equal(fs.existsSync(item.tombstoneDir), false);
 
     const replay = store.removeProfile(item.config, "primary", {
       detachChildren: true,
     }, "remove-primary");
     assert.equal(replay.replayed, true);
-    assert.equal(store.listTombstones().length, 1);
+    assert.equal(store.listTombstones().length, 0);
   } finally {
     fs.rmSync(item.root, { recursive: true, force: true });
   }
 });
 
-test("restore refuses occupied agent ids and restores an available tombstone once", () => {
+test("removed profiles are final and cannot be restored", () => {
   const item = fixture();
   try {
     const store = createConfigStore({
@@ -131,33 +127,15 @@ test("restore refuses occupied agent ids and restores an available tombstone onc
       tombstoneDir: item.tombstoneDir,
       randomId: () => "tomb-2",
     });
-    const removed = store.removeProfile(item.config, "child", {
+    store.removeProfile(item.config, "child", {
       detachChildren: false,
     }, "remove-child");
-
-    assert.throws(
-      () => store.restoreProfile(
-        item.config,
-        removed.tombstone.id,
-        "restore-conflict",
-      ),
-      /already registered/i,
+    assert.deepEqual(
+      JSON.parse(fs.readFileSync(item.configPath, "utf8")).removedAgentIds,
+      ["child"],
     );
-
-    const restored = store.restoreProfile(
-      removed.config,
-      removed.tombstone.id,
-      "restore-child",
-    );
-    assert.equal(restored.config.agents.at(-1).id, "child");
+    assert.equal(typeof store.restoreProfile, "undefined");
     assert.deepEqual(store.listTombstones(), []);
-
-    const replay = store.restoreProfile(
-      removed.config,
-      removed.tombstone.id,
-      "restore-child",
-    );
-    assert.equal(replay.replayed, true);
   } finally {
     fs.rmSync(item.root, { recursive: true, force: true });
   }

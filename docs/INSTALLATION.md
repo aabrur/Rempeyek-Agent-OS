@@ -95,7 +95,7 @@ Expected JSON output structure:
 {
   "bootstrapped": true,
   "state": "healthy",
-  "version": "2.3.1",
+  "version": "2.3.2",
   "mode": "installed",
   "vaultPath": ".../Vault"
 }

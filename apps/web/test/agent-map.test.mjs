@@ -149,17 +149,15 @@ test("projects the complete edge vocabulary and provenance into inspectable rows
     edges: [
       { source: "codex", target: "hermes", type: "dependency", provenance: { source: "configuration", id: "hermes:codex" }, flowing: false },
       { source: "hermes", target: "pi", type: "task_assignment", provenance: { source: "task", id: "task-1" }, flowing: true },
-      { source: "codex", target: "cline", type: "spawned_subagent", provenance: { source: "subagent", id: "spawn-1" }, flowing: false },
       { source: "pi", target: "cline", type: "communication", provenance: { source: "communication", id: "message-1" }, flowing: false },
     ],
   };
 
   const map = buildAgentMap(topology);
-  assert.deepEqual(map.legend.relations.map(item => item.type), ["dependency", "co_assignment", "task_assignment", "spawned_subagent", "communication"]);
+  assert.deepEqual(map.legend.relations.map(item => item.type), ["dependency", "co_assignment", "task_assignment", "communication"]);
   assert.deepEqual(map.rows.filter(row => row.kind === "relationship").map(row => ({ type: row.type, provenanceId: row.provenanceId, provenanceSource: row.provenanceSource })), [
     { type: "communication", provenanceId: "message-1", provenanceSource: "communication" },
     { type: "dependency", provenanceId: "hermes:codex", provenanceSource: "configuration" },
-    { type: "spawned_subagent", provenanceId: "spawn-1", provenanceSource: "subagent" },
     { type: "task_assignment", provenanceId: "task-1", provenanceSource: "task" },
   ]);
 });
@@ -233,10 +231,9 @@ test("enforces ontology provenance and semantic animation at the view seam", () 
   assert.deepEqual(live.edges.map(edge => [edge.provenance.id, edge.animated]), [
     ["live-message", true],
     ["not-flowing", false],
-    ["spawn", false],
     ["recorded-task", false],
     ["queued-task", true],
   ]);
-  assert.equal(live.metadata.droppedRelations, 2);
+  assert.equal(live.metadata.droppedRelations, 3);
   assert.equal(reduced.edges.every(edge => edge.animated === false), true);
 });

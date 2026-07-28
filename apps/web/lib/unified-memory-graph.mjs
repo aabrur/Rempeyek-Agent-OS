@@ -4,10 +4,12 @@ import crypto from 'node:crypto';
 import { buildVaultGraph } from './vault-graph.mjs';
 
 const CODE_EXTENSIONS = new Set([
-  '.js', '.mjs', '.cjs', '.jsx', '.ts', '.tsx', '.json', '.md', '.yaml', '.yml', '.css', '.html'
+  '.js', '.mjs', '.cjs', '.jsx', '.ts', '.tsx', '.json', '.md', '.txt',
+  '.yaml', '.yml', '.toml', '.css', '.scss', '.html', '.svg', '.sql',
+  '.py', '.ps1', '.sh', '.cmd', '.go', '.rs', '.java', '.kt', '.cs',
+  '.c', '.h', '.cpp', '.hpp', '.xml',
 ]);
 
-const REPO_DIRS = ['apps', 'packages', 'scripts', 'docs', 'prompts', '.github'];
 const REPO_ROOT_FILES = ['README.md', 'CHANGELOG.md', 'CLAUDE.md', 'CONTEXT.md', 'LICENSE', 'package.json', 'agents.config.example.json'];
 
 function sha256Short(str) {
@@ -80,7 +82,7 @@ export function buildUnifiedMemoryGraph({ vaultPath, rootDir, configDir } = {}) 
         // Backward compatibility fields for neural-engine renderer
         folder: node.folder || (node.id.includes('/') ? node.id.slice(0, node.id.lastIndexOf('/')) : '(root)'),
         degree: 0,
-        mtime: node.mtime || (node.updatedAt ? Date.parse(node.updatedAt) : Date.now())
+        mtime: node.mtime ?? (node.updatedAt ? Date.parse(node.updatedAt) : 0)
       });
     } else {
       // Merge node metadata
@@ -102,6 +104,11 @@ export function buildUnifiedMemoryGraph({ vaultPath, rootDir, configDir } = {}) 
         source,
         target,
         type,
+        renderType: type === 'REFERENCES'
+          ? 'ghost'
+          : ['BELONGS_TO', 'CONTAINS', 'OWNED_BY'].includes(type)
+            ? 'folder'
+            : 'link',
         confidence,
         provenance,
         // Compatibility for neural-engine
@@ -174,11 +181,14 @@ export function buildUnifiedMemoryGraph({ vaultPath, rootDir, configDir } = {}) 
   // 2. Whole Application Source Projection (Repo/)
   if (rootDir && fs.existsSync(rootDir)) {
     try {
-      for (const dirName of REPO_DIRS) {
-        const absDir = path.join(rootDir, dirName);
-        if (!fs.existsSync(absDir)) continue;
-        const repoFiles = walkDir(absDir, rootDir);
-        for (const file of repoFiles) {
+      const repoFiles = [
+        ...walkDir(rootDir, rootDir),
+        ...walkDir(path.join(rootDir, '.github'), rootDir),
+      ];
+      const seenRepoFiles = new Set();
+      for (const file of repoFiles) {
+          if (seenRepoFiles.has(file.rel)) continue;
+          seenRepoFiles.add(file.rel);
           const virtualId = `Repo/${file.rel}`;
           const isDoc = file.rel.endsWith('.md');
           addNode({
@@ -207,7 +217,6 @@ export function buildUnifiedMemoryGraph({ vaultPath, rootDir, configDir } = {}) 
             prevFolder = folderId;
           }
           addEdge({ source: prevFolder, target: virtualId, type: 'CONTAINS', provenance: 'repo-structure' });
-        }
       }
 
       for (const fileName of REPO_ROOT_FILES) {
@@ -444,10 +453,16 @@ export function buildUnifiedMemoryGraph({ vaultPath, rootDir, configDir } = {}) 
     stats.byType[n.type] = (stats.byType[n.type] || 0) + 1;
   }
 
+  const revisionInput = [
+    ...nodes.map(node => `${node.id}:${node.mtime ?? node.updatedAt ?? ""}`),
+    ...edges.map(edge => `${edge.source}:${edge.target}:${edge.type}`),
+  ].sort().join("\n");
+  const revision = sha256Short(revisionInput);
+
   return {
     schemaVersion: 1,
     generatedAt: new Date().toISOString(),
-    sourceRevision: sha256Short(`${nodes.length}:${edges.length}`),
+    sourceRevision: revision,
     nodes,
     edges,
     stats,
@@ -465,7 +480,7 @@ export function buildUnifiedMemoryGraph({ vaultPath, rootDir, configDir } = {}) 
     metadata: {
       totalNodes: nodes.length,
       totalEdges: edges.length,
-      datasetIdentity: sha256Short(`${nodes.length}:${edges.length}`),
+      datasetIdentity: revision,
       generatedAt: new Date().toISOString()
     }
   };

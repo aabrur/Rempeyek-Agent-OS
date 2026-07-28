@@ -3,7 +3,6 @@ const RELATIONS = [
   { type: "dependency", label: "Dependency", description: "Configured prerequisite" },
   { type: "co_assignment", label: "Co-assignment", description: "Shared project, from vault tasks" },
   { type: "task_assignment", label: "Task assignment", description: "Verified task routing" },
-  { type: "spawned_subagent", label: "Spawned subagent", description: "Verified parent and child agents" },
   { type: "communication", label: "Communication", description: "Verified agent-to-agent message" },
 ];
 // Symmetric relations carry no arrowhead — direction would be a lie.
@@ -20,7 +19,6 @@ const PROVENANCE_BY_TYPE = new Map([
   ["dependency", "configuration"],
   ["co_assignment", "co_assignment"],
   ["task_assignment", "task"],
-  ["spawned_subagent", "subagent"],
   ["communication", "communication"],
 ]);
 const FLOW_TYPES = new Set(["task_assignment", "communication"]);
@@ -241,7 +239,7 @@ export function buildAgentMap(topology = {}, { width = 760, height = 480, reduce
     },
     emptyState: hasRelationships ? null : {
       title: "No verified relationships yet",
-      detail: "Edges appear only when configuration, task, subagent, or communication records identify both agents and their provenance.",
+      detail: "Edges appear only when configuration, task, or communication records identify both primary agents and their provenance.",
     },
   };
 }

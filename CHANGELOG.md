@@ -3,6 +3,20 @@
 All notable changes to Rempeyek Agent OS. The in-app update banner compares the local version
 against the latest GitHub Release of this repository — tag releases as `v<version>`.
 
+## [2.3.2] - 2026-07-29
+
+- **Operational synchronization dashboard**: Agents now exposes a
+  runtime-injected synchronization contract that users can copy or dispatch to
+  every registered primary agent.
+- **Safe family dispatch**: one shared Vault contract and one idempotent inbox
+  task per primary agent are written atomically; spawned subagents remain inside
+  their owner profile and receive no duplicate top-level task.
+- **Agent lifecycle and neural views**: completes the permanent removal,
+  installed-versus-registered Marketplace, dropdown Add Agent, owned gateway
+  controls, primary-only Agent Map, and approved-repository Neural Vault work.
+- **Release boundary**: desktop artifacts remain stable-feed gated by valid
+  Authenticode signing and clean-machine update evidence.
+
 ## [2.3.1] - 2026-07-28
 
 - **Marketplace lifecycle hardening**: installer completion and post-install

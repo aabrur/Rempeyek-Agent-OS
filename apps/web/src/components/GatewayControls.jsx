@@ -63,13 +63,19 @@ function SummonSplit({ agent, gw }) {
 }
 
 /** compact = agent card (one primary action). full = detail panel (all actions). */
-export function GatewayControls({ agent, gw, compact }) {
+export function GatewayControls({ agent, gw, compact, onOpenLog }) {
   if (!agent.enabled) {
     return <Btn variant="dim" disabled title={agent.note || "disabled"}>setup required</Btn>;
   }
   const acts = agent.actions || [];
   const termAlive = agent.term?.alive;
-  const running = agent.proc?.status === "running";
+  const ownedRunning = agent.proc?.mode === "owned" && agent.proc?.status === "running";
+  const serviceRunning = agent.proc?.mode === "service" && agent.proc?.status === "running";
+  const running = ownedRunning || serviceRunning;
+  const agentBusy = gw.isAgentBusy(agent.id);
+  const canStop = termAlive
+    || ownedRunning
+    || (serviceRunning && acts.includes("stop"));
 
   if (compact) {
     if (termAlive) return <ActionBtn agent={agent} act="stop-term" gw={gw} />;
@@ -81,8 +87,33 @@ export function GatewayControls({ agent, gw, compact }) {
   return (
     <>
       {agent.canSummon && <SummonSplit agent={agent} gw={gw} />}
-      {termAlive && <ActionBtn agent={agent} act="stop-term" gw={gw} />}
-      {acts.filter(x => x !== "start").map(x => <ActionBtn key={x} agent={agent} act={x} gw={gw} />)}
+      <Btn
+        variant="stop"
+        disabled={agentBusy || !canStop}
+        title={!canStop ? "No stoppable owned process, summoned terminal, or native service is running" : ""}
+        onClick={() => gw.runAction(agent.id, termAlive ? "stop-term" : "stop")}
+      >
+        Stop
+      </Btn>
+      <Btn
+        variant="dim"
+        disabled={agentBusy || !acts.includes("run")}
+        title={!acts.includes("run") ? "This profile has no reviewed foreground gateway command" : ""}
+        onClick={() => gw.runAction(agent.id, "run")}
+      >
+        Gateway run
+      </Btn>
+      <Btn variant="dim" onClick={onOpenLog}>Log</Btn>
+      <Btn
+        variant="dim"
+        disabled={agentBusy || !acts.includes("status")}
+        title={!acts.includes("status") ? "This profile has no reviewed status command" : ""}
+        onClick={() => gw.runAction(agent.id, "status")}
+      >
+        Status
+      </Btn>
+      {acts.filter(x => !["start", "stop", "run", "status"].includes(x))
+        .map(x => <ActionBtn key={x} agent={agent} act={x} gw={gw} />)}
     </>
   );
 }

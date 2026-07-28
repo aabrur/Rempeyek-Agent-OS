@@ -3,12 +3,11 @@ const path = require("path");
 
 const SAFE_TRIGGER = /^[a-z0-9][a-z0-9-]{0,59}$/i;
 
-function writeAgentLauncher({
+function launcherSpec({
   stateRoot,
   trigger,
   upstreamTrigger,
   workingDirectory,
-  fsImpl = fs,
   pathImpl = path,
 } = {}) {
   const command = String(trigger || "").trim();
@@ -30,9 +29,40 @@ function writeAgentLauncher({
     `"${upstream}" %*`,
     "",
   ].join("\r\n");
-  fsImpl.mkdirSync(root, { recursive: true });
-  fsImpl.writeFileSync(file, script, "utf8");
-  return { path: file, command, ...(upstreamTrigger ? { upstreamTrigger: upstream } : {}) };
+  return {
+    file,
+    script,
+    result: {
+      path: file,
+      command,
+      ...(upstreamTrigger ? { upstreamTrigger: upstream } : {}),
+    },
+  };
 }
 
-module.exports = { writeAgentLauncher };
+function writeAgentLauncher(options = {}) {
+  const { fsImpl = fs } = options;
+  const spec = launcherSpec(options);
+  if (!spec) return null;
+  const root = String(options.stateRoot || "").trim();
+  fsImpl.mkdirSync(root, { recursive: true });
+  fsImpl.writeFileSync(spec.file, spec.script, "utf8");
+  return spec.result;
+}
+
+function removeOwnedAgentLauncher(options = {}) {
+  const { fsImpl = fs } = options;
+  const spec = launcherSpec(options);
+  if (!spec || !fsImpl.existsSync(spec.file)) return false;
+  let current;
+  try {
+    current = fsImpl.readFileSync(spec.file, "utf8");
+  } catch {
+    return false;
+  }
+  if (current !== spec.script) return false;
+  fsImpl.unlinkSync(spec.file);
+  return true;
+}
+
+module.exports = { removeOwnedAgentLauncher, writeAgentLauncher };

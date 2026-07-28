@@ -62,6 +62,17 @@ test("actions never expose command text", () => {
   assert.equal(JSON.stringify(marketplaceAction(entries[0])).includes("cmd"), false);
 });
 
+test("installed but unregistered agents offer Rempeyek registration only", () => {
+  assert.deepEqual(
+    marketplaceAction({ ...entries[0], installed: true, registered: false }),
+    {
+      kind: "register",
+      label: "Register to Rempeyek Agent OS",
+      adapterId: null,
+    },
+  );
+});
+
 test("running and ready states stay explicit", () => {
   assert.deepEqual(
     marketplaceAction(entries[0], { runningId: "codex" }),

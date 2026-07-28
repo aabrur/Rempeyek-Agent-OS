@@ -87,9 +87,18 @@ export function CatalogGrid({ onAdded, kind = "all" }) {
 
   const registerOnly = async entry => {
     setHint("");
+    const approvalId = await approveAction(
+      "agents.add",
+      "registry",
+      `Register ${entry.name} to Rempeyek Agent OS.`,
+    );
+    if (!approvalId) return;
     const response = await api("/api/agents/add", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "x-approval-id": approvalId,
+      },
       body: JSON.stringify({ catalogId: entry.id }),
     });
     if (response.error) {

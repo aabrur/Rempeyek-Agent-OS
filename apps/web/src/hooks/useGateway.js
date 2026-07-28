@@ -28,6 +28,7 @@ export function useGateway(agents, refresh) {
   const [busy, setBusy] = useState(null);
   const key = (id, act) => `${id}:${act}`;
   const isBusy = (id, act) => busy === key(id, act);
+  const isAgentBusy = id => Boolean(busy?.startsWith(`${id}:`));
 
   const approve = useCallback((type, target, consequence) => approveAction(type, target, consequence), []);
 
@@ -80,5 +81,5 @@ export function useGateway(agents, refresh) {
     setTimeout(refresh, 800);
   }, [approve, refresh]);
 
-  return { runAction, runTerminal, startAll, isBusy };
+  return { runAction, runTerminal, startAll, isBusy, isAgentBusy };
 }

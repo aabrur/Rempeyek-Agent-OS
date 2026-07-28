@@ -1,6 +1,6 @@
 {
   "name": "@rempeyek/desktop",
-  "version": "2.3.1",
+  "version": "2.3.2",
   "description": "Secure Windows desktop shell for Rempeyek Agent OS.",
   "author": "Rempeyek Agent OS Contributors",
   "private": true,
@@ -57,6 +57,13 @@
         "filter": [
           "hermes-daily-bridge.cjs",
           "report.cjs"
+        ]
+      },
+      {
+        "from": "../../prompts",
+        "to": "app-root/prompts",
+        "filter": [
+          "operational-synchronization.md"
         ]
       },
       {

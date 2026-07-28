@@ -65,6 +65,17 @@ test("packaged app contains required runtime and excludes user data", {
     ),
     true,
   );
+  assert.equal(
+    fs.existsSync(
+      path.join(
+        root,
+        "app-root",
+        "prompts",
+        "operational-synchronization.md",
+      ),
+    ),
+    true,
+  );
 });
 
 const sourceWebDist = path.resolve(desktopRoot, "..", "web", "dist");

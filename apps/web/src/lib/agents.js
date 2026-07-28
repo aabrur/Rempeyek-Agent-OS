@@ -52,5 +52,5 @@ export function nodeStatus(a) {
   return { cls: "top-idle", ring: "#8E88BE", label: "idle" };
 }
 
-export const ACT_LABEL = { start: "▶ Start", stop: "■ Stop", "stop-term": "■ Stop terminal", restart: "↻ Restart", status: "◇ Status", run: "⚡ Run" };
+export const ACT_LABEL = { start: "▶ Start", stop: "■ Stop", "stop-term": "■ Stop terminal", restart: "↻ Restart", status: "◇ Status", run: "Gateway run" };
 export const ACT_VARIANT = { start: "run", stop: "stop", "stop-term": "stop", restart: "dim", status: "dim", run: "dim" };

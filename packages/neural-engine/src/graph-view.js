@@ -130,7 +130,7 @@ export function layoutGraph(data = {}, { width = 800, height = 600, iterations =
     };
   }).sort((a, b) => a.id.localeCompare(b.id));
   const byId = new Map(nodes.map(node => [node.id, node]));
-  const edges = (data.edges || []).map(edge => ({ a: byId.get(edge.source ?? edge.s), b: byId.get(edge.target ?? edge.t), type: edge.type || "link" })).filter(edge => edge.a && edge.b);
+  const edges = (data.edges || []).map(edge => ({ a: byId.get(edge.source ?? edge.s), b: byId.get(edge.target ?? edge.t), type: edgeRenderType(edge) })).filter(edge => edge.a && edge.b);
   const centers = clusterMap;
   const steps = Math.max(0, Math.min(120, Number(iterations) || 0));
 
@@ -173,6 +173,19 @@ export function layersForMode(mode) {
     : { link: true, ghost: true, tag: true, folder: true, asset: true, code: true, agent: true, project: true, session: true, task: true, memory: true };
 }
 
+export function edgeRenderType(edge = {}) {
+  if (["link", "ghost", "tag", "folder"].includes(edge.renderType)) {
+    return edge.renderType;
+  }
+  if (["link", "ghost", "tag", "folder"].includes(edge.type)) {
+    return edge.type;
+  }
+  const semantic = String(edge.type || "").toUpperCase();
+  if (semantic === "REFERENCES") return "ghost";
+  if (["BELONGS_TO", "CONTAINS", "OWNED_BY"].includes(semantic)) return "folder";
+  return "link";
+}
+
 export function nodeSemantics(node, { generatedAt, changedNodeIds: changed = [], recentDays = 7 } = {}) {
   const degree = Number(node.degree ?? node.deg ?? 0);
   const snapshotTime = Date.parse(generatedAt || "");
@@ -201,7 +214,7 @@ export function projectGraph(data = {}, { mode = "cosmos", layers = layersForMod
     return true; // Allow all unified memory graph nodes in cosmos mode
   };
   const allowed = new Set((data.nodes || []).filter(nodeAllowed).map(node => node.id));
-  let edges = (data.edges || []).filter(edge => (layers[edge.type] !== false) && allowed.has(edge.source ?? edge.s) && allowed.has(edge.target ?? edge.t));
+  let edges = (data.edges || []).filter(edge => (layers[edgeRenderType(edge)] !== false) && allowed.has(edge.source ?? edge.s) && allowed.has(edge.target ?? edge.t));
   let visible = allowed;
   const appliedFocusId = focusId && allowed.has(focusId) ? focusId : null;
   if (appliedFocusId) {
