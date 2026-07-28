@@ -137,3 +137,19 @@ test("resolved processes never delegate to a shell", () => {
     },
   }]);
 });
+
+test("resolved installer processes can open a visible Windows terminal", () => {
+  let options;
+  startResolvedProcess(
+    { program: "npm.cmd", args: ["install", "--global", "example"] },
+    {
+      visible: true,
+      spawnImpl(_program, _args, receivedOptions) {
+        options = receivedOptions;
+        return {};
+      },
+    },
+  );
+  assert.equal(options.windowsHide, false);
+  assert.equal(options.shell, false);
+});

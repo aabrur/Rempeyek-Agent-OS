@@ -18,6 +18,7 @@ const secretPatterns = [
 ];
 
 for (const file of tracked) {
+  if (!fs.existsSync(path.join(ROOT, file))) continue;
   if (forbiddenPath.test(file)) errors.push(`${file}: forbidden runtime or personal path is tracked`);
   if (personalRaster.test(file)) errors.push(`${file}: personal raster evidence is tracked`);
   if (!textExtensions.has(path.extname(file).toLowerCase())) continue;

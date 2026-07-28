@@ -17,7 +17,7 @@ test("root, web, and desktop report the same release version", () => {
   const desktopPackage = JSON.parse(
     fs.readFileSync(path.join(DESKTOP, "package.json"), "utf8"),
   );
-  assert.equal(rootPackage.version, "2.2.3");
+  assert.equal(rootPackage.version, "2.3.0");
   assert.equal(webPackage.version, rootPackage.version);
   assert.equal(desktopPackage.version, rootPackage.version);
 });

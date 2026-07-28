@@ -15,6 +15,9 @@ against the latest GitHub Release of this repository — tag releases as `v<vers
 - **Zero Obsidian Dependency**: Obsidian is strictly an optional Markdown file format layer; removed all Obsidian app launcher requirements, prompts, and external buttons.
 - **Skills Safety**: Removed unconditional `|| true` capability matching; added recursive copying for skill `references`, `assets`, `scripts`, and defaulted skills to `unreviewed` / `restricted`.
 - **Graphify Access Enforcement**: Integrated `access-policy-engine.mjs` path validation across all Graphify index target files.
+- **Marketplace installation lifecycle**: reviewed installers now open a visible terminal, manual-only agents open their official guide, and registration waits for a successful installer exit.
+- **Add Agent responsive feedback**: fixed invalid external adapter spawning, improved error/status messages, and made the catalog usable on narrow screens.
+- **Source updater verification**: the update path remains clean-check, fast-forward-only, dependency install, and production build before applying the refreshed UI.
 
 ## [2.2.3] - 2026-07-27
 

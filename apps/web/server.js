@@ -372,7 +372,7 @@ function walkVault() {
    output, and the vault itself can never leak into the graph. */
 function walkVaultAll() { return walk(VAULT, [], VAULT, 0, { all: true }); }
 const REPO_DIRS = ["apps", "packages", "scripts", "docs", "prompts", ".github"];
-const REPO_ROOT_FILES = ["README.md", "CHANGELOG.md", "CLAUDE.md", "CONTEXT.md", "LICENSE", "checkpoint.md", "package.json", "agents.config.example.json", ".env.example"];
+const REPO_ROOT_FILES = ["README.md", "CHANGELOG.md", "CLAUDE.md", "CONTEXT.md", "LICENSE", "package.json", "agents.config.example.json", ".env.example"];
 const REPO_EXT = new Set([".js", ".jsx", ".mjs", ".cjs", ".css", ".json", ".md", ".yml", ".yaml", ".html", ".cmd"]);
 function walkRepo() {
   const out = [];
@@ -1947,7 +1947,7 @@ function marketplaceSnapshot(services) {
   return { schemaVersion: 1, entries };
 }
 
-function startMarketplaceProcess(services, entry, adapterId, action, operationId) {
+function startMarketplaceProcess(services, entry, adapterId, action, operationId, hooks = {}) {
   const spec = processAdaptersLib.resolveAdapter({
     entry,
     adapterId,
@@ -1962,8 +1962,15 @@ function startMarketplaceProcess(services, entry, adapterId, action, operationId
     throw new Error(`${entry.id} already has a Marketplace mutation running`);
   }
   const child = services.startResolvedProcess
-    ? services.startResolvedProcess(spec)
-    : processAdaptersLib.startResolvedProcess(spec, { spawnImpl: spawn });
+    ? services.startResolvedProcess(spec, {
+        cwd: services.userHome,
+        visible: action === "install",
+      })
+    : processAdaptersLib.startResolvedProcess(spec, {
+        spawnImpl: spawn,
+        cwd: services.userHome,
+        visible: action === "install",
+      });
   const operation = {
     id: operationId,
     entityId: entry.id,
@@ -1978,11 +1985,13 @@ function startMarketplaceProcess(services, entry, adapterId, action, operationId
     operation.exitCode = code;
     operation.finishedAt = new Date().toISOString();
     installedCache.delete(entry.id);
+    if (typeof hooks.onExit === "function") hooks.onExit(code, operation);
   });
   child.once("error", error => {
     operation.status = "error";
     operation.error = error.message;
     operation.finishedAt = new Date().toISOString();
+    if (typeof hooks.onError === "function") hooks.onError(error, operation);
   });
   return operation;
 }
@@ -2023,33 +2032,59 @@ function installMarketplace(services, entry, data) {
   const available = entry.installers.filter(adapter =>
     !adapter.platforms || adapter.platforms.includes(process.platform));
   const adapterId = String(data.adapterId || available[0]?.id || "");
+  const spec = processAdaptersLib.resolveAdapter({
+    entry,
+    adapterId,
+    action: "install",
+    platform: process.platform,
+  });
+  if (!spec) {
+    throw new Error(`${entry.name} has no reviewed install adapter for this platform`);
+  }
+  if (spec.externalUrl) {
+    const body = rememberMutation(services, data.operationId, {
+      operationId: data.operationId,
+      state: lifecycleState(services, entry.id),
+      event: {
+        type: "agent.manual_install_required",
+        agentId: entry.id,
+        url: spec.externalUrl,
+        note: spec.note,
+      },
+    });
+    return { code: 200, body };
+  }
   const operation = startMarketplaceProcess(
     services,
     entry,
     adapterId,
     "install",
     data.operationId,
+    {
+      onExit(code) {
+        if (code !== 0 || data.register !== true) return;
+        const config = services.loadConfig();
+        if (config.agents.some(agent =>
+          agent.id === entry.id || agent.gateway?.marketplaceId === entry.id
+        )) return;
+        const agent = reviewedAgentProfile(
+          config,
+          entry,
+          services.userHome,
+          services.stateRoot,
+        );
+        const committed = { ...config, agents: [...config.agents, agent] };
+        services.store.commit(committed, `${data.operationId}.register`);
+        scaffoldRuntimeVaultLane(agent, services.vaultPath);
+        writeAgentLauncher({
+          stateRoot: services.stateRoot,
+          trigger: agent.gateway?.trigger,
+          workingDirectory: agent.gateway?.workdir,
+        });
+      },
+    },
   );
-
-  let config = services.loadConfig();
-  if (data.register === true && !config.agents.some(agent =>
-    agent.id === entry.id || agent.gateway?.marketplaceId === entry.id
-  )) {
-    const agent = reviewedAgentProfile(
-      config,
-      entry,
-      services.userHome,
-      services.stateRoot,
-    );
-    config = { ...config, agents: [...config.agents, agent] };
-    services.store.commit(config, data.operationId);
-    scaffoldRuntimeVaultLane(agent, services.vaultPath);
-    writeAgentLauncher({
-      stateRoot: services.stateRoot,
-      trigger: agent.gateway?.trigger,
-      workingDirectory: agent.gateway?.workdir,
-    });
-  }
+  const config = services.loadConfig();
   const body = rememberMutation(services, data.operationId, {
     operationId: data.operationId,
     state: lifecycleState(services, entry.id, config),

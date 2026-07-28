@@ -112,7 +112,7 @@ export function resolveAdapter({
   return null;
 }
 
-export function startResolvedProcess(spec, { spawnImpl, cwd, env } = {}) {
+export function startResolvedProcess(spec, { spawnImpl, cwd, env, visible = false } = {}) {
   if (!spec?.program || !Array.isArray(spec.args)) {
     throw new Error("resolved process spec is required");
   }
@@ -123,6 +123,6 @@ export function startResolvedProcess(spec, { spawnImpl, cwd, env } = {}) {
     cwd,
     env,
     shell: false,
-    windowsHide: true,
+    windowsHide: !visible,
   });
 }

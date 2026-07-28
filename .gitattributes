@@ -1,7 +1,6 @@
 marketplace/bundles/hypertaks-agent/** -text
 
-# Exclude internal AI process documents, checkpoints, and worktrees from public release archives
-checkpoint.md export-ignore
+# Exclude internal AI process documents and worktrees from public release archives
 docs/superpowers/ export-ignore
 .superpowers/ export-ignore
 .worktrees/ export-ignore

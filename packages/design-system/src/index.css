@@ -650,11 +650,12 @@ body {
 .brand-name { line-height: 1.25; }
 
 /* ---------------- add-agent modal ---------------- */
-.aa-box { width: min(560px, 92vw); max-height: min(760px, calc(100dvh - 32px)); overflow-y: auto; overscroll-behavior: contain; }
+.aa-box { width: min(820px, calc(100vw - 24px)); max-height: min(820px, calc(100dvh - 24px)); overflow-y: auto; overscroll-behavior: contain; }
 /* ＋ Add Agent — curated catalog grid (install path) above the custom form */
 .aa-catalog { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 10px 0 4px; }
 .aa-cat-card {
-  display: flex; align-items: center; gap: 10px; padding: 9px 11px; min-width: 0;
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center;
+  gap: 10px; padding: 10px 11px; min-width: 0; min-height: 58px;
   background: var(--card); border: var(--surface-border-width) var(--surface-border-style) var(--line);
   border-radius: var(--control-radius);
 }
@@ -662,7 +663,7 @@ body {
 .aa-cat-body { min-width: 0; margin-right: auto; display: flex; flex-direction: column; }
 .aa-cat-body b { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .aa-cat-body small { font-size: 10px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.aa-cat-card .btn { flex: none; font-size: 10px; padding: 4px 8px; }
+.aa-cat-card .btn { flex: none; min-height: 40px; max-width: 190px; font-size: 10px; padding: 6px 10px; white-space: normal; }
 .aa-cat-state { font-family: var(--font-data); font-size: 9px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); flex: none; }
 .aa-cat-state.ok { color: var(--lime); }
 .aa-cat-state a { color: var(--cyan); text-decoration: none; }
@@ -672,9 +673,18 @@ body {
   background: var(--graph-panel); color: var(--text);
   border: var(--surface-border-width) var(--surface-border-style) var(--line); border-radius: var(--control-radius);
 }
+.aa-feedback { margin: 8px 0 0; line-height: 1.45; }
 .aa-custom-head { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 10px; }
 .aa-field-hint { display: block; margin-top: 4px; color: var(--muted); font-size: 10px; line-height: 1.3; }
-@media (max-width: 560px) { .aa-catalog { grid-template-columns: 1fr; } }
+@media (max-width: 720px) {
+  .aa-catalog, .aa-grid { grid-template-columns: 1fr; }
+  .aa-cat-card { grid-template-columns: auto minmax(0, 1fr); }
+  .aa-cat-card > .btn, .aa-cat-card > .aa-cat-state { grid-column: 2; justify-self: start; }
+  .aa-cat-card > .btn { max-width: none; width: 100%; }
+  .aa-field.wide { grid-column: auto; }
+  .aa-actions { flex-wrap: wrap; }
+  .aa-actions .aa-hint { flex: 1 1 100%; margin-right: 0 !important; }
+}
 
 /* Update banner — silent unless GitHub has a strictly newer release */
 .update-banner {

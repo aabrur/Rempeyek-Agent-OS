@@ -8,7 +8,7 @@ const CODE_EXTENSIONS = new Set([
 ]);
 
 const REPO_DIRS = ['apps', 'packages', 'scripts', 'docs', 'prompts', '.github'];
-const REPO_ROOT_FILES = ['README.md', 'CHANGELOG.md', 'CLAUDE.md', 'CONTEXT.md', 'LICENSE', 'checkpoint.md', 'package.json', 'agents.config.example.json'];
+const REPO_ROOT_FILES = ['README.md', 'CHANGELOG.md', 'CLAUDE.md', 'CONTEXT.md', 'LICENSE', 'package.json', 'agents.config.example.json'];
 
 function sha256Short(str) {
   return crypto.createHash('sha256').update(String(str)).digest('hex').substring(0, 12);

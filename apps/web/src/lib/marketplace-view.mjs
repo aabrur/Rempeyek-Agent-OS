@@ -14,8 +14,20 @@ export function marketplaceAction(entry, operationState = {}) {
       adapterId: null,
     };
   }
+  if (entry.installed && entry.kind === "agent" && !entry.registered) {
+    return { kind: "register", label: "Register launcher", adapterId: null };
+  }
   if (entry.installed && (entry.kind !== "agent" || entry.registered)) {
     return { kind: "state", label: "✓ ready", adapterId: null };
+  }
+  const manualAdapter = entry.adapterIds?.find(id => id === "official-url" || id === "wsl-only");
+  if (manualAdapter || (!entry.adapterIds?.length && entry.officialUrl)) {
+    return {
+      kind: "manual",
+      label: "Open install guide",
+      adapterId: manualAdapter || null,
+      url: entry.officialUrl,
+    };
   }
   if (entry.adapterIds?.length) {
     return {

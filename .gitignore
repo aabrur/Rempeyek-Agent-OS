@@ -36,6 +36,7 @@ repomix-output.xml
 agents.config.json
 .claude/
 .codex/
+.private/
 
 # Runtime handshake files
 telemetry/terms/

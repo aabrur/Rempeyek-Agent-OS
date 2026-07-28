@@ -50,12 +50,21 @@ export function CatalogGrid({ onAdded, kind = "all" }) {
       }),
     });
     if (response.error) {
-      setHint(response.error);
+      setHint(`Install ${entry.name} failed: ${response.error}`);
       setInstalling(null);
       return;
     }
 
-    setTail([response.event?.type || "Marketplace operation accepted"]);
+    if (response.event?.type === "agent.manual_install_required") {
+      setHint(response.event.note || "Finish setup from the official install guide.");
+      if (response.event.url) window.open(response.event.url, "_blank", "noopener,noreferrer");
+      setInstalling(null);
+      return;
+    }
+    setTail([
+      response.event?.type || "Marketplace operation accepted",
+      "Installer is running in a visible terminal. Registration waits for exit code 0.",
+    ]);
     if (response.event?.type?.endsWith("_started")) {
       for (let attempt = 0; attempt < 300 && alive.current; attempt += 1) {
         await new Promise(resolve => setTimeout(resolve, 1200));
@@ -66,6 +75,14 @@ export function CatalogGrid({ onAdded, kind = "all" }) {
     setInstalling(null);
     await refreshCatalog();
     onAdded?.();
+  };
+
+  const openGuide = entry => {
+    const action = marketplaceAction(entry);
+    setHint(action.url
+      ? `${entry.name} requires manual setup. The official guide is opening.`
+      : "No reviewed installer is available for this platform.");
+    if (action.url) window.open(action.url, "_blank", "noopener,noreferrer");
   };
 
   const registerOnly = async entry => {
@@ -94,6 +111,9 @@ export function CatalogGrid({ onAdded, kind = "all" }) {
     }
     if (action.kind === "register") {
       return <Btn onClick={() => registerOnly(entry)}>{action.label}</Btn>;
+    }
+    if (action.kind === "manual") {
+      return <Btn onClick={() => openGuide(entry)}>{action.label}</Btn>;
     }
     return (
       <span className={`aa-cat-state ${action.label.includes("ready") ? "ok" : ""}`.trim()}>
@@ -128,7 +148,7 @@ export function CatalogGrid({ onAdded, kind = "all" }) {
           {tail.length ? tail.join("\n") : "starting installer…"}
         </pre>
       )}
-      {hint && <span className="aa-hint err" role="alert">{hint}</span>}
+      {hint && <div className="aa-hint err aa-feedback" role="alert">{hint}</div>}
     </>
   );
 }

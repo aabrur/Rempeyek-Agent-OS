@@ -9,7 +9,7 @@ const read = relative => fs.readFileSync(path.join(root, relative), "utf8");
 test("Add Agent can scroll to the custom form and explains its default launch folder", () => {
   const css = read("packages/design-system/src/index.css");
   const modal = read("apps/web/src/components/AddAgentModal.jsx");
-  assert.match(css, /\.aa-box\s*\{[^}]*max-height:\s*min\(760px,\s*calc\(100dvh - 32px\)\)[^}]*overflow-y:\s*auto/s);
+  assert.match(css, /\.aa-box\s*\{[^}]*max-height:\s*min\(820px,\s*calc\(100dvh - 24px\)\)[^}]*overflow-y:\s*auto/s);
   assert.match(modal, /Default launch folder: Rempeyek Agent OS state folder\./);
 });
 

@@ -47,6 +47,8 @@ async function withServer(run) {
     }),
   );
   const launched = [];
+  const launchOptions = [];
+  const children = [];
   const server = createServer({
     configPath,
     stateRoot: root,
@@ -54,15 +56,18 @@ async function withServer(run) {
     telemetryDir,
     userHome: path.join(root, "home"),
     bundleRoot: path.resolve("marketplace", "bundles"),
-    startResolvedProcess(spec) {
+    startResolvedProcess(spec, options) {
       launched.push(spec);
-      return fakeChild();
+      launchOptions.push(options);
+      const child = fakeChild();
+      children.push(child);
+      return child;
     },
   });
   await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
   const base = `http://127.0.0.1:${server.address().port}`;
   try {
-    await run({ base, root, vaultPath, telemetryDir, launched });
+    await run({ base, root, vaultPath, telemetryDir, launched, launchOptions, children });
   } finally {
     await new Promise(resolve => server.close(resolve));
     fs.rmSync(root, { recursive: true, force: true });
@@ -255,7 +260,7 @@ test("uninstall requires two scoped approvals and launches only a reviewed adapt
 });
 
 test("agent install rejects executable input and can atomically register a reviewed profile", async () => {
-  await withServer(async ({ base, launched, root }) => {
+  await withServer(async ({ base, launched, launchOptions, children, root }) => {
     const rejected = await mutation(base, "/api/marketplace/opencode/install", {
       body: {
         operationId: "install-rejected",
@@ -278,13 +283,19 @@ test("agent install rejects executable input and can atomically register a revie
     });
     assert.equal(installed.status, 202);
     const body = await installed.json();
-    assert.equal(body.state.profile, "registered");
+    assert.notEqual(body.state.profile, "registered");
     assert.equal(launched.length, 1);
     assert.deepEqual(launched[0].args, [
       "install",
       "--global",
       "opencode-ai",
     ]);
+    assert.equal(launchOptions[0].visible, true);
+
+    const beforeExit = JSON.parse(fs.readFileSync(path.join(root, "agents.config.json"), "utf8"));
+    assert.equal(beforeExit.agents.some(agent => agent.id === "opencode"), false);
+    children[0].emit("exit", 0);
+    await new Promise(resolve => setImmediate(resolve));
 
     const state = await fetch(`${base}/api/state`).then(value => value.json());
     assert.equal(state.agents.some(agent => agent.id === "opencode"), true);
@@ -293,6 +304,27 @@ test("agent install rejects executable input and can atomically register a revie
     const config = JSON.parse(fs.readFileSync(path.join(root, "agents.config.json"), "utf8"));
     assert.equal(config.agents.find(agent => agent.id === "opencode").gateway.workdir, root);
     assert.equal(fs.existsSync(path.join(root, "opencode.cmd")), true);
+  });
+});
+
+test("official-url adapters open setup guidance without spawning an invalid process", async () => {
+  await withServer(async ({ base, launched, root }) => {
+    const approvalId = await approve(base, "agent.install", "openhands");
+    const response = await mutation(base, "/api/marketplace/openhands/install", {
+      approvalId,
+      body: {
+        operationId: "install-openhands-manual",
+        adapterId: "official-url",
+        register: true,
+      },
+    });
+    assert.equal(response.status, 200);
+    const body = await response.json();
+    assert.equal(body.event.type, "agent.manual_install_required");
+    assert.match(body.event.url, /^https:\/\//);
+    assert.equal(launched.length, 0);
+    const config = JSON.parse(fs.readFileSync(path.join(root, "agents.config.json"), "utf8"));
+    assert.equal(config.agents.some(agent => agent.id === "openhands"), false);
   });
 });
 

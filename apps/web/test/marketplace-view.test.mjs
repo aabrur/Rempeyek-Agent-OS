@@ -54,9 +54,10 @@ test("actions never expose command text", () => {
     adapterId: "npm",
   });
   assert.deepEqual(marketplaceAction(entries[2]), {
-    kind: "register",
-    label: "Register launcher",
+    kind: "manual",
+    label: "Open install guide",
     adapterId: null,
+    url: "https://example.test",
   });
   assert.equal(JSON.stringify(marketplaceAction(entries[0])).includes("cmd"), false);
 });

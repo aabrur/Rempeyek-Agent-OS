@@ -16,7 +16,7 @@ test("public example starts with no personal agents", () => {
 
 test("tracked public text contains no owner-specific absolute Windows path", () => {
   const textExtensions = new Set([".md", ".json", ".js", ".cjs", ".mjs", ".jsx", ".ts", ".tsx", ".css", ".html", ".txt", ".yml", ".yaml"]);
-  const offenders = tracked().filter(file => textExtensions.has(path.extname(file).toLowerCase())).filter(file => {
+  const offenders = tracked().filter(file => fs.existsSync(path.join(ROOT, file))).filter(file => textExtensions.has(path.extname(file).toLowerCase())).filter(file => {
     const text = fs.readFileSync(path.join(ROOT, file), "utf8");
     // one-or-two separators so JSON-escaped owner paths are caught too
     return /C:[\\/]{1,2}Users[\\/]{1,2}abrur/i.test(text);
