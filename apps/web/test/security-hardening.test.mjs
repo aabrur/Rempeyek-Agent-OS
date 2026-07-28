@@ -69,6 +69,24 @@ describe('Security Hardening', () => {
     it('should return empty for null', () => {
       assert.strictEqual(resolveCanonicalPath(null), '');
     });
+
+    it('should use Windows canonicalization for Windows input on Ubuntu', () => {
+      assert.strictEqual(
+        resolveCanonicalPath('C:\\Users\\test\\..\\test\\Documents', 'linux'),
+        'C:\\Users\\test\\Documents'
+      );
+    });
+
+    it('should use path.win32 for injected Windows platform', () => {
+      const paths = getDefaultSystemPaths({ USERPROFILE: 'C:\\Users\\test' }, 'win32');
+      assert.strictEqual(paths.runtimeRoot, 'C:\\Users\\test\\AppData\\Local\\Rempeyek-Agent-OS');
+      assert.strictEqual(paths.sharedVault, 'C:\\Users\\test\\AppData\\Local\\Rempeyek-Agent-OS\\Vault');
+    });
+
+    it('should use POSIX paths for injected Ubuntu platform', () => {
+      const paths = getDefaultSystemPaths({ USERPROFILE: '/home/test' }, 'linux');
+      assert.strictEqual(paths.runtimeRoot, '/home/test/AppData/Local/Rempeyek-Agent-OS');
+    });
   });
 
   describe('resolveRealPath', () => {

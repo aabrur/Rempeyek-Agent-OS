@@ -8,8 +8,8 @@ import { createSharedMemoryEngine } from './shared-memory-engine.mjs';
 import { createSkillsSyncEngine } from './skills-sync-engine.mjs';
 import { createGraphifyUnifiedEngine } from './graphify-unified-engine.mjs';
 
-export function createUnifiedCommandRouter({ env = process.env, agents = [] } = {}) {
-  const paths = getDefaultSystemPaths(env);
+export function createUnifiedCommandRouter({ env = process.env, agents = [], platform = process.platform } = {}) {
+  const paths = getDefaultSystemPaths(env, platform);
   const vaultPath = paths.sharedVault;
   const agentsDir = paths.agentsRuntimeState;
 
@@ -119,7 +119,7 @@ export function createUnifiedCommandRouter({ env = process.env, agents = [] } = 
               const registry = readRegistry();
               result = { nodes: registry.nodes || [], total: (registry.nodes || []).length };
             } else if (operation === 'discover') {
-              const home = process.env.USERPROFILE || os.homedir();
+              const home = env.USERPROFILE || os.homedir();
               const knownAgentDirs = [
                 { dir: '.claude', provider: 'claude', name: 'Claude Code' },
                 { dir: '.commandcode', provider: 'command-code', name: 'Command Code' },

@@ -40,6 +40,7 @@ describe('/agents command', () => {
     assert.ok(resp.result.discovered.length > 0);
     const gemini = resp.result.discovered.find(d => d.provider === 'gemini');
     assert.ok(gemini, 'Should discover .gemini directory');
+    assert.strictEqual(gemini.path, path.join(tmpDir, '.gemini'));
   });
 
   it('should register a new agent', async () => {

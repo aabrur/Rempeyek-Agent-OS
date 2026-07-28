@@ -2,33 +2,44 @@ import path from 'node:path';
 import fs from 'node:fs';
 import os from 'node:os';
 
-export function resolveCanonicalPath(inputPath) {
-  if (!inputPath) return '';
-  const resolved = path.resolve(inputPath);
-  return path.normalize(resolved);
+function pathModuleFor(inputPath, platform = process.platform) {
+  if (platform === 'win32') return path.win32;
+  const isWindowsInput = /^[A-Za-z]:[\\/]/.test(inputPath) || /^\\\\/.test(inputPath);
+  if (isWindowsInput) return path.win32;
+  if (platform === 'linux' || platform === 'darwin') return path.posix;
+  return path.win32.isAbsolute(inputPath)
+    ? path.win32
+    : path;
 }
 
-export function getDefaultSystemPaths(env = process.env) {
+export function resolveCanonicalPath(inputPath, platform = process.platform) {
+  if (!inputPath) return '';
+  const pathModule = pathModuleFor(inputPath, platform);
+  return pathModule.normalize(pathModule.resolve(inputPath));
+}
+
+export function getDefaultSystemPaths(env = process.env, platform = process.platform) {
+  const pathModule = platform === 'win32' ? path.win32 : path.posix;
   const home = env.USERPROFILE || os.homedir();
-  const localAppData = env.LOCALAPPDATA || path.join(home, 'AppData', 'Local');
-  const runtimeRoot = env.REMPEYEK_RUNTIME_ROOT || env.AGENT_STATE_DIR || path.join(localAppData, 'Rempeyek-Agent-OS');
+  const localAppData = env.LOCALAPPDATA || pathModule.join(home, 'AppData', 'Local');
+  const runtimeRoot = env.REMPEYEK_RUNTIME_ROOT || env.AGENT_STATE_DIR || pathModule.join(localAppData, 'Rempeyek-Agent-OS');
 
   return {
     home,
     localAppData,
     runtimeRoot,
-    sharedVault: env.REMPEYEK_VAULT_PATH || path.join(runtimeRoot, 'Vault'),
-    centralSkillsWarehouse: env.REMPEYEK_SKILLS_PATH || path.join(home, '.skills'),
-    agentsRuntimeState: path.join(runtimeRoot, 'Agents'),
-    sharedGraphifyData: path.join(runtimeRoot, 'Vault', '.graphify'),
-    systemConfig: path.join(runtimeRoot, 'Config'),
-    logsDir: path.join(runtimeRoot, 'Logs'),
-    cacheDir: path.join(runtimeRoot, 'Cache'),
-    backupsDir: path.join(runtimeRoot, 'Backups'),
-    quarantineDir: path.join(runtimeRoot, 'Quarantine'),
-    tempDir: path.join(runtimeRoot, 'Temp'),
-    updatesDir: path.join(runtimeRoot, 'Updates'),
-    packagesDir: path.join(runtimeRoot, 'Packages')
+    sharedVault: env.REMPEYEK_VAULT_PATH || pathModule.join(runtimeRoot, 'Vault'),
+    centralSkillsWarehouse: env.REMPEYEK_SKILLS_PATH || pathModule.join(home, '.skills'),
+    agentsRuntimeState: pathModule.join(runtimeRoot, 'Agents'),
+    sharedGraphifyData: pathModule.join(runtimeRoot, 'Vault', '.graphify'),
+    systemConfig: pathModule.join(runtimeRoot, 'Config'),
+    logsDir: pathModule.join(runtimeRoot, 'Logs'),
+    cacheDir: pathModule.join(runtimeRoot, 'Cache'),
+    backupsDir: pathModule.join(runtimeRoot, 'Backups'),
+    quarantineDir: pathModule.join(runtimeRoot, 'Quarantine'),
+    tempDir: pathModule.join(runtimeRoot, 'Temp'),
+    updatesDir: pathModule.join(runtimeRoot, 'Updates'),
+    packagesDir: pathModule.join(runtimeRoot, 'Packages')
   };
 }
 
@@ -95,7 +106,8 @@ export function isSymlinkSafe(targetPath, allowedRoots = []) {
     if (allowedRoots.length > 0) {
       const inAllowed = allowedRoots.some(root => {
         const canonicalRoot = resolveCanonicalPath(root);
-        return canonical === canonicalRoot || canonical.startsWith(canonicalRoot + path.sep);
+        const separator = pathModuleFor(canonicalRoot).sep;
+        return canonical === canonicalRoot || canonical.startsWith(canonicalRoot + separator);
       });
       if (!inAllowed) {
         return { safe: false, reason: `Symlink target escapes allowed roots: ${realTarget}` };
@@ -117,6 +129,7 @@ export function isSymlinkSafe(targetPath, allowedRoots = []) {
 
 export function isPathAllowed(targetPath, accessPolicy = {}) {
   const canonical = resolveCanonicalPath(targetPath);
+  const separator = pathModuleFor(canonical).sep;
 
   // Check symlink safety
   try {
@@ -144,7 +157,7 @@ export function isPathAllowed(targetPath, accessPolicy = {}) {
   if (accessPolicy.denied_roots && Array.isArray(accessPolicy.denied_roots)) {
     for (const deniedRoot of accessPolicy.denied_roots) {
       const canonicalDenied = resolveCanonicalPath(deniedRoot);
-      if (canonical === canonicalDenied || canonical.startsWith(canonicalDenied + path.sep)) {
+      if (canonical === canonicalDenied || canonical.startsWith(canonicalDenied + separator)) {
         return { allowed: false, reason: `Inside explicitly denied root: ${deniedRoot}` };
       }
     }
@@ -154,7 +167,7 @@ export function isPathAllowed(targetPath, accessPolicy = {}) {
     let matchesAllowed = false;
     for (const allowedRoot of accessPolicy.allowed_roots) {
       const canonicalAllowed = resolveCanonicalPath(allowedRoot);
-      if (canonical === canonicalAllowed || canonical.startsWith(canonicalAllowed + path.sep)) {
+      if (canonical === canonicalAllowed || canonical.startsWith(canonicalAllowed + separator)) {
         matchesAllowed = true;
         break;
       }
