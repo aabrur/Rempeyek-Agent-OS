@@ -12,7 +12,7 @@ React + Vite, split into components across an npm-workspaces monorepo.
 
 ## Download for Windows
 
-[![Download latest verified release](https://img.shields.io/badge/Download-latest_verified_release-ff8a00?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/aabrur/Rempeyek-Agent-OS/releases/latest)
+[![View releases](https://img.shields.io/badge/Download-view_releases-ff8a00?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/aabrur/Rempeyek-Agent-OS/releases)
 
 **The installer and direct download are free.** Most users only need to click
 the button above. No GitHub account, Git, Node.js, npm, or repository clone is
@@ -26,7 +26,7 @@ required.
 
 ### Install
 
-1. Open the **latest verified release** above.
+1. Open a release explicitly marked **verified/stable** in the releases list above.
 2. Download the NSIS installer and the published `SHA256SUMS.txt` from that same release.
 3. Verify the downloaded installer against `SHA256SUMS.txt` in PowerShell:
 
