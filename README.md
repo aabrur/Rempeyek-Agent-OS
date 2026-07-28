@@ -12,7 +12,7 @@ React + Vite, split into components across an npm-workspaces monorepo.
 
 ## Download for Windows
 
-[![Download Rempeyek Agent OS 2.2.3](https://img.shields.io/badge/Download-Rempeyek_Agent_OS_2.2.3-ff8a00?style=for-the-badge&logo=windows&logoColor=white)](./Rempeyek-Agent-OS-Setup-2.2.3.exe?raw=1)
+[![Download latest verified release](https://img.shields.io/badge/Download-latest_verified_release-ff8a00?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/aabrur/Rempeyek-Agent-OS/releases/latest)
 
 **The installer and direct download are free.** Most users only need to click
 the button above. No GitHub account, Git, Node.js, npm, or repository clone is
@@ -26,42 +26,31 @@ required.
 
 ### Install
 
-1. Click **Download Rempeyek Agent OS 2.2.3** above.
-2. Confirm that the downloaded file is named
-   `Rempeyek-Agent-OS-Setup-2.2.3.exe`.
-3. Optional but recommended: verify its SHA-256 in PowerShell:
+1. Open the **latest verified release** above.
+2. Download the NSIS installer and the published `SHA256SUMS.txt` from that same release.
+3. Verify the downloaded installer against `SHA256SUMS.txt` in PowerShell:
 
    ```powershell
-   Get-FileHash "$HOME\Downloads\Rempeyek-Agent-OS-Setup-2.2.3.exe" -Algorithm SHA256
+   Get-FileHash "$HOME\Downloads\Rempeyek-Agent-OS-Setup-<version>.exe" -Algorithm SHA256
    ```
 
-   Expected value:
-
-   ```text
-   19B77C702A09AE88E2E36AD5EAC4F9F80929527534BA58ED00192580A0C6834B
-   ```
-
-4. Open the installer, choose the installation folder, and finish the setup.
+4. Open the installer only when the hash and release publisher match.
 5. Launch **Rempeyek Agent OS** from the Start menu or desktop shortcut.
 
 ### Windows download warning
 
-The current public installer is not yet Authenticode-signed because a publicly
-trusted publisher certificate is a paid service. Windows or the browser may
-therefore show **Unknown publisher**, **not commonly downloaded**, or a
-SmartScreen warning. Continue only when the filename and SHA-256 match the
-values above and the download came from this official repository. If either
-value differs, delete the file and do not run it.
+A stable signed installer is published only after the Authenticode and
+clean-machine acceptance gates pass. If the latest release is marked unsigned,
+prerelease, or missing `latest.yml`/`SHA256SUMS.txt`, do not install it as a
+stable update.
 
 ### Updates
 
-The desktop updater is already implemented, but the public signed update feed
-is not active yet. Local 2.2.3 artifacts remain unsigned until the signed GitHub
-Release gate succeeds, so this version does not silently install an
-unverified update. Until a signed installer and matching `latest.yml` are
-published in GitHub Releases, install future versions manually from this
-Download section. User settings, installed-agent records, telemetry, avatars,
-and vault data remain in place across application upgrades.
+The desktop updater is implemented but remains fail-closed until a signed
+GitHub Release, matching `latest.yml`, and clean-machine update evidence are
+published. Until then, install only a verified stable release manually from
+the Download section. User settings, installed-agent records, telemetry,
+avatars, and Vault data remain in place across application upgrades.
 
 ## Features
 

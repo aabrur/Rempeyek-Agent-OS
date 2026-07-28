@@ -307,6 +307,43 @@ test("agent install rejects executable input and can atomically register a revie
   });
 });
 
+test("agent registration failure is contained and replayable after installer success", async () => {
+  await withServer(async ({ base, children, root }) => {
+    const approvalId = await approve(base, "agent.install", "opencode");
+    const started = await mutation(base, "/api/marketplace/opencode/install", {
+      approvalId,
+      body: {
+        operationId: "install-registration-failure",
+        adapterId: "npm",
+        register: true,
+      },
+    });
+    assert.equal(started.status, 202);
+
+    const configPath = path.join(root, "agents.config.json");
+    const config = fs.readFileSync(configPath, "utf8");
+    fs.writeFileSync(configPath, "{ invalid json", "utf8");
+    children[0].emit("exit", 0);
+    fs.writeFileSync(configPath, config, "utf8");
+    await new Promise(resolve => setImmediate(resolve));
+
+    const replayApproval = await approve(base, "agent.install", "opencode");
+    const replay = await mutation(base, "/api/marketplace/opencode/install", {
+      approvalId: replayApproval,
+      body: {
+        operationId: "install-registration-failure",
+        adapterId: "npm",
+        register: true,
+      },
+    });
+    assert.equal(replay.status, 200);
+    const body = await replay.json();
+    assert.equal(body.event.type, "agent.install_registration_failed");
+    assert.equal(body.error, "installer completed but agent registration failed");
+    assert.equal(body.event.stage, "onExit");
+  });
+});
+
 test("official-url adapters open setup guidance without spawning an invalid process", async () => {
   await withServer(async ({ base, launched, root }) => {
     const approvalId = await approve(base, "agent.install", "openhands");

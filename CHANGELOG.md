@@ -3,6 +3,16 @@
 All notable changes to Rempeyek Agent OS. The in-app update banner compares the local version
 against the latest GitHub Release of this repository — tag releases as `v<version>`.
 
+## [2.3.1] - 2026-07-28
+
+- **Marketplace lifecycle hardening**: installer completion and post-install
+  registration failures are contained, replayable, and returned as safe
+  operation evidence instead of escaping the server process.
+- **Release lineage**: package, web, desktop, lockfile, and user-facing
+  installation metadata are prepared for the next release tag.
+- **Release safety**: stable updater claims remain gated by Authenticode,
+  matching `latest.yml`, and clean-machine acceptance.
+
 ## [2.3.0] - 2026-07-28
 
 ### Added

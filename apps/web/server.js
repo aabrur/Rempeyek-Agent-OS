@@ -1947,6 +1947,25 @@ function marketplaceSnapshot(services) {
   return { schemaVersion: 1, entries };
 }
 
+function marketplaceHookFailure(hooks, operation, hookName) {
+  operation.status = "error";
+  operation.error = "Marketplace lifecycle hook failed";
+  operation.errorStage = hookName;
+  operation.finishedAt = new Date().toISOString();
+  try {
+    if (typeof hooks.onHookError === "function") hooks.onHookError(operation);
+  } catch {}
+}
+
+function invokeMarketplaceHook(hooks, hookName, operation, ...args) {
+  if (typeof hooks[hookName] !== "function") return;
+  try {
+    hooks[hookName](...args);
+  } catch {
+    marketplaceHookFailure(hooks, operation, hookName);
+  }
+}
+
 function startMarketplaceProcess(services, entry, adapterId, action, operationId, hooks = {}) {
   const spec = processAdaptersLib.resolveAdapter({
     entry,
@@ -1985,13 +2004,13 @@ function startMarketplaceProcess(services, entry, adapterId, action, operationId
     operation.exitCode = code;
     operation.finishedAt = new Date().toISOString();
     installedCache.delete(entry.id);
-    if (typeof hooks.onExit === "function") hooks.onExit(code, operation);
+    invokeMarketplaceHook(hooks, "onExit", operation, code, operation);
   });
   child.once("error", error => {
     operation.status = "error";
     operation.error = error.message;
     operation.finishedAt = new Date().toISOString();
-    if (typeof hooks.onError === "function") hooks.onError(error, operation);
+    invokeMarketplaceHook(hooks, "onError", operation, error, operation);
   });
   return operation;
 }
@@ -2054,6 +2073,20 @@ function installMarketplace(services, entry, data) {
     });
     return { code: 200, body };
   }
+  const rememberInstallOutcome = (event, extra = {}) => {
+    let config = null;
+    try { config = services.loadConfig(); } catch {}
+    let state = null;
+    try {
+      if (config) state = lifecycleState(services, entry.id, config);
+    } catch {}
+    return rememberMutation(services, data.operationId, {
+      operationId: data.operationId,
+      state,
+      event,
+      ...extra,
+    });
+  };
   const operation = startMarketplaceProcess(
     services,
     entry,
@@ -2062,25 +2095,52 @@ function installMarketplace(services, entry, data) {
     data.operationId,
     {
       onExit(code) {
-        if (code !== 0 || data.register !== true) return;
+        if (code !== 0) {
+          rememberInstallOutcome(
+            { type: "agent.install_failed", agentId: entry.id, exitCode: code },
+            { error: "agent installer exited with a non-zero status" },
+          );
+          return;
+        }
+        if (data.register !== true) {
+          rememberInstallOutcome(
+            { type: "agent.install_completed", agentId: entry.id, registered: false },
+          );
+          return;
+        }
         const config = services.loadConfig();
-        if (config.agents.some(agent =>
+        const registered = config.agents.find(agent =>
           agent.id === entry.id || agent.gateway?.marketplaceId === entry.id
-        )) return;
-        const agent = reviewedAgentProfile(
+        );
+        const agent = registered || reviewedAgentProfile(
           config,
           entry,
           services.userHome,
           services.stateRoot,
         );
-        const committed = { ...config, agents: [...config.agents, agent] };
-        services.store.commit(committed, `${data.operationId}.register`);
+        if (!registered) {
+          const committed = { ...config, agents: [...config.agents, agent] };
+          services.store.commit(committed, `${data.operationId}.register`);
+        }
         scaffoldRuntimeVaultLane(agent, services.vaultPath);
         writeAgentLauncher({
           stateRoot: services.stateRoot,
           trigger: agent.gateway?.trigger,
           workingDirectory: agent.gateway?.workdir,
         });
+        rememberInstallOutcome(
+          { type: "agent.install_completed", agentId: entry.id, registered: true },
+        );
+      },
+      onHookError(operation) {
+        rememberInstallOutcome(
+          {
+            type: "agent.install_registration_failed",
+            agentId: entry.id,
+            stage: operation.errorStage || "post_install_registration",
+          },
+          { error: "installer completed but agent registration failed" },
+        );
       },
     },
   );

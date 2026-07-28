@@ -6,6 +6,8 @@ import { fileURLToPath } from "node:url";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const tracked = execFileSync("git", ["ls-files"], { cwd: ROOT, encoding: "utf8" }).split(/\r?\n/).filter(Boolean);
 const errors = [];
+const deleted = execFileSync("git", ["ls-files", "--deleted"], { cwd: ROOT, encoding: "utf8" }).split(/\r?\n/).filter(Boolean);
+for (const file of deleted) errors.push(`${file}: tracked file is deleted from the working tree`);
 const forbiddenPath = /^(?:\.env$|agents\.config\.json$|Obsidian Vault\/|runtime\/|telemetry\/.*\.jsonl$|apps\/web\/public\/avatars\/[^.])/i;
 const personalRaster = /^(?:docs\/qa-screenshots|docs\/design-refs)\/.*\.png$/i;
 const textExtensions = new Set([".md", ".json", ".js", ".cjs", ".mjs", ".jsx", ".ts", ".tsx", ".css", ".html", ".txt", ".yml", ".yaml"]);
