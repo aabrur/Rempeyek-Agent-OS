@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { APP_VERSION } from '../version.mjs';
 
 export const version = 2;
 export const description = 'Initialize Unified Memory Neural Fabric data structures and registries';
@@ -46,7 +47,7 @@ export async function up({ configDir, vaultPath }) {
   if (fs.existsSync(manifestPath)) {
     try {
       const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-      manifest.applicationVersion = '2.3.0';
+      manifest.applicationVersion = APP_VERSION;
       manifest.runtimeSchemaVersion = 2;
       manifest.memorySchemaVersion = 2;
       manifest.graphSchemaVersion = 2;
@@ -76,6 +77,9 @@ export async function down({ configDir, vaultPath }) {
       const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
       manifest.applicationVersion = '2.2.3';
       manifest.runtimeSchemaVersion = 1;
+      manifest.memorySchemaVersion = 1;
+      manifest.graphSchemaVersion = 1;
+      manifest.updatedAt = new Date().toISOString();
       fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2), 'utf8');
     } catch {}
   }

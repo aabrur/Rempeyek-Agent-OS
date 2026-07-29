@@ -7,6 +7,7 @@ import { createSharedMemoryEngine } from './shared-memory-engine.mjs';
 import { createSkillsSyncEngine } from './skills-sync-engine.mjs';
 import { createGraphifyUnifiedEngine } from './graphify-unified-engine.mjs';
 import { createUnifiedCommandRouter } from './unified-command-router.mjs';
+import { APP_VERSION } from './version.mjs';
 
 export function initializeHypertaksUnifiedSystem({ env = process.env, agents = [] } = {}) {
   const paths = getDefaultSystemPaths(env);
@@ -50,7 +51,7 @@ export function initializeHypertaksUnifiedSystem({ env = process.env, agents = [
   if (!fs.existsSync(runtimeConfigFile)) {
     fs.writeFileSync(runtimeConfigFile, JSON.stringify({
       system_name: 'Rempeyek Agent OS',
-      version: '2.3.0',
+      version: APP_VERSION,
       unified_system_enabled: true,
       vault_path: paths.sharedVault,
       skills_warehouse: paths.centralSkillsWarehouse,

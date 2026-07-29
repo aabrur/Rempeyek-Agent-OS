@@ -52,7 +52,7 @@ describe('Desktop Update Migration 002', () => {
     await migration002.up({ configDir, vaultPath });
 
     const updated = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-    assert.strictEqual(updated.applicationVersion, '2.3.0');
+    assert.strictEqual(updated.applicationVersion, '2.3.3');
     assert.strictEqual(updated.runtimeSchemaVersion, 2);
   });
 
@@ -64,6 +64,13 @@ describe('Desktop Update Migration 002', () => {
   });
 
   it('should perform safe rollback on down() without deleting user notes', async () => {
+    const manifestPath = path.join(configDir, 'runtime-manifest.json');
+    fs.writeFileSync(
+      manifestPath,
+      JSON.stringify({ applicationVersion: '2.2.3', runtimeSchemaVersion: 1 }, null, 2),
+      'utf8'
+    );
+
     const userNotePath = path.join(vaultPath, 'MyImportantNote.md');
     fs.writeFileSync(userNotePath, '# My Note\nImportant user data', 'utf8');
 
@@ -77,5 +84,9 @@ describe('Desktop Update Migration 002', () => {
     assert.strictEqual(downResult.success, true);
     assert.ok(fs.existsSync(userNotePath), 'User note MUST remain intact after rollback');
     assert.ok(fs.existsSync(obsidianDir), '.obsidian MUST remain intact after rollback');
+
+    const restoredManifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+    assert.strictEqual(restoredManifest.memorySchemaVersion, 1);
+    assert.strictEqual(restoredManifest.graphSchemaVersion, 1);
   });
 });

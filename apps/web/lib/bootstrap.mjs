@@ -7,6 +7,7 @@ import { initializeAIFamilyRegistry } from './ai-family-registry.mjs';
 import { createSharedMemoryEngine } from './shared-memory-engine.mjs';
 import { createSkillsSyncEngine } from './skills-sync-engine.mjs';
 import { createGraphifyUnifiedEngine } from './graphify-unified-engine.mjs';
+import { APP_VERSION } from './version.mjs';
 
 const DEFAULT_ACCESS_POLICY = {
   schema_version: 1,
@@ -94,7 +95,7 @@ export function createBootstrap({ configDir, vaultPath, agentsDir, backupsDir, a
             mode: process.env.REMPEYEK_MODE || 'installed',
             platform: process.platform,
             architecture: process.arch,
-            applicationVersion: '2.3.0',
+            applicationVersion: APP_VERSION,
             vaultPath
           });
           result.steps.manifest = { status: 'created' };

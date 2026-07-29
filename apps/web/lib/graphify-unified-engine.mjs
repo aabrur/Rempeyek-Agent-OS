@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { isPathAllowed, isSymlinkSafe } from './access-policy-engine.mjs';
+import { APP_VERSION } from './version.mjs';
 
 export function createGraphifyUnifiedEngine({ vaultPath } = {}) {
   if (!vaultPath) throw new TypeError('vaultPath is required');
@@ -38,7 +39,7 @@ export function createGraphifyUnifiedEngine({ vaultPath } = {}) {
           metadata: {
             created_at: now,
             updated_at: now,
-            graph_version: '2.3.0'
+            graph_version: APP_VERSION
           }
         };
         fs.writeFileSync(graphJsonPath, JSON.stringify(initialGraph, null, 2), 'utf8');
