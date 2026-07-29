@@ -7,6 +7,7 @@ import { initializeAIFamilyRegistry } from './ai-family-registry.mjs';
 import { createSharedMemoryEngine } from './shared-memory-engine.mjs';
 import { createSkillsSyncEngine } from './skills-sync-engine.mjs';
 import { createGraphifyUnifiedEngine } from './graphify-unified-engine.mjs';
+import { APP_VERSION } from './version.mjs';
 
 export function createUnifiedCommandRouter({ env = process.env, agents = [], platform = process.platform } = {}) {
   const paths = getDefaultSystemPaths(env, platform);
@@ -262,7 +263,7 @@ export function createUnifiedCommandRouter({ env = process.env, agents = [], pla
 
             // Memory
             try {
-              const handoffs = sharedMemory.getRecentHandoffs(100);
+              const handoffs = typeof memoryEngine.getRecentHandoffs === 'function' ? memoryEngine.getRecentHandoffs(100) : [];
               status.memory.handoffs = Array.isArray(handoffs) ? handoffs.length : 0;
               const memIndexPath = path.join(vaultPath, 'Memory', 'Shared', 'index.json');
               if (fs.existsSync(memIndexPath)) {

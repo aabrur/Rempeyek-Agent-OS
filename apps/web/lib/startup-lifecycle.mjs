@@ -87,11 +87,12 @@ export function createStartupLifecycle({ configDir, vaultPath, agentsDir }) {
           // ignore
       }
 
-      const graphifyDir = path.join(configDir, 'graphify');
-      if (!fs.existsSync(graphifyDir)) {
+      const graphifyDir = path.join(vaultPath, '.graphify');
+      const graphIndexesDir = path.join(vaultPath, 'Graph');
+      if (!fs.existsSync(graphifyDir) && !fs.existsSync(graphIndexesDir)) {
           report.checks.graphify = { status: 'missing' };
       }
-      const memoryDir = path.join(configDir, 'memory');
+      const memoryDir = path.join(vaultPath, 'Memory');
       if (!fs.existsSync(memoryDir)) {
           report.checks.memory = { status: 'missing' };
       }
