@@ -10,4 +10,4 @@ export function NeuralVaultView({ active, theme }) {
 }
 
 /* ReportsView merged into views/ObservatoryView.jsx; ProjectsView was superseded
-   by views/Workspace.jsx (the Teams destination). */
+   by views/Workspace.jsx (the Projects destination). */

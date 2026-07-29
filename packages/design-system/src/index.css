@@ -661,12 +661,39 @@ body {
 }
 .aa-cat-icon { font-size: 17px; flex: none; }
 .aa-cat-body { min-width: 0; margin-right: auto; display: flex; flex-direction: column; }
-.aa-cat-body b { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.aa-cat-body b { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text); }
 .aa-cat-body small { font-size: 10px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .aa-cat-card .btn { flex: none; min-height: 40px; max-width: 190px; font-size: 10px; padding: 6px 10px; white-space: normal; }
 .aa-cat-state { font-family: var(--font-data); font-size: 9px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); flex: none; }
 .aa-cat-state.ok { color: var(--lime); }
 .aa-cat-state a { color: var(--cyan); text-decoration: none; }
+/* ⋯ context menu trigger and dropdown */
+.aa-menu-wrap { position: relative; flex: none; }
+.aa-menu-trigger {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 36px; height: 36px; border-radius: var(--control-radius);
+  border: 1px solid var(--line); background: var(--card-hi); color: var(--text);
+  font-size: 18px; font-weight: 700; cursor: pointer; transition: all .15s;
+  letter-spacing: .1em; line-height: 1;
+}
+.aa-menu-trigger:hover { border-color: var(--acc); color: var(--acc); }
+.aa-menu-trigger[aria-expanded="true"] { border-color: var(--acc); color: var(--acc); background: color-mix(in srgb, var(--acc) 10%, var(--card-hi)); }
+.aa-dropdown {
+  position: absolute; top: 100%; right: 0; z-index: 90;
+  min-width: 140px; margin-top: 4px; padding: 4px 0;
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: var(--control-radius); box-shadow: var(--surface-shadow);
+  backdrop-filter: blur(var(--surface-blur)); -webkit-backdrop-filter: blur(var(--surface-blur));
+}
+.aa-dropdown-item {
+  display: block; width: 100%; padding: 8px 14px; border: none; background: none;
+  color: var(--text); font: 700 10px var(--disp); letter-spacing: .1em;
+  text-transform: uppercase; text-align: left; cursor: pointer; transition: background .12s;
+}
+.aa-dropdown-item:hover { background: color-mix(in srgb, var(--acc) 12%, transparent); }
+.aa-dropdown-item:disabled { opacity: .45; cursor: not-allowed; }
+.aa-dropdown-danger { color: var(--red); }
+.aa-dropdown-danger:hover { background: color-mix(in srgb, var(--red) 12%, transparent); }
 .aa-cat-log {
   margin: 8px 0 0; padding: 8px 10px; max-height: 130px; overflow: auto;
   font-family: var(--font-data); font-size: 10px; line-height: 1.5; white-space: pre-wrap; word-break: break-word;

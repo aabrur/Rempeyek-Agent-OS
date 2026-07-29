@@ -1,7 +1,7 @@
 # Rempeyek Agent OS checkpoint
 
 Updated: 2026-07-29
-Status: READY WITH DOCUMENTED LIMITATIONS — SOURCE AND UNSIGNED PREVIEW
+Status: READY - VERSION 2.3.3 RELEASE CANDIDATE
 
 ## Contract
 

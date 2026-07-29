@@ -3,6 +3,13 @@
 All notable changes to Rempeyek Agent OS. The in-app update banner compares the local version
 against the latest GitHub Release of this repository — tag releases as `v<version>`.
 
+## [2.3.3] - 2026-07-29
+
+- **Navigation Renaming**: Renamed "TEAMS" to "PROJECTS" and "PROTOCOLS" to "SWITCHBOARD" across sidebar and workspace views.
+- **De-cluttered Action Controls**: Replaced verbose/overlapping agent card action buttons with a sleek `⋯` dropdown context menu.
+- **Theme Contrast & Legibility Sweep**: High contrast typography, legends, indicators, and text styling across all themes (`minimalist`, `brutalist`, `glassmorph`, `cyberpunk`).
+- **Settings System Hardening**: Verified and validated all settings toggles, theme selectors, update channel controls, and system options.
+
 ## [2.3.2] - 2026-07-29
 
 - **Operational synchronization dashboard**: Agents now exposes a

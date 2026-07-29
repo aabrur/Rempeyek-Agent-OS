@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Btn, Panel, Pill, Overlay } from "@rempeyek/ui";
 import { api } from "../api";
 import { approveAction } from "../hooks/useGateway";
@@ -17,11 +17,48 @@ function stateStatus(value) {
   return "idle";
 }
 
+/** Positioned dropdown that appears next to the ⋯ trigger. */
+function ActionMenu({ row, busy, onAction, onClose }) {
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = event => {
+      if (ref.current && !ref.current.contains(event.target)) onClose();
+    };
+    const handleEscape = event => {
+      if (event.key === "Escape") onClose();
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleEscape);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [onClose]);
+
+  return (
+    <div className="aa-dropdown" ref={ref} role="menu" aria-label={`Actions for ${row.name}`}>
+      {row.actions.map(action => (
+        <button
+          key={action}
+          role="menuitem"
+          className={`aa-dropdown-item${action === "remove" || action === "uninstall" ? " aa-dropdown-danger" : ""}`}
+          disabled={Boolean(busy)}
+          onClick={() => { onAction(row, action); onClose(); }}
+        >
+          {busy === `${row.id}:${action}` ? "…" : action}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export function AgentManagementPanel({ state, refresh }) {
   const [busy, setBusy] = useState(null);
   const [hint, setHint] = useState("");
   const [editing, setEditing] = useState(null);
   const [confirming, setConfirming] = useState(null);
+  const [openMenu, setOpenMenu] = useState(null);
   const allRows = useMemo(
     () => agentManagementRows(state?.agents || []),
     [state],
@@ -247,17 +284,27 @@ export function AgentManagementPanel({ state, refresh }) {
                   ))}
                 </span>
               </div>
-              <div className="aa-actions">
-                {row.actions.map(action => (
-                  <Btn
-                    key={action}
-                    variant={action === "remove" || action === "uninstall" ? "stop" : "dim"}
-                    disabled={Boolean(busy)}
-                    onClick={() => runAction(row, action)}
-                  >
-                    {busy === `${row.id}:${action}` ? "…" : action}
-                  </Btn>
-                ))}
+              <div className="aa-menu-wrap">
+                <button
+                  className="aa-menu-trigger"
+                  aria-label={`Actions for ${row.name}`}
+                  aria-haspopup="menu"
+                  aria-expanded={openMenu === row.id}
+                  onClick={event => {
+                    event.stopPropagation();
+                    setOpenMenu(openMenu === row.id ? null : row.id);
+                  }}
+                >
+                  ⋯
+                </button>
+                {openMenu === row.id && (
+                  <ActionMenu
+                    row={row}
+                    busy={busy}
+                    onAction={runAction}
+                    onClose={() => setOpenMenu(null)}
+                  />
+                )}
               </div>
             </div>
           ))}

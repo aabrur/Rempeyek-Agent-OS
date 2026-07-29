@@ -8,9 +8,9 @@ import { obsUri } from "../lib/obsidian";
 const NAV = [
   { id: "map", label: "Agent Map", Icon: MapIcon },
   { id: "agents", label: "Agents", Icon: Cpu },
-  { id: "teams", label: "Teams", Icon: Users },
+  { id: "teams", label: "Projects", Icon: Users },
   { id: "memory", label: "Memory", Icon: Database },
-  { id: "protocols", label: "Protocols", Icon: Network },
+  { id: "protocols", label: "Switchboard", Icon: Network },
   { id: "marketplace", label: "Marketplace", Icon: ShoppingBag },
   { id: "observatory", label: "Observatory", Icon: Eye },
 ];

@@ -1,5 +1,6 @@
 # Secrets — NEVER commit
 .env
+.env*.local
 
 # Runtime / local data
 node_modules/
@@ -13,13 +14,14 @@ runtime/
 Obsidian Vault/
 .obsidian/
 
-# Generated artifacts
+# Generated artifacts & binaries
 graphify-out/
 apps/web/dist/
 apps/desktop/dist/
 dist-release/
 .commandcode/
 *.log
+*.exe
 
 # Config backup written by the dashboard's Add Agent
 agents.config.json.bak
@@ -29,10 +31,10 @@ Thumbs.db
 Desktop.ini
 .DS_Store
 
-# Secrets / dumps — NEVER commit (repomix embeds .env)
+# Secrets / dumps — NEVER commit
 repomix-output.xml
 
-# Personal config & tooling (copy agents.config.example.json instead)
+# Personal config & tooling
 agents.config.json
 .claude/
 .codex/
@@ -41,7 +43,7 @@ agents.config.json
 # Runtime handshake files
 telemetry/terms/
 
-# Local scratch (graphify pipeline one-offs, personal canvas)
+# Local scratch
 .worktrees/
 do_semantic*.py
 ast_and_cache.py
