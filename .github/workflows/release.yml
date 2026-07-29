@@ -105,7 +105,10 @@ jobs:
           if (-not [string]::IsNullOrWhiteSpace($env:DESKTOP_PUBLISHER_SUBJECT)) {
             foreach ($executable in $executables) {
               $signature = Get-AuthenticodeSignature -LiteralPath $executable.FullName
-              if ($signature.Status -eq "Valid" -and $signature.SignerCertificate.Subject -ne $env:DESKTOP_PUBLISHER_SUBJECT) {
+              if ($signature.Status -ne "Valid") {
+                throw "$($executable.Name) has invalid Authenticode status: $($signature.Status)"
+              }
+              if ($signature.SignerCertificate.Subject -ne $env:DESKTOP_PUBLISHER_SUBJECT) {
                 throw "$($executable.Name) signer does not match DESKTOP_PUBLISHER_SUBJECT"
               }
             }
