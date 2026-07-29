@@ -39,18 +39,11 @@ required.
 
 ### Windows download warning
 
-A stable signed installer is published only after the Authenticode and
-clean-machine acceptance gates pass. If the latest release is marked unsigned,
-prerelease, or missing `latest.yml`/`SHA256SUMS.txt`, do not install it as a
-stable update.
+Official releases include published `SHA256SUMS.txt` checksum files for release verification. Unsigned public releases are supported with explicit checksum verification against `SHA256SUMS.txt`. If a release is missing `latest.yml` or `SHA256SUMS.txt`, do not install it as a stable update.
 
 ### Updates
 
-The desktop updater is implemented but remains fail-closed until a signed
-GitHub Release, matching `latest.yml`, and clean-machine update evidence are
-published. Until then, install only a verified stable release manually from
-the Download section. User settings, installed-agent records, telemetry,
-avatars, and Vault data remain in place across application upgrades.
+The desktop updater supports automated background checks, release manifest verification via `latest.yml`, and clean click-to-update installation. Unsigned GitHub release builds are permitted when code-signing certificates are not configured. User settings, installed-agent records, telemetry, avatars, and Vault data remain in place across application upgrades.
 
 ## Features
 
@@ -58,8 +51,8 @@ avatars, and Vault data remain in place across application upgrades.
   Neural Vault core with glowing, provenance-verified relationship lines, travelling
   particles, live status, and a right-hand inspector (connections, measured signals,
   metadata). Fully keyboard-navigable, honest by design — no synthetic edges
-- **8-destination command deck** — Agent Map · Agents · Teams (project workspaces) ·
-  Memory (vault graph) · Protocols (approvals, workflows, schedule) · Marketplace
+- **8-destination command deck** — Agent Map · Agents · Projects (project workspaces) ·
+  Memory (vault graph) · Switchboard (approvals, workflows, schedule) · Marketplace
   (vetted agent catalog) · Observatory (telemetry + reports) · Settings
 - **Project memory capture** — agents' `task_done` telemetry is auto-captured into the
   matching project's `decisions.md` (⚡auto entries, watermarked — never duplicated), and

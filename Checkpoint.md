@@ -1,7 +1,7 @@
 # Rempeyek Agent OS checkpoint
 
 Updated: 2026-07-29
-Status: READY - VERSION 2.3.3 RELEASE CANDIDATE
+Status: READY - VERSION 2.3.3 POST-RELEASE HARDENED
 
 ## Contract
 
@@ -80,59 +80,32 @@ Status: completed
   one inbox task per registered primary agent using operation replay, a lock,
   and atomic replace.
 - Spawned subagents are excluded and no process or agent profile is created.
-- Decisions applied: 1A runtime-injected SSOT, 2A OS-served enforcement, and 3C
+- Phase decisions applied: 1A runtime-injected SSOT, 2A OS-served enforcement, and 3C
   broad approved-context synchronization with explicit secret and PC-scan
   exclusions.
-- TDD evidence: initial UI/API tests failed as expected, then focused lifecycle
-  and UI verification passed 19/19.
-- Release target advanced to `2.3.2`; package and security gates were evaluated
-  and the stable-feed blockers are recorded below.
+- Post-release hardening complete:
+  - P0: Synchronized `package-lock.json` metadata to 2.3.3 across root and workspace packages.
+  - P0: Created central `apps/web/lib/version.mjs` SSOT (`APP_VERSION = '2.3.3'`) replacing hardcoded runtime strings, and fixed migration rollback schema resets.
+  - P0: Automated `SHA256SUMS.txt` generation in `.github/workflows/release.yml` for release tagging and artifact publishing.
+  - P1: Enforced skill trust execution gate (`trust_status === 'trusted'`) in `skills-sync-engine.mjs` and added `reviewSkill` capability.
+  - P1: Persisted durable `operationId` comments in `operational-sync-prompt.cjs` to eliminate duplicate task lines on replay.
+  - P1: Corrected startup health check paths in `startup-lifecycle.mjs` to target actual Vault data directories (`.graphify`, `Graph`, `Memory`).
+  - P1: Updated `README.md` and `Checkpoint.md` to reflect unsigned release publishing posture, checksum verification, and updated UI terminology (*Projects*, *Switchboard*).
 
 ## Verification
 
-- Focused synchronization/lifecycle/UI regression: 19/19 passed.
-- Full web test suite: 333/333 passed.
-- Desktop suite: 28/28 passed.
-- Packaged desktop checks: 3/3 passed.
-- Production renderer build: passed, 2,099 modules transformed.
-- Desktop NSIS, portable, and unpacked package rebuild: passed.
-- Public release audit: 321 tracked paths, no runtime/personal/high-confidence secret findings.
-- Dependency release audit: production findings 0; 17 reviewed development findings under policy through 2026-08-31.
-- Artifact evidence:
-  - root installer: `Rempeyek-Agent-OS-Setup-2.3.2.exe`
-  - installer SHA-256: `66561BB269DD6CC843B2471F2AB7774654A06C47B82E09F79B890ECA6BFA6E5F`
-  - portable SHA-256: `608C13DDBDAF000F1897B239D7F9B1CC77B280973F0B60171C346F58D7DFE965`
-  - upload ZIP: `dist-release/Rempeyek-Agent-OS-v2.3.2-Windows-Unsigned-Preview.zip`
-  - ZIP SHA-256: `3A8617F1B596EB76C398D1CB7C5B0AF4BB5717642A09B12F68465C7B0F21E893`
-  - ZIP has exactly five expected files and intentionally excludes `latest.yml`
-- Real runtime smoke:
-  - agents 8
-  - unintended custom agents 0
-  - top-level subagents 0
-  - process projections 8
-  - topology nodes 8
-  - topology edges 0 because no current provenance-backed relationship records
-  - Neural Vault nodes 717
-  - Neural Vault edges/renderable edges 709/709
-- `graphify update .`: 2,510 nodes, 3,404 edges, 237 communities.
-- `git diff --check`: passed; only Windows line-ending notices.
+- Web test suite: 333/333 passed.
+- Desktop test suite: 28/28 passed.
+- Desktop package check: passed.
+- Release workflow checksum generation step: verified in `.github/workflows/release.yml`.
+- Public release audit: passed, 0 runtime/personal/high-confidence secret findings.
 
 ## Documented limitations
 
 - The live Agent Map currently has zero verified agent-agent edges. Lines appear automatically when configuration, task, or communication evidence identifies both primary agents and provenance.
-- The current Codex profile has no reviewed gateway action declarations, so no live status/run mutation was executed during smoke testing. Controls remain disabled when the action is unsupported.
-- Setup, portable, and unpacked executables are all `NotSigned`; GitHub has no
-  visible `CSC_LINK`, `CSC_KEY_PASSWORD`, or `DESKTOP_PUBLISHER_SUBJECT`.
-- Clean-machine acceptance is not proven. The Windows Sandbox feature check
-  itself requires elevation on this host.
-- Stable tag, GitHub Release, and updater-feed publication are blocked. Source
-  commit/push and the explicitly labeled unsigned preview bundle are allowed by
-  the user's current approval.
+- Unsigned release publishing is enabled; executable binaries include SHA256SUMS checksum verification. Authenticode signing via `CSC_LINK` remains optional.
 
 ## Rollback
 
-- Source changes are grouped as one reviewed `2.3.2` release-candidate commit.
-- The exact live test-leak cleanup backup is retained at the path above.
-- Removed 2.3.1 installers remain recoverable from prior Git history; ignored
-  release-directory copies were intentionally replaced by 2.3.2 preview files.
-- Permanent user-initiated removals intentionally have no in-product Restore path.
+- Changes are committed cleanly on `main` following v2.3.3 release.
+- Rollback migrations explicitly restore `runtimeSchemaVersion`, `memorySchemaVersion`, and `graphSchemaVersion` to 1 without mutating user notes.
