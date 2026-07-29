@@ -72,6 +72,7 @@ function dispatchOperationalSyncPrompt({
   vaultPath,
   config,
   prompt,
+  operationId,
   now = new Date(),
   fsImpl = fs,
   pathImpl = path,
@@ -102,6 +103,7 @@ function dispatchOperationalSyncPrompt({
     throw error;
   }
 
+  const linesToAdd = [];
   try {
     atomicReplace(promptPath, prompt, { fsImpl, pathImpl });
     const date = new Date(now).toISOString().slice(0, 10);
@@ -109,13 +111,25 @@ function dispatchOperationalSyncPrompt({
     const current = fsImpl.existsSync(taskPath)
       ? fsImpl.readFileSync(taskPath, "utf8").trimEnd() + "\n"
       : header;
-    const lines = recipients.map(agent =>
-      `- [ ] Apply [[Operational Synchronization]] — ${agent.name} — ${date} · Read the shared contract, synchronize approved context, and report the acceptance gate.`,
-    );
-    atomicReplace(taskPath, `${current}${lines.join("\n")}\n`, {
-      fsImpl,
-      pathImpl,
-    });
+
+    const opTag = operationId ? `<!-- opId:${operationId} --> ` : "";
+    for (const agent of recipients) {
+      const taskLine = `- [ ] ${opTag}Apply [[Operational Synchronization]] — ${agent.name} — ${date} · Read the shared contract, synchronize approved context, and report the acceptance gate.`;
+      const isDuplicate = operationId
+        ? (current.includes(`opId:${operationId}`) && current.includes(agent.name))
+        : current.includes(taskLine);
+
+      if (!isDuplicate) {
+        linesToAdd.push(taskLine);
+      }
+    }
+
+    if (linesToAdd.length > 0) {
+      atomicReplace(taskPath, `${current}${linesToAdd.join("\n")}\n`, {
+        fsImpl,
+        pathImpl,
+      });
+    }
   } finally {
     try {
       if (lock !== undefined) fsImpl.closeSync(lock);
@@ -128,7 +142,7 @@ function dispatchOperationalSyncPrompt({
 
   return {
     ok: true,
-    sent: recipients.length,
+    sent: linesToAdd.length,
     agentIds: recipients.map(agent => agent.id),
     promptRel: PROMPT_RELATIVE_PATH,
     taskRel: TASK_RELATIVE_PATH,
