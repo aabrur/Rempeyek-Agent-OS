@@ -75,6 +75,19 @@ export function createSkillsSyncEngine({ centralWarehouseDir, vaultPath, agentsD
   return {
     discoverWarehouseSkills() {
       if (!fs.existsSync(warehouse)) return [];
+      const registryFile = path.join(registryDir, 'skills-registry.json');
+      const existingMap = new Map();
+      if (fs.existsSync(registryFile)) {
+        try {
+          const reg = JSON.parse(fs.readFileSync(registryFile, 'utf8'));
+          if (Array.isArray(reg.skills)) {
+            for (const s of reg.skills) {
+              if (s && s.skill_id) existingMap.set(s.skill_id, s);
+            }
+          }
+        } catch {}
+      }
+
       const entries = fs.readdirSync(warehouse, { withFileTypes: true });
       const skills = [];
 
@@ -83,6 +96,7 @@ export function createSkillsSyncEngine({ centralWarehouseDir, vaultPath, agentsD
         const skillDir = path.join(warehouse, entry.name);
         const manifest = parseSkillManifest(skillDir);
         const checksum = calculateDirectoryChecksum(skillDir);
+        const prev = existingMap.get(entry.name);
 
         skills.push({
           skill_id: entry.name,
@@ -92,13 +106,28 @@ export function createSkillsSyncEngine({ centralWarehouseDir, vaultPath, agentsD
           checksum,
           manifest_path: manifest.skillMdPath,
           capabilities: manifest.capabilities,
-          assigned_nodes: [],
-          trust_status: checksum ? 'unreviewed' : 'quarantined',
+          assigned_nodes: prev?.assigned_nodes || [],
+          trust_status: prev?.trust_status || (checksum ? 'unreviewed' : 'quarantined'),
           validation_status: checksum ? 'valid' : 'invalid',
           last_synced_at: new Date().toISOString()
         });
       }
       return skills;
+    },
+
+    reviewSkill(skillId, newStatus) {
+      const allowed = ['trusted', 'unreviewed', 'quarantined'];
+      if (!allowed.includes(newStatus)) {
+        throw new Error(`Invalid trust status: ${newStatus}`);
+      }
+      const registryFile = path.join(registryDir, 'skills-registry.json');
+      const now = new Date().toISOString();
+      const warehouseSkills = this.discoverWarehouseSkills();
+      const skill = warehouseSkills.find(s => s.skill_id === skillId);
+      if (!skill) throw new Error(`Skill not found: ${skillId}`);
+      skill.trust_status = newStatus;
+      fs.writeFileSync(registryFile, JSON.stringify({ version: 1, updated_at: now, skills: warehouseSkills }, null, 2), 'utf8');
+      return skill;
     },
 
     syncSkillsToNodes({ nodes = [] } = {}) {
@@ -117,6 +146,7 @@ export function createSkillsSyncEngine({ centralWarehouseDir, vaultPath, agentsD
 
         for (const skill of warehouseSkills) {
           if (skill.validation_status !== 'valid') continue;
+          if (skill.trust_status !== 'trusted') continue;
 
           // Capability matching logic without unconditional || true
           const nodeCaps = node.capabilities || ['coding', 'research'];

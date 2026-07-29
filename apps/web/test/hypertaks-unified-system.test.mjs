@@ -104,12 +104,24 @@ test('skills-sync-engine discovers, matches capabilities, and syncs skills', () 
     const discovered = skillsEngine.discoverWarehouseSkills();
     assert.equal(discovered.length, 1);
     assert.equal(discovered[0].skill_id, 'mock-skill');
+    assert.equal(discovered[0].trust_status, 'unreviewed');
 
-    const syncResult = skillsEngine.syncSkillsToNodes({
+    // Unreviewed skills must NOT sync
+    const initialSync = skillsEngine.syncSkillsToNodes({
       nodes: [{ node_id: 'Node-1', capabilities: ['coding'] }]
     });
+    assert.strictEqual(initialSync.assignments['Node-1'].includes('mock-skill'), false);
+    assert.strictEqual(fs.existsSync(path.join(agentsDir, 'Node-1', 'skills', 'mock-skill', 'SKILL.md')), false);
 
-    assert.ok(syncResult.assignments['Node-1'].includes('mock-skill'));
+    // Review skill to trusted
+    const reviewed = skillsEngine.reviewSkill('mock-skill', 'trusted');
+    assert.equal(reviewed.trust_status, 'trusted');
+
+    // Now trusted skill syncs cleanly
+    const trustedSync = skillsEngine.syncSkillsToNodes({
+      nodes: [{ node_id: 'Node-1', capabilities: ['coding'] }]
+    });
+    assert.ok(trustedSync.assignments['Node-1'].includes('mock-skill'));
     assert.ok(fs.existsSync(path.join(agentsDir, 'Node-1', 'skills', 'mock-skill', 'SKILL.md')));
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
