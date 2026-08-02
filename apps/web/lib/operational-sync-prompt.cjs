@@ -114,7 +114,7 @@ function dispatchOperationalSyncPrompt({
 
     const opTag = operationId ? `<!-- opId:${operationId} --> ` : "";
     for (const agent of recipients) {
-      const taskLine = `- [ ] ${opTag}Apply [[Operational Synchronization]] — ${agent.name} — ${date} · Read the shared contract, synchronize approved context, and report the acceptance gate.`;
+      const taskLine = `- [ ] ${opTag}Apply [[Operational Synchronization]] - ${agent.name} - ${date} · Read the shared contract, synchronize approved context, and report the acceptance gate.`;
       const isDuplicate = operationId
         ? (current.includes(`opId:${operationId}`) && current.includes(agent.name))
         : current.includes(taskLine);

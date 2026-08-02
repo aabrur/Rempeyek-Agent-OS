@@ -48,7 +48,7 @@ export function buildVaultGraph({ files = [], generatedAt = new Date().toISOStri
   };
 
   /* Three node classes from one file list: vault .md → note (link-parsed), vault non-.md → asset
-     (embed/link TARGET only — the Boss decree .txt and Assets/ become visible), kind:'repo' → code
+     (embed/link TARGET only - the Boss decree .txt and Assets/ become visible), kind:'repo' → code
      (repo source under the virtual Repo/ folder). Only notes are parsed for links. */
   const allFiles = files.filter((file) => typeof file?.rel === 'string');
   const readableFiles = allFiles.filter((file) => file.kind !== 'repo' && file.rel.toLowerCase().endsWith('.md'));

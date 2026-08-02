@@ -10,7 +10,7 @@ const REPORT = fileURLToPath(new URL("../../../scripts/report.cjs", import.meta.
 
 function run(args) {
   const dir = mkdtempSync(join(tmpdir(), "report-"));
-  // report.cjs writes to <script>/../telemetry — so point it at an isolated ROOT via a copy is
+  // report.cjs writes to <script>/../telemetry - so point it at an isolated ROOT via a copy is
   // overkill; instead we run it and read the real path it prints, scoped to a throwaway id.
   try {
     const out = execFileSync(process.execPath, [REPORT, ...args], { encoding: "utf8", env: { ...process.env } });

@@ -1,4 +1,4 @@
-/* Agentic OS — zero-dependency Node server.
+/* Agentic OS - zero-dependency Node server.
    Live dashboard from the Obsidian Vault + agent gateway launcher.
    Run: npm run dev  →  http://localhost:4321
    Remote:   set DASH_TOKEN=secret  →  access requires the token. */
@@ -123,7 +123,7 @@ SOURCE_UPDATE_MOD.then(m => { sourceUpdateLib = m; }).catch(e => console.error("
 /* PUBLIC = tracked static source. Runtime avatars live in the ignored state root so
    Vite cannot copy a user's uploads into dist during a production build.
    DIST = the built React app (`npm run build`). Requests resolve DIST first, then
-   PUBLIC, then fall back to index.html — /avatars always comes from PUBLIC, because
+   PUBLIC, then fall back to index.html - /avatars always comes from PUBLIC, because
    Vite's emptyOutDir would otherwise delete uploads on the next build. */
 const PUBLIC = path.join(__dirname, "public");
 const DIST = path.join(__dirname, "dist");
@@ -157,7 +157,7 @@ function loadConfig() {
   }
 }
 
-/* saveConfig: the ONLY write path for agents.config.json — backs up the current file
+/* saveConfig: the ONLY write path for agents.config.json - backs up the current file
    to <config>.bak first, writes pretty JSON, and invalidates the mtime cache. */
 function saveConfig(cfg) {
   try { fs.copyFileSync(CONFIG_PATH, CONFIG_PATH + ".bak"); } catch {}
@@ -303,19 +303,19 @@ function scaffoldRuntimeVaultLane(agent, vaultPath) {
   }
 }
 
-/* /api/agents/add — register a new agent from the dashboard.
+/* /api/agents/add - register a new agent from the dashboard.
    Two shapes:
      { catalogId }                     → pull id/name/icon/role/trigger/home/install from the curated
                                           catalog (this is the "+ Add Agent" install path).
      { id, name, icon?, role?, accent?, trigger?, home? }  → a custom agent. trigger+home are now
                                           PERSISTED as a gateway (the bug that shipped: they were
                                           silently dropped). No install.cmd is ever taken from the
-                                          body — auto-install runs only vetted catalog commands. */
+                                          body - auto-install runs only vetted catalog commands. */
 function addAgent(body, services = DEFAULT_RUNTIME_SERVICES) {
-  if (!catalogLib) return { error: "catalog module still loading — retry in a moment" };
+  if (!catalogLib) return { error: "catalog module still loading - retry in a moment" };
   const cat = body.catalogId ? catalogLib.catalogEntry(body.catalogId) : null;
   if (body.catalogId) {
-    if (!marketplaceLib) return { error: "marketplace module still loading — retry in a moment" };
+    if (!marketplaceLib) return { error: "marketplace module still loading - retry in a moment" };
     const marketplaceEntry = marketplaceLib.marketplaceEntry(body.catalogId);
     if (marketplaceEntry && !catalogInstalled(marketplaceEntry, services, { fresh: true })) {
       return {
@@ -354,7 +354,7 @@ function addAgent(body, services = DEFAULT_RUNTIME_SERVICES) {
 }
 
 /* scaffoldVaultLane: create Brains/<Lane>/ in the canonical constitution shape (Identity/Memory/
-   Rules + Knowledge/ + Notes/) for a newly-registered agent — writing only files that don't exist,
+   Rules + Knowledge/ + Notes/) for a newly-registered agent - writing only files that don't exist,
    so it never clobbers a real brain. No-op until the ESM helper (templates) has loaded. */
 function scaffoldVaultLane(agent) {
   if (!agentDetailLib || !agent.lane) return;
@@ -397,7 +397,7 @@ function walkVault() {
 /* Full-fidelity walks for the Neural Vault graph ONLY. walkVaultAll() lifts the .md gate and the
    Assets/ exclusion so every vault file (decree .txt, images, PDFs) becomes a node; every other
    consumer keeps the lean .md walk above. walkRepo() adds the repo's own source as a `code` layer
-   under the virtual Repo/ folder — allowlisted dirs/files only, so .env, telemetry data, dist
+   under the virtual Repo/ folder - allowlisted dirs/files only, so .env, telemetry data, dist
    output, and the vault itself can never leak into the graph. */
 function walkVaultAll() { return walk(VAULT, [], VAULT, 0, { all: true }); }
 const REPO_DIRS = ["apps", "packages", "scripts", "docs", "prompts", ".github"];
@@ -452,7 +452,7 @@ function openTasks() {
    decisions.md (append-only cross-agent log), next.md (resume pointer).
    Flat Projects/<name>.md notes still render (kind "note"), read-only.
    The dashboard writes ONLY inside Projects/<slug>/ it created or that already exists. */
-const _docCache = new Map();   // abs path -> {mtime, text} — mtime-keyed, bounded
+const _docCache = new Map();   // abs path -> {mtime, text} - mtime-keyed, bounded
 function readDoc(abs) {
   try {
     const st = fs.statSync(abs);
@@ -566,7 +566,7 @@ function buildProjects(files) {
 /* the Continue brief: what an agent needs to resume this project with full context */
 function projectBrief(p, meta, decisions, next) {
   return [
-    `## Resume brief — ${meta.title || p.slug}`,
+    `## Resume brief - ${meta.title || p.slug}`,
     meta.goal ? `**Goal:** ${meta.goal}` : null,
     `**Status:** ${meta.status}${meta.progress != null ? ` · ${meta.progress}%` : ""}${meta.tasksOpen ? ` · ${meta.tasksOpen} open tasks` : ""}`,
     next ? `**Next:** ${next}` : null,
@@ -737,7 +737,7 @@ function buildState() {
    procs = `run` processes owned by the dashboard. gwCache = last status result per agent. */
 const procs = new Map();   // id -> {child,pid,log:[],seq,status,startedAt,exitCode}
 const gwCache = new Map();  // id -> {running,text,at,exitCode}
-const summons = new Map();  // id -> {pid,startedAt,alive,launchedAt} — summoned admin terminals (pid-file handshake)
+const summons = new Map();  // id -> {pid,startedAt,alive,launchedAt} - summoned admin terminals (pid-file handshake)
 
 /* system-event ring buffer (topology SYSTEM LOG panel) */
 const sysLog = [];
@@ -751,7 +751,7 @@ function gwActions(agent) { return (agent && agent.gateway && agent.gateway.acti
 
 function detectRunning(text) {
   const t = (text || "").toLowerCase();
-  // Note: matches Indonesian output emitted by some agent CLIs — do not translate
+  // Note: matches Indonesian output emitted by some agent CLIs - do not translate
   if (/not running|tidak (sedang )?jalan|belum jalan|\bstopped\b|\binactive\b|no gateway|not installed|no running/.test(t)) return false;
   if (/\brunning\b|\bactive\b|\bpid[:\s#]*\d|listening on|is up\b/.test(t)) return true;
   return false;
@@ -869,7 +869,7 @@ function processManager() {
   return managedProcessManager;
 }
 
-/* R2: consistent tree-kill (Win: taskkill /T, POSIX: kill process group) — used by owned-run & gwCtl timeout */
+/* R2: consistent tree-kill (Win: taskkill /T, POSIX: kill process group) - used by owned-run & gwCtl timeout */
 function killTree(pid, child) {
   if (!pid) { try { child && child.kill(); } catch {} return; }
   if (process.platform === "win32") { try { execFile("taskkill", ["/pid", String(pid), "/T", "/F"], () => {}); } catch {} }
@@ -897,14 +897,14 @@ function alertDown(id, reason) {
     const fname = `ALERT ${name} ${stamp.slice(0, 10)} ${stamp.slice(11, 19).replace(/:/g, ".")}.md`;
     fs.writeFileSync(path.join(dir, fname),
       `---\ntype: alert\nagent: ${id}\ncreated: ${stamp}\ntags: [alert, agentic-os]\n---\n\n` +
-      `# ⚠ ${name} — gateway down\n\n- Time: ${stamp.slice(0, 19).replace("T", " ")}\n- Cause: ${reason}\n- Source: agentic-os dashboard (automatic detection)\n`, "utf8");
+      `# ⚠ ${name} - gateway down\n\n- Time: ${stamp.slice(0, 19).replace("T", " ")}\n- Cause: ${reason}\n- Source: agentic-os dashboard (automatic detection)\n`, "utf8");
   } catch (e) { console.error("[alert] failed to write inbox note:", e.message); }
-  sysEvent(id, "error", `DOWN — ${reason}`);
+  sysEvent(id, "error", `DOWN - ${reason}`);
   notifyWindows(`⚠ ${name} down`, reason);
 }
 
 /* ROADMAP #2: log each status poll to telemetry/uptime.jsonl (ts + up 0/1) → 24-hour uptime strip.
-   ponytail: append-only, read via tailRead (byte cap). File grows ~polls/day — rotate later if needed. */
+   ponytail: append-only, read via tailRead (byte cap). File grows ~polls/day - rotate later if needed. */
 function logUptime(id, running) {
   try { fs.appendFileSync(path.join(TELEMETRY_DIR, "uptime.jsonl"), JSON.stringify({ ts: Date.now(), id, up: running ? 1 : 0 }) + "\n"); } catch {}
 }
@@ -1056,7 +1056,7 @@ function gwRun(id) {
    Summon opens an ADMIN terminal (wt.exe/powershell -Verb RunAs) that runs the agent's trigger CLI.
    The dashboard is non-elevated, so it can't kill the elevated shell directly. Instead the elevated
    shell registers its own $PID to telemetry/terms/<id>.pid and runs a background job that watches for
-   telemetry/terms/<id>.kill — when that file appears, the shell taskkills its own tree (no second UAC). */
+   telemetry/terms/<id>.kill - when that file appears, the shell taskkills its own tree (no second UAC). */
 function termPidFile(id) { return path.join(TERMS_DIR, `${id}.pid`); }
 function termKillFile(id) { return path.join(TERMS_DIR, `${id}.kill`); }
 function readTermPid(id) {
@@ -1169,7 +1169,7 @@ function gwTerminal(id, mode, cb) {
   const finish = obj => { if (done) return; done = true; clearTimeout(timer); cb(obj); };
   try { child = spawn("powershell", ["-NoProfile", "-Command", ps], { shell: false, windowsHide: true, stdio: ["ignore", "ignore", "pipe"] }); }
   catch (e) { summons.delete(id); return cb({ error: `failed to open terminal: ${e.message}` }); }
-  // UAC prompts can sit unanswered — after 45s report "pending" and let the poll settle it later
+  // UAC prompts can sit unanswered - after 45s report "pending" and let the poll settle it later
   const timer = setTimeout(() => finish({ ok: true, mode, dir, cmd, terminal: true, pending: true, note: "waiting for UAC confirmation" }), 45000);
   child.stderr.on("data", d => { errOut += d; });
   child.on("error", err => { summons.delete(id); finish({ error: `failed to open terminal: ${err.message}` }); });
@@ -1211,7 +1211,7 @@ function gwStopTerm(id, cb) {
         const ps2 = `Start-Process taskkill -Verb RunAs -ArgumentList '/PID','${pid}','/T','/F' -Wait`;
         execFile("powershell", ["-NoProfile", "-Command", ps2], { windowsHide: true, timeout: 60000 }, () => {
           execFile("tasklist", ["/FO", "CSV", "/NH", "/FI", `PID eq ${pid}`], { windowsHide: true }, (e2, out2) => {
-            if (!e2 && /"\d+"/.test(String(out2))) return cb({ error: "terminal still alive — UAC declined or kill failed" });
+            if (!e2 && /"\d+"/.test(String(out2))) return cb({ error: "terminal still alive - UAC declined or kill failed" });
             cleanupTerm(id);
             sysEvent(id, "ok", `summoned terminal pid ${pid} force-closed`);
             cb({ ok: true, pid, closed: true, forced: true });
@@ -1228,7 +1228,7 @@ function killOwned(id) {
   const p = procs.get(id);
   if (p?.runId) return false;
   if (!p || p.status !== "running" || !p.pid) return false;
-  pushLog(p, "sys", "[agentic-os] stop owned — tree-kill");
+  pushLog(p, "sys", "[agentic-os] stop owned - tree-kill");
   killTree(p.pid, p.child);
   return true;
 }
@@ -1262,7 +1262,7 @@ function gwStop(id, cb) {
   });
 }
 
-/* R#7: real health probe — check that the TCP port is actually listening (more honest than matching status text).
+/* R#7: real health probe - check that the TCP port is actually listening (more honest than matching status text).
    Config: agent.gateway.probe = { host?, port }. Successful connect = alive, else down. */
 function probePort(host, port, cb) {
   const sock = new net.Socket();
@@ -1301,7 +1301,7 @@ function maybeWatchdog(id) {
 }
 
 /* refresh the status of every agent that supports it (called periodically).
-   R4: in-flight guard — don't spawn a new status check while the old one is still running (prevents overlap/pileup). */
+   R4: in-flight guard - don't spawn a new status check while the old one is still running (prevents overlap/pileup). */
 const polling = new Set();
 function pollAllStatus() {
   let agents; try { agents = loadConfig().agents; } catch { return; }
@@ -1316,7 +1316,7 @@ function pollAllStatus() {
 }
 
 /* ---------------- installed-state probe ----------------
-   Whether an agent's CLI is actually on THIS machine — a `where <trigger>` (or existsSync for a path
+   Whether an agent's CLI is actually on THIS machine - a `where <trigger>` (or existsSync for a path
    trigger). Previously this ran only lazily at summon time, so the dashboard never knew what was
    installed; now it is cached and refreshed on a slow interval so every card, the gateway panel, and
    the install catalog can show a truthful Installed / Install state. */
@@ -1372,7 +1372,7 @@ function catalogInstalled(entry, services = DEFAULT_RUNTIME_SERVICES, { fresh = 
    manifest and resolves to a fixed program plus argv. Caller input never becomes executable text. */
 function installAgent(id, adapterId) {
   if (!catalogLib || !marketplaceLib || !processAdaptersLib)
-    return { error: "Marketplace modules still loading — retry in a moment" };
+    return { error: "Marketplace modules still loading - retry in a moment" };
   const entry = marketplaceLib.marketplaceEntry(id);
   if (!entry || entry.kind !== "agent") return { error: `unknown catalog agent '${id}'` };
   const available = entry.installers.filter(adapter =>
@@ -1386,7 +1386,7 @@ function installAgent(id, adapterId) {
   });
   if (!spec)
     return {
-      error: `${entry.name} has no vetted auto-install adapter for this platform — use its install page`,
+      error: `${entry.name} has no vetted auto-install adapter for this platform - use its install page`,
       url: entry.officialUrl || null,
     };
   const existing = procs.get(id);
@@ -1421,7 +1421,7 @@ function installAgent(id, adapterId) {
   return { ok: true, pid: child.pid, id, log: `/api/proc/${id}/log` };
 }
 
-/* /api/version — local identity for the update banner. Cached (git calls are cheap, not free). */
+/* /api/version - local identity for the update banner. Cached (git calls are cheap, not free). */
 let versionCache = null;
 function versionInfo() {
   if (versionCache) return versionCache;
@@ -1437,7 +1437,7 @@ function versionInfo() {
   return versionCache;
 }
 
-const UPDATE_ID = "os-update";   // reserved procs id — the /api/proc/:id/log tail route serves it
+const UPDATE_ID = "os-update";   // reserved procs id - the /api/proc/:id/log tail route serves it
 function startUpdate() {
   const existing = procs.get(UPDATE_ID);
   if (existing && existing.status === "running") return { error: "an update is already running", log: `/api/proc/${UPDATE_ID}/log` };
@@ -1451,12 +1451,12 @@ function startUpdate() {
   }).then(() => {
     p.status = "exited"; p.exitCode = 0;
     versionCache = null;   // version on disk may have changed
-    pushLog(p, "sys", "[agentic-os] update applied — UI assets are live now; restart the server to load backend changes");
+    pushLog(p, "sys", "[agentic-os] update applied - UI assets are live now; restart the server to load backend changes");
     sysEvent(UPDATE_ID, "ok", "self-update applied");
   }).catch(error => {
     p.status = "error"; p.exitCode = 1;
     pushLog(p, "err", error?.message || String(error));
-    pushLog(p, "sys", "[agentic-os] update failed — no pull runs unless the checkout is clean; --ff-only refuses divergence");
+    pushLog(p, "sys", "[agentic-os] update failed - no pull runs unless the checkout is clean; --ff-only refuses divergence");
     sysEvent(UPDATE_ID, "warn", "self-update failed");
   });
   return { ok: true, id: UPDATE_ID, log: `/api/proc/${UPDATE_ID}/log` };
@@ -1482,10 +1482,10 @@ function saveAvatar(id, dataUrl) {
 /* ---------------- graph vault (view: Neural Vault) ----------------
    Four layers, each tagged on the edge so the client can toggle them and the
    report can still count wikilinks alone (totals.edges must stay honest):
-     link   — a real [[wikilink]] or [](note.md) between two existing notes
-     ghost  — a wikilink whose target note does not exist yet (Obsidian shows these too)
-     tag    — note → #tag hub (a star, not a clique: a 20-note tag costs 20 edges, not 190)
-     folder — note → containing folder → parent folder (the structural skeleton)
+     link   - a real [[wikilink]] or [](note.md) between two existing notes
+     ghost  - a wikilink whose target note does not exist yet (Obsidian shows these too)
+     tag    - note → #tag hub (a star, not a clique: a 20-note tag costs 20 edges, not 190)
+     folder - note → containing folder → parent folder (the structural skeleton)
    Link resolution is path-aware: the vault holds 52 duplicate basenames, and a
    first-wins basename map silently orphans every one of the losers. */
 const CODE_FENCE = /(^|\n)\s*(```|~~~)[\s\S]*?(\n\s*\2|$)/g;
@@ -1495,12 +1495,12 @@ function resolveLink(raw, fromRel, byPath, byBase) {
   const clean = raw.trim().replace(/\\/g, "/").replace(/\.md$/i, "").replace(/^\.\//, "");
   if (!clean) return null;
   const lc = clean.toLowerCase();
-  if (byPath.has(lc)) return byPath.get(lc);            // [[Brains/Copilot/Note]] — exact path
+  if (byPath.has(lc)) return byPath.get(lc);            // [[Brains/Copilot/Note]] - exact path
   const cands = byBase.get(lc.split("/").pop());
   if (!cands || !cands.length) return null;
   if (cands.length === 1) return cands[0];
   // Ambiguous basename. Prefer a path ending with what was written, then a sibling
-  // of the source note, then the shallowest path — Obsidian's own resolution order.
+  // of the source note, then the shallowest path - Obsidian's own resolution order.
   const suffix = cands.find(c => c.toLowerCase().replace(/\.md$/, "").endsWith("/" + lc));
   if (suffix) return suffix;
   const dir = fromRel.slice(0, fromRel.lastIndexOf("/") + 1);
@@ -1608,7 +1608,7 @@ function buildGraph() {
   const files = walkVault();
   const nodes = new Map();   // id -> node
   const byPath = new Map();  // "brains/hermes/note" -> rel
-  const byBase = new Map();  // "note" -> [rel, rel, …]  — every candidate, not first-wins
+  const byBase = new Map();  // "note" -> [rel, rel, …]  - every candidate, not first-wins
 
   const addNode = (id, n) => { if (!nodes.has(id)) nodes.set(id, { id, deg: 0, ...n }); return nodes.get(id); };
 
@@ -1655,7 +1655,7 @@ function buildGraph() {
       const target = resolveLink(raw, f.rel, byPath, byBase);
       if (target) push(f.rel, target, "link");
     }
-    // #tag — code is already stripped, and "# Heading" needs a space so it cannot match
+    // #tag - code is already stripped, and "# Heading" needs a space so it cannot match
     for (const m of body.matchAll(/(?:^|[\s(])#([A-Za-z][\w-]*(?:\/[\w-]+)*)/gm)) {
       const tid = "tag:" + m[1].toLowerCase();
       addNode(tid, { label: "#" + m[1], folder: "(tags)", type: "tag", mtime: 0 });
@@ -1899,7 +1899,7 @@ function reportMarkdown(r) {
     "created_by: agentic-os-dashboard",
     "tags: [report, agentic-os]",
     "---", "",
-    `# Agentic OS Report — ${r.generatedAt.slice(0, 16).replace("T", " ")}`, "",
+    `# Agentic OS Report - ${r.generatedAt.slice(0, 16).replace("T", " ")}`, "",
     `| Metric | Value |`, `|---|---|`,
     `| Total vault notes | ${r.totals.notes} |`,
     `| Note-to-note links (wikilinks) | ${r.totals.edges} |`,
@@ -1956,7 +1956,7 @@ function processPendingAgentTasks(agentId) {
       if (/^\s*[-*] \[ \]/.test(l) && (l.toLowerCase().includes(who.toLowerCase()) || l.toLowerCase().includes(agentId.toLowerCase()))) {
         lines[i] = lines[i].replace("[ ]", "[x]");
         modified = true;
-        const taskText = l.replace(/^\s*[-*] \[ \]\s*/, "").split(" — ")[0];
+        const taskText = l.replace(/^\s*[-*] \[ \]\s*/, "").split(" - ")[0];
         const teleFile = path.join(TELEMETRY_DIR, `${agentId}.jsonl`);
         fs.appendFileSync(teleFile, JSON.stringify({
           ts: new Date().toISOString(),
@@ -1986,7 +1986,7 @@ function createTask(agentId, title, detail) {
     const dir = path.join(VAULT, "Tasks");
     fs.mkdirSync(dir, { recursive: true });
     const file = path.join(dir, "Inbox Tasks.md");
-    const line = `- [ ] ${title} — ${who} — ${date}${extra}\n`;   // — = clean em-dash (avoids mojibake)
+    const line = `- [ ] ${title} - ${who} - ${date}${extra}\n`;   // - = clean em-dash (avoids mojibake)
     if (!fs.existsSync(file))
       fs.writeFileSync(file, `# 📥 Inbox Tasks\n\n> Tasks from the dashboard. Agents pick them up → mark \`[x]\` when done.\n\n${line}`, "utf8");
     else
@@ -2049,7 +2049,7 @@ function sendOperationalSyncPrompt(services, operationId) {
   });
 }
 
-/* R#8: schedule panel — read each agent's Windows Scheduled Task (next run, last run, last result). */
+/* R#8: schedule panel - read each agent's Windows Scheduled Task (next run, last run, last result). */
 function querySchtask(name, cb) {
   execFile("schtasks", ["/query", "/tn", name, "/fo", "LIST", "/v"], { windowsHide: true }, (e, out) => {
     if (e) return cb({ name, error: String((e.message || "query failed")).split("\n")[0].slice(0, 120) });
@@ -2067,7 +2067,7 @@ function buildSchedule(cb) {
   agents.forEach(a => querySchtask(a.gateway.schtask, r => { out.push({ id: a.id, agent: a.name, icon: a.icon, ...r }); if (--pending === 0) cb(out); }));
 }
 
-/* R#9: vault health — age of the last git commit + age of the last backup (prevent losing the brain).
+/* R#9: vault health - age of the last git commit + age of the last backup (prevent losing the brain).
    Backup optional via env BACKUP_PATH (folder/file); if unset, only git is reported. */
 function buildVaultHealth(cb) {
   const res = { vault: VAULT, gitCommitAt: null, gitAgeH: null, gitOk: false, backupAt: null, backupAgeH: null, backup: null };
@@ -2534,7 +2534,7 @@ function readBody(req, res, cb) {
 }
 
 /* ---------------- http ---------------- */
-/* S1: constant-time token compare (anti timing attack). S2: header-only auth — ?token= query is not accepted */
+/* S1: constant-time token compare (anti timing attack). S2: header-only auth - ?token= query is not accepted */
 function safeEq(a, b) {
   const ba = Buffer.from(String(a || "")), bb = Buffer.from(String(b || ""));
   if (ba.length !== bb.length) { crypto.timingSafeEqual(bb, bb); return false; }
@@ -2612,7 +2612,7 @@ function requestHandler(req, res, services = DEFAULT_RUNTIME_SERVICES) {
   const url = (req.url || "/").split("?")[0];
 
   if (url.startsWith("/api/")) {
-    if (!authorized(req)) return json(res, 401, { error: "invalid/missing token — set the x-dash-token header" });
+    if (!authorized(req)) return json(res, 401, { error: "invalid/missing token - set the x-dash-token header" });
     try {
       if (url === "/api/today" && req.method === "GET")
         return TODAY_PROJECTION.then(({ buildTodayProjection }) => {
@@ -3376,7 +3376,7 @@ function requestHandler(req, res, services = DEFAULT_RUNTIME_SERVICES) {
   if (!file && !path.extname(rel)) file = resolve(DIST, "index.html");
 
   if (!file) {
-    const hint = fs.existsSync(DIST) ? "not found" : "not built — run: npm run build";
+    const hint = fs.existsSync(DIST) ? "not found" : "not built - run: npm run build";
     res.writeHead(404, { "Content-Type": "text/plain" });
     return res.end(hint);
   }
@@ -3392,12 +3392,12 @@ function createServer(runtime) {
 }
 const server = createServer();
 
-/* R1+R3: shutdown & crash handlers — SIGINT/SIGTERM/SIGHUP + uncaughtException are not covered by
+/* R1+R3: shutdown & crash handlers - SIGINT/SIGTERM/SIGHUP + uncaughtException are not covered by
    process.on("exit") (the event loop is dead at 'exit', so async taskkill never runs). Here the loop is still alive. */
 let shuttingDown = false;
 function shutdown(sig) {
   if (shuttingDown) return; shuttingDown = true;
-  console.error(`[agentic-os] shutdown (${sig}) — stopping owned processes`);
+  console.error(`[agentic-os] shutdown (${sig}) - stopping owned processes`);
   try { processManager()?.stopAll(); } catch {}
   for (const id of procs.keys()) killOwned(id);
   try { server.close(); } catch {}
@@ -3441,7 +3441,7 @@ if (require.main === module) {
   console.log(TOKEN ? "  Auth: token ACTIVE (x-dash-token)" : "  Auth: no token (local only). For remote access: set DASH_TOKEN.\n");
   setTimeout(pollAllStatus, 3000);       // initial status
   setInterval(pollAllStatus, 45000);     // R4: interval (45s) > gwCtl timeout (30s) + in-flight guard
-  setTimeout(pollInstalled, 1500);       // installed-state probe (where <trigger>) — drives Install/Summon UI
+  setTimeout(pollInstalled, 1500);       // installed-state probe (where <trigger>) - drives Install/Summon UI
   setInterval(pollInstalled, 120000);    // installs change rarely → slow refresh keeps spawns cheap
   setTimeout(pollSummons, 3000);         // pick up summoned-terminal pid files from a previous run
   setInterval(pollSummons, 45000);       // keep summoned-terminal liveness fresh

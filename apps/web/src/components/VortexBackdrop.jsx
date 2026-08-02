@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
-/* Vortex cosmos backdrop — a flow-field particle canvas behind the shell.
+/* Vortex cosmos backdrop - a flow-field particle canvas behind the shell.
    Ported from the Aceternity Vortex concept, but dependency-free: a small
    Perlin noise field replaces simplex-noise, theme tokens replace hardcoded
    hues, and it renders nothing when the active theme zeroes

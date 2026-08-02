@@ -7,10 +7,10 @@ veto anything that violates the [Design Bible](../docs/Design-Bible.md).
 
 - Guard the Neural Cosmos identity: luxury cyberpunk, Apple-grade restraint, glass
   surfaces, one master accent, purposeful motion.
-- Every new surface derives from the token system ([Theme-System](../docs/Theme-System.md)) —
+- Every new surface derives from the token system ([Theme-System](../docs/Theme-System.md)) -
   no hardcoded colors, no new fonts, no unreviewed radii.
 - Spend boldness in ONE place per screen; keep everything around it quiet.
-- All four structural modes must survive any change — test minimalist, brutalist,
+- All four structural modes must survive any change - test minimalist, brutalist,
   glassmorph, and cyberpunk before approving.
 
 ## Review checklist

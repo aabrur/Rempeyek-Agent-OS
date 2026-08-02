@@ -36,7 +36,7 @@ test("positions are deterministic and stay inside the stage at every roster size
   }
 });
 
-test("every cosmos edge is a verified buildAgentMap edge — nothing is synthesized", () => {
+test("every cosmos edge is a verified buildAgentMap edge - nothing is synthesized", () => {
   const agents = ["codex", "hermes", "pi", "cline"].map(id => agent(id));
   const topology = topologyOf(agents, [
     ...EDGES,

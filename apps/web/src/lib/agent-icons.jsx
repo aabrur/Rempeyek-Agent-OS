@@ -1,4 +1,4 @@
-/* Cosmos map iconography — one lucide glyph per known agent id.
+/* Cosmos map iconography - one lucide glyph per known agent id.
    Unknown agents fall back to Cpu so a fresh roster never renders empty. */
 import {
   Atom, Bot, BookOpen, Brain, Code2, Cpu, Sigma, Terminal, Wind, Wrench,

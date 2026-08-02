@@ -2,10 +2,10 @@
 
 Rempeyek Agent OS exposes four structural appearance modes over one semantic token contract:
 
-- `minimalist` — calm, content-first surfaces and restrained depth.
-- `brutalist` — hard borders, compact geometry, high contrast, and no decorative blur.
-- `glassmorph` — translucent hierarchy with controlled blur and light.
-- `cyberpunk` — the Neural Cosmos identity: cyan light (`#00d4ff`) on deep-navy space
+- `minimalist` - calm, content-first surfaces and restrained depth.
+- `brutalist` - hard borders, compact geometry, high contrast, and no decorative blur.
+- `glassmorph` - translucent hierarchy with controlled blur and light.
+- `cyberpunk` - the Neural Cosmos identity: cyan light (`#00d4ff`) on deep-navy space
   (`#030918`) with self-hosted Orbitron / Rajdhani / JetBrains Mono display faces.
 
 Legacy theme IDs remain migration aliases in `packages/theme-engine/src/themes.js`; they are not active product themes.
@@ -18,10 +18,10 @@ The Agent Map consumes its own `--cosmos-*` namespace (canvas, panel, node fill,
 status colors, connection tiers strong/data/weak, nebula, star). Canon values are the
 cyberpunk palette in `:root`; each other mode overrides the full set. Luminous effects
 (glow filters, stars, particles, dash flow) are gated by the shared `--graph-effect-glow`
-token — `0` in minimalist/brutalist — read live by `useEffectsEnabled()`, so flat modes
+token - `0` in minimalist/brutalist - read live by `useEffectsEnabled()`, so flat modes
 need no per-component branches. Display faces ship self-hosted from
 `apps/web/public/fonts/` (Orbitron and JetBrains Mono as variable fonts, Rajdhani 400/600,
-all latin-subset woff2 under the OFL — license texts alongside the files).
+all latin-subset woff2 under the OFL - license texts alongside the files).
 
 ## Switching
 

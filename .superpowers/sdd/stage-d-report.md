@@ -1,4 +1,4 @@
-# Stage D Report — Neural Vault Cosmos v2
+# Stage D Report - Neural Vault Cosmos v2
 
 ## Outcome
 

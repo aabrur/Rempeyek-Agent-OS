@@ -1,6 +1,6 @@
 # @rempeyek/neural-vault
 
-**Extraction target — code lives in `apps/web` today.**
+**Extraction target - code lives in `apps/web` today.**
 
 Vault domain logic: `walk`/`walkVault` scanner, Obsidian-order link resolver
 (`resolveLink`), 4-layer graph builder (`buildGraph`), open-tasks scanner, vault

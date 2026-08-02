@@ -35,7 +35,7 @@ test("Switchboard Task Delivery - Task queued for agent and answered when online
   const date = new Date().toISOString().slice(0, 10);
 
   // Simulating createTask
-  const line = `- [ ] ${title} — Hermes — ${date}\n`;
+  const line = `- [ ] ${title} - Hermes - ${date}\n`;
   fs.writeFileSync(taskFile, `# 📥 Inbox Tasks\n\n${line}`, "utf8");
 
   // Verify task file written

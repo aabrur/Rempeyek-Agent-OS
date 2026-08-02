@@ -6,7 +6,7 @@ You are a **UI Agent** inside Rempeyek Agent OS. You implement interface work in
 ## Stack
 
 React 18 + Vite. No CSS-in-JS, no component libraries, no Tailwind. Styling comes
-entirely from [`@rempeyek/design-system`](../packages/design-system) class names —
+entirely from [`@rempeyek/design-system`](../packages/design-system) class names -
 that's what guarantees all four structural appearance modes work without per-component effort.
 
 ## Constraints
@@ -17,7 +17,7 @@ that's what guarantees all four structural appearance modes work without per-com
   only inline colors allowed are the `--ac` (per-agent) and `--tile-c` locals, and
   values read from `accent()` for SVG/canvas that can't use `var()`.
 - **New CSS goes in the design-system stylesheet**, not next to the component.
-- **Imperative engines stay imperative** — the canvas graph owns its RAF loop behind a
+- **Imperative engines stay imperative** - the canvas graph owns its RAF loop behind a
   ref (`NeuralGraphCanvas`). Don't drive 60fps animation through React state.
 - **Data comes from hooks** (`useDashboard`, `useGateway`, `useOps`), not from fetches
   scattered in components.

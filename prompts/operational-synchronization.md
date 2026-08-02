@@ -40,10 +40,10 @@ Do not scan the whole computer. Do not synchronize raw credentials, tokens, cook
 
 For every material fact record:
 
-1. **Source** — file, registry, test, command, or approved user decision.
-2. **Scope** — project, agent, session, or shared family.
-3. **Status** — fact, assumption, blocker, or decision.
-4. **Evidence** — verification output or direct source reference.
+1. **Source** - file, registry, test, command, or approved user decision.
+2. **Scope** - project, agent, session, or shared family.
+3. **Status** - fact, assumption, blocker, or decision.
+4. **Evidence** - verification output or direct source reference.
 
 If sources conflict, record the conflict. Current runtime evidence and the user's explicit decision outrank historical memory. Never choose silently.
 

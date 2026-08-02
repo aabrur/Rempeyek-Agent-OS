@@ -1,4 +1,4 @@
-/* NeuralGraph — cosmos-neural force-directed graph, pure 2D canvas.
+/* NeuralGraph - cosmos-neural force-directed graph, pure 2D canvas.
    Renders the 4-layer vault graph from /api/graph: link | ghost | tag | folder.
    API: const g = NeuralGraph(canvas, {onOpen});
         g.setData({nodes,edges,stats}); g.setQuery(q);
@@ -54,7 +54,7 @@ export function NeuralGraph(canvas, opts = {}) {
   let tagColor = "#FF3DD8", ghostColor = "#8E88BE", folderColorToken = "#7C5CFF", starRgb = "210,205,255";
   let foreground = resolveGraphPalette().foreground, effects = resolveGraphPalette().effects;
   // per-layer physics + stroke: folders form the short stiff skeleton, links the mid web,
-  // tags/ghosts long loose threads — that spread is what makes it read as tissue, not a blob
+  // tags/ghosts long loose threads - that spread is what makes it read as tissue, not a blob
   const EDGE = {
     link:   { rgb: "90,160,255",  w: 1.15, a: .34, curve: .16, len: 95,  k: .0045 },
     ghost:  { rgb: "160,140,255", w: .8,   a: .15, curve: .10, len: 120, k: .0018, dash: [3, 5] },
@@ -251,7 +251,7 @@ export function NeuralGraph(canvas, opts = {}) {
 
     const now = performance.now();
 
-    // plasma halos under the strongest hubs — breathing glow that follows real degree
+    // plasma halos under the strongest hubs - breathing glow that follows real degree
     if (effects.halo) for (const n of nodes) {
       const degree = n.degree ?? n.deg ?? 0;
       if (mode !== "cosmos" || n.hidden || !n.renderHalo) continue;

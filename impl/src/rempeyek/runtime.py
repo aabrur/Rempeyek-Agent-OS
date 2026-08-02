@@ -1,5 +1,5 @@
 """
-Rempeyek Agent OS — Runtime paths, registry, and system init.
+Rempeyek Agent OS - Runtime paths, registry, and system init.
 
 Resolves all canonical paths, manages the AI family registry,
 and handles system initialization lifecycle.

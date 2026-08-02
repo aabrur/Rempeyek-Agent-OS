@@ -1,4 +1,4 @@
-/* @rempeyek/ui — presentational primitives.
+/* @rempeyek/ui - presentational primitives.
    Pure, stateless, no data fetching. They render the design-system class names,
    so visual fidelity is guaranteed by the stylesheet, not by per-component CSS. */
 

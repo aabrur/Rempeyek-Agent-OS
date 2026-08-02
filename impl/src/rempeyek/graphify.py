@@ -1,5 +1,5 @@
 ﻿"""
-Rempeyek Agent OS — Graphify integration and data model.
+Rempeyek Agent OS - Graphify integration and data model.
 
 Provides graph node/edge management for the knowledge graph,
 project indexing, and query support.

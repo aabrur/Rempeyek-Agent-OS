@@ -19,7 +19,7 @@ test("isHeartbeat recognises explicit type and legacy named task_progress", () =
 });
 
 test("selectTelemetryWindow keeps real signal even under a heartbeat flood", () => {
-  // 2 real events buried under 100 heartbeats — the old slice(-30) hid them entirely.
+  // 2 real events buried under 100 heartbeats - the old slice(-30) hid them entirely.
   const real = [
     { type: "subagent_start", name: "telemetry-writer", ts: "2026-07-06T19:41:02Z" },
     { type: "task_done", name: "Ringkas agentic-os", ts: "2026-07-06T19:41:03Z" },
@@ -81,9 +81,9 @@ const AGENTS = [
 test("coAssignments links agents sharing a workspace, resolving display names to ids", () => {
   const taskFiles = [{
     rel: "Tasks/Inbox Tasks.md", text: [
-      "- [ ] Resume project: Skill Hypertaks — Codex — 2026-07-14 · Workspace: Projects/skill-hypertaks/",
-      "- [ ] Resume project: Skill Hypertaks — Kilo Code — 2026-07-14 · Workspace: Projects/skill-hypertaks/",
-      "- [x] Resume project: Skill Hypertaks — Pi — 2026-07-14 · Workspace: Projects/skill-hypertaks/",
+      "- [ ] Resume project: Skill Hypertaks - Codex - 2026-07-14 · Workspace: Projects/skill-hypertaks/",
+      "- [ ] Resume project: Skill Hypertaks - Kilo Code - 2026-07-14 · Workspace: Projects/skill-hypertaks/",
+      "- [x] Resume project: Skill Hypertaks - Pi - 2026-07-14 · Workspace: Projects/skill-hypertaks/",
     ].join("\n"),
   }];
   const links = coAssignments(taskFiles, AGENTS);
@@ -97,8 +97,8 @@ test("coAssignments links agents sharing a workspace, resolving display names to
 test("coAssignments ignores unknown/retired agents and single-member projects", () => {
   const taskFiles = [{
     rel: "Tasks/Active Tasks.md", text: [
-      "- [x] Sinkronkan skill junction Copilot CLI — Copilot CLI — 2026-07-06",       // retired → dropped
-      "- [ ] Resume project: Lonely — Hermes — 2026-07-14 · Workspace: Projects/lonely/", // single member → no edge
+      "- [x] Sinkronkan skill junction Copilot CLI - Copilot CLI - 2026-07-06",       // retired → dropped
+      "- [ ] Resume project: Lonely - Hermes - 2026-07-14 · Workspace: Projects/lonely/", // single member → no edge
     ].join("\n"),
   }];
   assert.deepEqual(coAssignments(taskFiles, AGENTS), []);
@@ -124,9 +124,9 @@ test("laneScaffold emits the canonical Brains lane shape", () => {
 test("coAssignments dedupes an agent that appears twice in one project", () => {
   const taskFiles = [{
     rel: "Tasks/Inbox Tasks.md", text: [
-      "- [x] Resume project: Pivot — Claude Code — 2026-07-12 · Workspace: Projects/rempeyek-workspace-pivot/",
-      "- [x] Resume project: Pivot — Claude Code — 2026-07-13 · Workspace: Projects/rempeyek-workspace-pivot/",
-      "- [ ] Resume project: Pivot — Pi — 2026-07-13 · Workspace: Projects/rempeyek-workspace-pivot/",
+      "- [x] Resume project: Pivot - Claude Code - 2026-07-12 · Workspace: Projects/rempeyek-workspace-pivot/",
+      "- [x] Resume project: Pivot - Claude Code - 2026-07-13 · Workspace: Projects/rempeyek-workspace-pivot/",
+      "- [ ] Resume project: Pivot - Pi - 2026-07-13 · Workspace: Projects/rempeyek-workspace-pivot/",
     ].join("\n"),
   }];
   const links = coAssignments(taskFiles, AGENTS);

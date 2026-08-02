@@ -3,7 +3,7 @@ name: agentic-os
 description: "Use whenever working with Agentic OS as the Windows dashboard for Hermes, OpenClaw, Codex, or other local agents. Covers dashboard lifecycle, gateway wrapper behavior on Windows, auth/localhost quirks, and frontend-to-backend control verification. Trigger on agentic-os dashboard issues, Hermes/OpenClaw/Codex gateway control from UI, Start/Stop/Restart/Status/Run buttons not working, port-in-use dashboard relaunch, 401 from localhost, gateway command parsing, or daily bridge/telemetry lane visibility."
 ---
 
-# Agentic OS — Local Windows Dashboard + Gateway Control
+# Agentic OS - Local Windows Dashboard + Gateway Control
 
 Class-level operational skill for the `<repo>` dashboard stack:
 - `server.js` HTTP API + `public/` frontend
@@ -60,7 +60,7 @@ Run these in order after any `agents.config.json` or `server.js` change:
 1. `curl http://127.0.0.1:<port>/api/state` → must return JSON, no 401.
 2. `curl http://127.0.0.1:<port>/api/procs` → must return agent array.
 3. `curl http://127.0.0.1:<port>/api/agent/<id>/detail` → must return `proc`, `activity`, `telemetry`, `laneFiles`.
-4. From browser: open dashboard, open the agent detail panel, confirm Sesi/Aktivitas, Subagent, Telemetry, and Lane vault — `Brains/` sections populate without empty-state text when real data exists.
+4. From browser: open dashboard, open the agent detail panel, confirm Sesi/Aktivitas, Subagent, Telemetry, and Lane vault - `Brains/` sections populate without empty-state text when real data exists.
 5. Click one gateway action inside agent detail; repeat `1-3` and inspect changed status or new owned log lines.
 
 ## Daily Bridge / Telemetry

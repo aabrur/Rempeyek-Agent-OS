@@ -8,26 +8,26 @@ All slash commands operate against canonical Vault: `%USERPROFILE%\AppData\Local
 
 ## 2. `/obsidian-vault`
 - **Operations:**
-  - `/obsidian-vault status` — Check vault health.
-  - `/obsidian-vault init` — Initialize vault directories.
-  - `/obsidian-vault health` — Return detailed health metrics.
-  - `/obsidian-vault repair` — Re-scaffold missing folders safely.
-  - `/obsidian-vault register-project <path>` — Register a project for indexing.
+  - `/obsidian-vault status` - Check vault health.
+  - `/obsidian-vault init` - Initialize vault directories.
+  - `/obsidian-vault health` - Return detailed health metrics.
+  - `/obsidian-vault repair` - Re-scaffold missing folders safely.
+  - `/obsidian-vault register-project <path>` - Register a project for indexing.
 
 ## 3. `/shared-memory`
 - **Operations:**
-  - `/shared-memory status` — Show shared memory state.
-  - `/shared-memory read` — Retrieve recent agent handoffs.
-  - `/shared-memory promote` — Promote candidate memory into shared memory.
+  - `/shared-memory status` - Show shared memory state.
+  - `/shared-memory read` - Retrieve recent agent handoffs.
+  - `/shared-memory promote` - Promote candidate memory into shared memory.
 
 ## 4. `/graphify`
 - **Operations:**
-  - `/graphify status` — Show node and edge counts.
-  - `/graphify scan` — Scan registered projects into graph.
-  - `/graphify project <id>` — Scan specific project.
+  - `/graphify status` - Show node and edge counts.
+  - `/graphify scan` - Scan registered projects into graph.
+  - `/graphify project <id>` - Scan specific project.
 
 ## 5. `/skills`
 - **Operations:**
-  - `/skills status` — View synchronized skills.
-  - `/skills discover` — Scan central warehouse `%USERPROFILE%\.skills`.
-  - `/skills sync` — Synchronize skills to agent nodes.
+  - `/skills status` - View synchronized skills.
+  - `/skills discover` - Scan central warehouse `%USERPROFILE%\.skills`.
+  - `/skills sync` - Synchronize skills to agent nodes.

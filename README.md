@@ -1,7 +1,7 @@
-# REMPEYEK AGENT OS — Agentic Operating System
+# REMPEYEK AGENT OS - Agentic Operating System
 
 One dashboard for all your AI agents: what they can do, what is running right now,
-and their latest results — all from a single screen. Live data is read from an
+and their latest results - all from a single screen. Live data is read from an
 Obsidian Vault (the shared memory layer), with per-agent daily logs under
 `Brains/<Lane>/`.
 
@@ -19,9 +19,9 @@ the button above. No GitHub account, Git, Node.js, npm, or repository clone is
 required.
 
 - **Windows x64** desktop installer
-- **Private local state** — settings, agents, telemetry, avatars, and the starter
+- **Private local state** - settings, agents, telemetry, avatars, and the starter
   vault stay under `%LOCALAPPDATA%\Rempeyek-Agent-OS`
-- **User data survives uninstall** — removing the application does not delete
+- **User data survives uninstall** - removing the application does not delete
   the user's agent or vault data
 
 ### Install
@@ -47,52 +47,52 @@ The desktop updater supports automated background checks, release manifest verif
 
 ## Features
 
-- **Agent Map (the front door)** — a living neural cosmos: every agent orbits the
+- **Agent Map (the front door)** - a living neural cosmos: every agent orbits the
   Neural Vault core with glowing, provenance-verified relationship lines, travelling
   particles, live status, and a right-hand inspector (connections, measured signals,
-  metadata). Fully keyboard-navigable, honest by design — no synthetic edges
-- **8-destination command deck** — Agent Map · Agents · Projects (project workspaces) ·
+  metadata). Fully keyboard-navigable, honest by design - no synthetic edges
+- **8-destination command deck** - Agent Map · Agents · Projects (project workspaces) ·
   Memory (vault graph) · Switchboard (approvals, workflows, schedule) · Marketplace
   (vetted agent catalog) · Observatory (telemetry + reports) · Settings
-- **Project memory capture** — agents' `task_done` telemetry is auto-captured into the
-  matching project's `decisions.md` (⚡auto entries, watermarked — never duplicated), and
+- **Project memory capture** - agents' `task_done` telemetry is auto-captured into the
+  matching project's `decisions.md` (⚡auto entries, watermarked - never duplicated), and
   a **resume brief** can be dispatched to any agent via the task board
-- **4 structural themes** — Minimalist · Brutalist · Glassmorph · Cyberpunk (the neon
+- **4 structural themes** - Minimalist · Brutalist · Glassmorph · Cyberpunk (the neon
   cosmos default), switched from Settings and persisted per browser; the flat themes
   turn off glow and particles entirely, and the system reduce-motion preference is
   always respected
-- **Public Marketplace** — browse separate **Agents**, **Plugins**, and
+- **Public Marketplace** - browse separate **Agents**, **Plugins**, and
   **Skills** filters. The current launch curation contains 21 agent
   projects for portable discovery; it is maintained product curation, not a
   ranking or performance claim
-- **Safe install boundary** — reviewed adapters execute fixed programs and
+- **Safe install boundary** - reviewed adapters execute fixed programs and
   argument arrays without a shell. Hypertaks is the featured plugin and its
   managed bundle targets `%USERPROFILE%\.agents`; Crimson Odyssey remains
   discoverable through its official project link but has no guessed one-click
   installer
-- **Agent lifecycle** — installed software and registered profiles are shown
+- **Agent lifecycle** - installed software and registered profiles are shown
   separately. Enable/disable, active-agent switching, editable profile fields,
   non-destructive Remove, and Restore are available in Settings. Advanced
   software uninstall is separate and requires two scoped approvals
-- **Primary-profile subagents** — open a primary agent and use `+` to create a
+- **Primary-profile subagents** - open a primary agent and use `+` to create a
   purpose-specific child with explicit scope, permissions, memory, and
   activation. Registry topology and the missing vault scaffold are persisted
   without fabricating activity telemetry
-- **Windows desktop shell** — the existing command deck runs unchanged inside
+- **Windows desktop shell** - the existing command deck runs unchanged inside
   a hardened Electron window with a supervised loopback server, single-instance
   behavior, tray controls, launch-at-login, and approval-gated verified updates
-- **Summon with install-gate** — one click opens an admin terminal at the
+- **Summon with install-gate** - one click opens an admin terminal at the
   profile's trusted home folder and runs its persisted CLI trigger; a missing
   CLI is reported honestly and routes back to the reviewed Marketplace or
   official project page
-- **Gateway control** — start / stop / restart / status / run agents from the dashboard
-- **Health monitoring** — TCP probes, 24h uptime history, watchdog auto-restart (opt-in), desktop alerts when an agent goes down
-- **Task board** — send tasks to agents (written to the vault), mark them done
-- **Telemetry** — per-agent JSONL event streams: sessions, subagents, progress
-- **Neural Vault graph** — interactive force-directed graph of your vault's `[[wikilinks]]`
-- **Reports** — auto-generated vault + agent activity reports, saved back to the vault
-- **Scheduled-task panel** — see what Windows Task Scheduler will run and when
-- **Vault health** — last git commit age + last backup age, so you never lose the brain
+- **Gateway control** - start / stop / restart / status / run agents from the dashboard
+- **Health monitoring** - TCP probes, 24h uptime history, watchdog auto-restart (opt-in), desktop alerts when an agent goes down
+- **Task board** - send tasks to agents (written to the vault), mark them done
+- **Telemetry** - per-agent JSONL event streams: sessions, subagents, progress
+- **Neural Vault graph** - interactive force-directed graph of your vault's `[[wikilinks]]`
+- **Reports** - auto-generated vault + agent activity reports, saved back to the vault
+- **Scheduled-task panel** - see what Windows Task Scheduler will run and when
+- **Vault health** - last git commit age + last backup age, so you never lose the brain
 
 ## Requirements
 
@@ -129,7 +129,7 @@ npm run dev                     # builds the UI, then serves http://localhost:43
 ```
 
 After `npm install`, double-click **`start.cmd`** (or run
-`node bin/rempeyek-agent-os.mjs`) — it builds the UI if needed, starts the server,
+`node bin/rempeyek-agent-os.mjs`) - it builds the UI if needed, starts the server,
 and opens your browser.
 
 ### Build the Windows desktop package
@@ -221,7 +221,7 @@ has a `gateway` block:
 | `actions` | subset of `start,stop,restart,status,run` (empty = observability-only) |
 | `envAllow` | provider environment variables this gateway may receive |
 
-Agents without a gateway CLI (`actions: []`) still appear on the dashboard —
+Agents without a gateway CLI (`actions: []`) still appear on the dashboard -
 status comes from telemetry and their vault lane instead.
 
 ### The Start button (split dropdown)
@@ -236,19 +236,19 @@ stops headless/owned gateways but never closes your own CLI/TUI windows.
 ## Agent detail
 
 Click any agent card: **Sessions/Activity**, **Subagents/Tasks**, **Telemetry**,
-and **Vault lane — Brains/**. Claude Code activity is parsed from its transcripts;
+and **Vault lane - Brains/**. Claude Code activity is parsed from its transcripts;
 other agents report via `telemetry\<id>.jsonl` (one-liner helper: `report.cmd "task name" 50`
-— see `telemetry\README.md`).
+- see `telemetry\README.md`).
 
 For a primary profile, the `+` control opens the subagent form. Required fields are
 name, field/domain, concrete outcome, and workspace scope. Configured children are
 listed separately from observed telemetry, and only primary profiles can create
 children.
 
-## Memory — the Neural Vault graph
+## Memory - the Neural Vault graph
 
 The **Memory** tab renders a live force-directed graph of the `[[wikilinks]]`
-in your vault — pan, zoom, drag, search. Click a node to open it in Obsidian.
+in your vault - pan, zoom, drag, search. Click a node to open it in Obsidian.
 
 ## Security notes
 
@@ -260,5 +260,5 @@ in your vault — pan, zoom, drag, search. Click a node to open it in Obsidian.
 
 ## License
 
-MIT — see [LICENSE](LICENSE). Personal config (`agents.config.json`, `.env`) stays
+MIT - see [LICENSE](LICENSE). Personal config (`agents.config.json`, `.env`) stays
 local and git-ignored; start from the `.example` files.

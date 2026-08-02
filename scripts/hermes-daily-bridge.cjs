@@ -53,7 +53,7 @@ const block = [
   `## Auto-status ${stamp}`,
   '- Agent: Hermes 🟢',
   '- Source: agentic-os daily bridge',
-  `- Telemetry: \`telemetry/hermes.jsonl\` — heartbeat OK`,
+  `- Telemetry: \`telemetry/hermes.jsonl\` - heartbeat OK`,
   '- Vault: write OK',
   `- Node: Hermes CLI v0.18.0 · gateway running (native schtask)`,
   `- Obsidian lane: Brains/Hermes/Daily/${path.basename(file)}`,
@@ -67,7 +67,7 @@ if (fs.existsSync(file)) {
 } else {
   // Touch a new lane daily note with header
   fs.writeFileSync(file, [
-    '# Hermes Lane — Daily',
+    '# Hermes Lane - Daily',
     block,
     '',
   ].join('\n'), 'utf8');

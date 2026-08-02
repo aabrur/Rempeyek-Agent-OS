@@ -1,6 +1,6 @@
 # @rempeyek/agent-runtime
 
-**Extraction target — code lives in `apps/web` today.**
+**Extraction target - code lives in `apps/web` today.**
 
 Gateway controller: `gwCtl`/`gwRun`/`gwStop`, summoned admin terminals (pid-file/
 kill-file handshake), TCP probes, watchdog (3×/hour cap), uptime log, down alerts,

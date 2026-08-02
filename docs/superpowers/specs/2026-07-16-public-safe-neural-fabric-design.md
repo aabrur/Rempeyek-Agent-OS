@@ -69,8 +69,8 @@ The map must not copy the reference's fake metrics, fixed names, fabricated capa
 
 The projection uses two explicitly different layers:
 
-1. **Verified relationship layer** — interactive, typed, selectable edges generated only from accepted provenance records. These retain the current dependency, co-assignment, task, subagent, and communication semantics.
-2. **Neural fabric layer** — non-interactive structural filaments that visually bind registered agents into one constellation. These are low-contrast, have no arrowheads, do not appear in the relationship legend or evidence table, and are labelled decorative for assistive technology by being hidden from it.
+1. **Verified relationship layer** - interactive, typed, selectable edges generated only from accepted provenance records. These retain the current dependency, co-assignment, task, subagent, and communication semantics.
+2. **Neural fabric layer** - non-interactive structural filaments that visually bind registered agents into one constellation. These are low-contrast, have no arrowheads, do not appear in the relationship legend or evidence table, and are labelled decorative for assistive technology by being hidden from it.
 
 The highest-degree real agent remains the anchor when evidence exists. With zero evidence, the layout chooses a deterministic visual focus without marking it as an operational hub. Every remaining agent occupies a bounded elliptical orbit. There is no detached perimeter band.
 

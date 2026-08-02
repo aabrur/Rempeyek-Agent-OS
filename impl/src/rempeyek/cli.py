@@ -1,5 +1,5 @@
 """
-Rempeyek Agent OS — CLI entry point.
+Rempeyek Agent OS - CLI entry point.
 
 Provides the main command-line interface for all system commands.
 """
@@ -193,7 +193,7 @@ def cmd_obsidian(args: argparse.Namespace) -> dict:
 def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="rempeyek",
-        description="Rempeyek Agent OS — Unified AI Family System",
+        description="Rempeyek Agent OS - Unified AI Family System",
     )
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     parser.add_argument("--log-level", default="INFO", help="Log level (DEBUG, INFO, WARNING, ERROR)")

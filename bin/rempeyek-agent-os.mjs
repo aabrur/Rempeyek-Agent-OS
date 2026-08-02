@@ -34,12 +34,12 @@ const PORT = Number(portOverride || process.env.PORT || 4321);
 /* ---- prerequisites ---- */
 const major = Number(process.versions.node.split(".")[0]);
 if (major < 18) {
-  console.error(`Rempeyek Agent OS needs Node.js 18 or newer — you are running ${process.version}.`);
+  console.error(`Rempeyek Agent OS needs Node.js 18 or newer - you are running ${process.version}.`);
   process.exit(1);
 }
 
 if (!Number.isInteger(PORT) || PORT < 0 || PORT > 65535) {
-  console.error(`Invalid port: ${portOverride || process.env.PORT}. Must be 0–65535.`);
+  console.error(`Invalid port: ${portOverride || process.env.PORT}. Must be 0-65535.`);
   process.exit(1);
 }
 
@@ -134,7 +134,7 @@ async function runStatus() {
   const configDir = path.join(runtimeRoot, "Config");
   const manifestPath = path.join(configDir, "runtime-manifest.json");
 
-  console.log("\n  Rempeyek Agent OS — Status\n");
+  console.log("\n  Rempeyek Agent OS - Status\n");
   console.log(`  Runtime root:  ${runtimeRoot}`);
   console.log(`  Config dir:    ${configDir}`);
 
@@ -198,7 +198,7 @@ async function runExportData() {
     console.log(`  Config:  exported to ${configExport}`);
   }
 
-  // Export vault (metadata only — not massive session data)
+  // Export vault (metadata only - not massive session data)
   if (fs.existsSync(vaultPath)) {
     const vaultExport = path.join(exportDir, "Vault");
     copyDirRecursive(vaultPath, vaultExport, { maxDepth: 4, maxFileSize: 1024 * 1024 });

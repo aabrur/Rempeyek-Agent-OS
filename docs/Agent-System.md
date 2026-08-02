@@ -10,15 +10,15 @@ external CLI installation is tracked independently.
 
 ```jsonc
 {
-  "id": "nova",               // unique slug — telemetry filename, routes, accent key
+  "id": "nova",               // unique slug - telemetry filename, routes, accent key
   "name": "Nova",
   "icon": "🤖",               // emoji in nodes/cards
   "role": "Research agent",
   "node": "Node-17",          // topology label (auto-numbered on dashboard add)
   "lane": "Nova",             // vault Brains/<lane>/ folder → vault status detection
   "enabled": true,
-  "accent": "#55FFB8",        // optional — colors this agent across the whole UI
-  "owner": "native-service",  // optional — destructive actions require a confirm
+  "accent": "#55FFB8",        // optional - colors this agent across the whole UI
+  "owner": "native-service",  // optional - destructive actions require a confirm
   "note": "shown in detail + disabled tooltip",
   "gateway": {
     "bin": "nova-gateway",    // headless start/stop/restart/status command
@@ -37,27 +37,27 @@ external CLI installation is tracked independently.
 
 ## Ways to add an agent
 
-1. **Dashboard** — Marketplace or Agents view → **＋ ADD AGENT**. The reviewed
+1. **Dashboard** - Marketplace or Agents view → **＋ ADD AGENT**. The reviewed
    catalog can install supported software and optionally register its profile;
    custom registration validates the slug, auto-numbers the node, and writes an
    atomic registry backup. Optional trigger + home makes a trusted custom
    profile summonable immediately.
-2. **By hand** — edit `agents.config.json`; the server hot-reloads by mtime and shows a
+2. **By hand** - edit `agents.config.json`; the server hot-reloads by mtime and shows a
    banner (not a crash) if the JSON is broken mid-edit.
 
 ## Lifecycle & status
 
-- **Two independent axes** — `installed` describes external software;
+- **Two independent axes** - `installed` describes external software;
   `registered/enabled/active` describes the local profile. Registering does not
   claim software is installed, and removing a profile does not uninstall it.
-- **Settings lifecycle** — edit name/role/note, enable or disable a profile,
+- **Settings lifecycle** - edit name/role/note, enable or disable a profile,
   switch the single active profile, Remove, and Restore. Remove stores a
   restorable tombstone while retaining vault, telemetry, activity, workflows,
   logs, credentials, software, and user files.
-- **Parent safety** — primary removal is blocked while attached children exist.
+- **Parent safety** - primary removal is blocked while attached children exist.
   An explicit detach operation preserves each child and records its former
   parent; removal never cascades into child data.
-- **Advanced uninstall** — uninstall is distinct from profile removal, available
+- **Advanced uninstall** - uninstall is distinct from profile removal, available
   only for reviewed uninstall adapters, and requires two exact scoped approvals.
 - **Status resolution order:** dashboard-owned run process → live summoned terminal →
   gateway status/probe cache → recent telemetry (15 min) → `off`.
@@ -65,9 +65,9 @@ external CLI installation is tracked independently.
   trusted `trigger`. Marketplace installation uses server-owned reviewed
   adapters; request bodies never supply executable shell text. Stop uses a
   pid-file/kill-file handshake so no second UAC prompt is needed.
-- **Down detection** — running→down transitions write an alert note to the vault `Inbox/`
+- **Down detection** - running→down transitions write an alert note to the vault `Inbox/`
   (appears in Needs Review) + a Windows toast; optional watchdog restarts (max 3×/hour).
-- **Uptime** — every status poll appends to `telemetry/uptime.jsonl` → 24h uptime chips.
+- **Uptime** - every status poll appends to `telemetry/uptime.jsonl` → 24h uptime chips.
 
 ## Telemetry contract
 

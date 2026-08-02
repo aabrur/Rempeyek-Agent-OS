@@ -1,5 +1,5 @@
 ﻿"""
-Rempeyek Agent OS — Unified AI Family Runtime.
+Rempeyek Agent OS - Unified AI Family Runtime.
 
 A secure, local-first synchronization system that unifies multiple AI agents
 into a coordinated family with shared memory, skill management, and

@@ -326,7 +326,7 @@ export function AddAgentModal({
           </div>
           {validationAttempted && (!form.name.trim() || !validSlug(slug(idTouched ? form.id : form.name))) && (
             <small id="aaRequiredError" className="aa-field-hint aa-hint err" role="alert">
-              Enter a name and a valid 2–32 character slug.
+              Enter a name and a valid 2-32 character slug.
             </small>
           )}
           <div className="aa-field">

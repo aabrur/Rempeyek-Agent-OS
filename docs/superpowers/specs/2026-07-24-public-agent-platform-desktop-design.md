@@ -55,7 +55,7 @@ Those operations require separate authority where applicable.
    surface. Unsupported one-click installers show verified official instructions
    rather than executing a guessed command.
 4. A registered agent can be enabled, disabled, made active, edited, removed from
-   the registry, restored, or—when a vetted adapter exists—uninstalled.
+   the registry, restored, or-when a vetted adapter exists-uninstalled.
 5. Switching the active agent changes routing/default selection only. It does not
    mutate the previous agent's data or stop unrelated workflows.
 6. Removing an agent profile makes it disappear from active product surfaces but
@@ -149,14 +149,14 @@ flowchart LR
 
 The implementation extends existing files surgically and introduces:
 
-- `apps/web/lib/marketplace-manifest.mjs` — manifest schema, curated entries, and
+- `apps/web/lib/marketplace-manifest.mjs` - manifest schema, curated entries, and
   validation;
-- `apps/web/lib/agent-lifecycle.mjs` — pure installed/registered/active state and
+- `apps/web/lib/agent-lifecycle.mjs` - pure installed/registered/active state and
   allowed transitions;
-- `apps/web/lib/process-adapters.mjs` — typed program/argument resolution with no
+- `apps/web/lib/process-adapters.mjs` - typed program/argument resolution with no
   shell;
-- `apps/web/lib/subagent-record.mjs` — subagent validation and config/lane model;
-- `apps/web/lib/config-store.mjs` — serialized atomic config writes, backup, and
+- `apps/web/lib/subagent-record.mjs` - subagent validation and config/lane model;
+- `apps/web/lib/config-store.mjs` - serialized atomic config writes, backup, and
   tombstones;
 - focused server routes that delegate to those modules;
 - additions to existing `AddAgentModal`, `MarketplaceView`, `AgentDetail`, and
@@ -395,7 +395,7 @@ Advanced disclosure:
 - completion/checkpoint rule;
 - concise operating instructions.
 
-The server—not the form—generates the slug, node identity, timestamps, parent
+The server-not the form-generates the slug, node identity, timestamps, parent
 binding, and safe lane path. Provider credentials are referenced by environment
 variable name and never entered or returned as plain values.
 
@@ -498,16 +498,16 @@ separate:
 
 Existing endpoints remain compatible. Additions use focused commands:
 
-- `GET /api/marketplace` — safe manifest metadata plus derived state;
-- `GET /api/agents/lifecycle` — registered, software, active, and health axes;
-- `PATCH /api/agents/:id` — validated editable metadata or enabled state;
-- `POST /api/agents/:id/activate` — atomic active-pointer update;
-- `POST /api/agents/:id/remove` — approved profile removal and tombstone;
-- `POST /api/agents/:id/restore` — approved conflict-checked restoration;
-- `POST /api/agents/:id/uninstall` — double-approved vetted adapter;
-- `POST /api/agents/:id/subagents` — validated parent-bound creation;
-- `GET /api/settings/runtime` — redacted desktop/storage/update state;
-- `PATCH /api/settings/runtime` — allowlisted preference changes.
+- `GET /api/marketplace` - safe manifest metadata plus derived state;
+- `GET /api/agents/lifecycle` - registered, software, active, and health axes;
+- `PATCH /api/agents/:id` - validated editable metadata or enabled state;
+- `POST /api/agents/:id/activate` - atomic active-pointer update;
+- `POST /api/agents/:id/remove` - approved profile removal and tombstone;
+- `POST /api/agents/:id/restore` - approved conflict-checked restoration;
+- `POST /api/agents/:id/uninstall` - double-approved vetted adapter;
+- `POST /api/agents/:id/subagents` - validated parent-bound creation;
+- `GET /api/settings/runtime` - redacted desktop/storage/update state;
+- `PATCH /api/settings/runtime` - allowlisted preference changes.
 
 Mutation responses contain operation ID, final derived state, audit event, and
 bounded redacted output. They never echo commands, environment values, secrets,
@@ -723,7 +723,7 @@ feature branch. Publication and deployment remain a separate user-approved step.
 ## Final acceptance boundary
 
 “100% working” means every claimed supported path above has executable evidence:
-tests, build output, a live local flow, and—for the desktop claim—a clean-machine
+tests, build output, a live local flow, and-for the desktop claim-a clean-machine
 package smoke test. A marketplace entry whose official installer cannot be
 verified is delivered as an honest official-link integration, not described as
 one-click installable. Signing, public release creation, and remote publication

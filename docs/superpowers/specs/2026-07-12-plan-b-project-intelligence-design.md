@@ -42,7 +42,7 @@ brief generation, and event provenance.
 
 ### Interface designs considered
 
-#### A. Command/query interface — recommended
+#### A. Command/query interface - recommended
 
 ```js
 projects.query({ id })
@@ -165,14 +165,14 @@ fonts, stable semantic states, and primitive → semantic → component tokens.
 Users can switch between four maintained visual modes without changing the
 information architecture or feature behavior:
 
-1. **Minimalist** — quiet neutral surfaces, generous whitespace, almost no
+1. **Minimalist** - quiet neutral surfaces, generous whitespace, almost no
    glow, flat ledger rows, strong typography, and a thin Project Thread.
-2. **Brutalist** — hard contrast, squared geometry, visible grid, heavy labels,
+2. **Brutalist** - hard contrast, squared geometry, visible grid, heavy labels,
    minimal radius, and immediate state changes without ornamental motion.
-3. **Glassmorph** — translucent layered surfaces and restrained depth. Blur is
+3. **Glassmorph** - translucent layered surfaces and restrained depth. Blur is
    limited to fixed navigation, overlays, and small stationary hero shells;
    scrolling lists and large canvas regions never use backdrop blur.
-4. **Cyberpunk** — luxury soft-cyberpunk with controlled violet/cyan energy,
+4. **Cyberpunk** - luxury soft-cyberpunk with controlled violet/cyan energy,
    neural fibers, luminous active states, and the richest effects. It must not
    become a gamer HUD, hacker terminal, neon overload, or fake dashboard.
 
@@ -210,7 +210,7 @@ The **Cosmos Neural** visualization is built only from real Vault data:
 ### Existing Obsidian Graph Parity
 
 The existing Obsidian graph is the minimum functional and topology baseline.
-The Rempeyek renderer must handle the same full Vault graph—not a curated demo
+The Rempeyek renderer must handle the same full Vault graph-not a curated demo
 or a small sample. It preserves:
 
 - every readable Markdown note as a node;
@@ -229,9 +229,9 @@ visible, reversible, and report its effect on counts.
 
 The UI provides two render modes over the same graph dataset:
 
-1. **Obsidian Parity** — restrained monochrome rendering close to the existing
+1. **Obsidian Parity** - restrained monochrome rendering close to the existing
    Obsidian graph, optimized for auditing completeness and comparing topology.
-2. **Cosmos Neural** — a more expressive rendering with community colors,
+2. **Cosmos Neural** - a more expressive rendering with community colors,
    depth layers, curved neural fibers, focus bloom, recent-activity energy,
    and semantic particles. It may look more spectacular, but it cannot alter,
    hide, invent, or merge graph truth unless aggregation is explicitly enabled.
@@ -279,7 +279,7 @@ language.
 
 ## Motion
 
-- view settle: 160–180ms opacity + 4px transform;
+- view settle: 160-180ms opacity + 4px transform;
 - detail transition: 220ms opacity + 12px transform;
 - confirmed Project Thread/progress update: 320ms once;
 - status marker: restrained opacity breath only while truly running;

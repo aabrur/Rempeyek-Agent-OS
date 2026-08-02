@@ -1,4 +1,4 @@
-# Secrets — NEVER commit
+# Secrets - NEVER commit
 .env
 .env*.local
 
@@ -34,7 +34,7 @@ Thumbs.db
 Desktop.ini
 .DS_Store
 
-# Secrets / dumps — NEVER commit
+# Secrets / dumps - NEVER commit
 repomix-output.xml
 
 # Personal config & tooling

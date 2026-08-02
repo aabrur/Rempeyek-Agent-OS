@@ -30,42 +30,42 @@
 
 ### New pure/runtime modules
 
-- `apps/web/lib/marketplace-manifest.mjs` — reviewed agent/plugin/skill metadata and redacted public projection.
-- `apps/web/lib/process-adapters.mjs` — platform-specific fixed `program + argv` resolution and probe specification.
-- `apps/web/lib/managed-bundle.mjs` — collision-safe plugin/skill copy plans, SHA-256 receipts, and hash-aware removal.
-- `scripts/sync-hypertaks-bundle.mjs` — maintainer-only, commit-verifying vendor sync for the reviewed public bundle.
-- `marketplace/bundles/hypertaks-agent/` — public, offline-installable snapshot containing only the reviewed plugin manifest and Hypertaks skill tree.
-- `apps/web/lib/config-store.cjs` — atomic registry commit, one bounded backup, tombstones, and idempotent mutation IDs.
-- `apps/web/lib/agent-lifecycle.mjs` — independent state axes and allowed transitions.
-- `apps/web/lib/subagent-record.mjs` — parent-bound subagent validation and record construction.
+- `apps/web/lib/marketplace-manifest.mjs` - reviewed agent/plugin/skill metadata and redacted public projection.
+- `apps/web/lib/process-adapters.mjs` - platform-specific fixed `program + argv` resolution and probe specification.
+- `apps/web/lib/managed-bundle.mjs` - collision-safe plugin/skill copy plans, SHA-256 receipts, and hash-aware removal.
+- `scripts/sync-hypertaks-bundle.mjs` - maintainer-only, commit-verifying vendor sync for the reviewed public bundle.
+- `marketplace/bundles/hypertaks-agent/` - public, offline-installable snapshot containing only the reviewed plugin manifest and Hypertaks skill tree.
+- `apps/web/lib/config-store.cjs` - atomic registry commit, one bounded backup, tombstones, and idempotent mutation IDs.
+- `apps/web/lib/agent-lifecycle.mjs` - independent state axes and allowed transitions.
+- `apps/web/lib/subagent-record.mjs` - parent-bound subagent validation and record construction.
 
 ### New React components
 
-- `apps/web/src/components/AgentManagementPanel.jsx` — Settings lifecycle controls.
-- `apps/web/src/components/ConfirmAgentAction.jsx` — typed-name impact confirmation using the existing `Overlay`.
-- `apps/web/src/components/SubagentModal.jsx` — existing-style subagent creation form.
+- `apps/web/src/components/AgentManagementPanel.jsx` - Settings lifecycle controls.
+- `apps/web/src/components/ConfirmAgentAction.jsx` - typed-name impact confirmation using the existing `Overlay`.
+- `apps/web/src/components/SubagentModal.jsx` - existing-style subagent creation form.
 
 ### Existing files modified surgically
 
-- `apps/web/lib/agent-catalog.mjs` — compatibility builder backed by the new manifest; remove command strings.
-- `apps/web/server.js` — module wiring, adapter execution, registry routes, Marketplace projection, topology parent edges, and settings facts.
-- `apps/web/src/components/CatalogGrid.jsx` — kinds/compatibility/adapter IDs without command display.
-- `apps/web/src/components/AddAgentModal.jsx` — consume the redacted Marketplace contract.
-- `apps/web/src/views/MarketplaceView.jsx` — existing view gains kind filters and featured ordering.
-- `apps/web/src/views/SettingsView.jsx` — compose lifecycle management in the current stack.
-- `apps/web/src/components/AgentDetail.jsx` — add the existing-style `+` entry point and configured subagents.
-- `apps/web/src/hooks/useGateway.js` — reusable approval helper accepts a caller-provided confirmation function.
-- `apps/web/lib/agent-topology.mjs` — no algorithm change; consume persisted parent relations through the existing `subagents` input.
-- `apps/web/test/*.test.mjs` — focused model, store, adapter, API, and regression coverage.
-- `checkpoint.md` and configured vault checkpoint notes — phase evidence.
+- `apps/web/lib/agent-catalog.mjs` - compatibility builder backed by the new manifest; remove command strings.
+- `apps/web/server.js` - module wiring, adapter execution, registry routes, Marketplace projection, topology parent edges, and settings facts.
+- `apps/web/src/components/CatalogGrid.jsx` - kinds/compatibility/adapter IDs without command display.
+- `apps/web/src/components/AddAgentModal.jsx` - consume the redacted Marketplace contract.
+- `apps/web/src/views/MarketplaceView.jsx` - existing view gains kind filters and featured ordering.
+- `apps/web/src/views/SettingsView.jsx` - compose lifecycle management in the current stack.
+- `apps/web/src/components/AgentDetail.jsx` - add the existing-style `+` entry point and configured subagents.
+- `apps/web/src/hooks/useGateway.js` - reusable approval helper accepts a caller-provided confirmation function.
+- `apps/web/lib/agent-topology.mjs` - no algorithm change; consume persisted parent relations through the existing `subagents` input.
+- `apps/web/test/*.test.mjs` - focused model, store, adapter, API, and regression coverage.
+- `checkpoint.md` and configured vault checkpoint notes - phase evidence.
 
 ---
 
 ## Phase and checkpoint map
 
-- Phase A — Marketplace foundation: Tasks 1–3.
-- Phase B — Lifecycle and Settings: Tasks 4–8.
-- Phase C — Subagents and public closure: Tasks 9–11.
+- Phase A - Marketplace foundation: Tasks 1-3.
+- Phase B - Lifecycle and Settings: Tasks 4-8.
+- Phase C - Subagents and public closure: Tasks 9-11.
 
 At the end of Tasks 3, 8, and 11, before the listed commit:
 
@@ -1291,7 +1291,7 @@ export function filterMarketplace(entries = [], kind = "all") {
 export function marketplaceAction(entry, operationState = {}) {
   if (operationState.runningId) return {
     kind: "state",
-    label: operationState.runningId === entry.id ? "installing…" : "—",
+    label: operationState.runningId === entry.id ? "installing…" : "-",
     adapterId: null,
   };
   if (entry.registered && entry.installed) return { kind: "state", label: "✓ ready", adapterId: null };
@@ -1313,7 +1313,7 @@ Approval consequence says `Install the reviewed <adapterId> adapter for
 install route with entity ID and adapter ID. For external links, render an
 ordinary `<a>` using `officialUrl`.
 
-`MarketplaceView` adds three existing `Btn` controls—Agents, Plugins, Skills—
+`MarketplaceView` adds three existing `Btn` controls-Agents, Plugins, Skills-
 inside `SectionRow`; “All” is the initial state. Featured Hypertaks remains the
 first normal catalog card with an existing `Pill`/text marker, not a new hero.
 
@@ -1601,7 +1601,7 @@ states, provider variable names, and the 50 newest redacted error/event records.
 - Storage & Recovery: State root, Vault, Log folder, `.bak` state, tombstone
   count, Restore Backup, and Clear Logs impact confirmation.
 - Privacy & Execution: anonymous telemetry toggle (off by default), retention
-  selector 1–365 days, provider variable names/detected state, approval audit
+  selector 1-365 days, provider variable names/detected state, approval audit
   count, Download Diagnostics, and Reset UI Preferences.
 
 Reset UI Preferences removes only `aos-theme`, `aos-release-check`, and

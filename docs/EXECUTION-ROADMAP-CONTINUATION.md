@@ -1,8 +1,8 @@
-# Rempeyek Agent OS — Roadmap Eksekusi Lanjutan
+# Rempeyek Agent OS - Roadmap Eksekusi Lanjutan
 
 Tanggal: 2026-07-12  
 Pembaruan skill command: 2026-07-13
-Status: Stage A–F terlaksana dan diverifikasi pada 2026-07-13
+Status: Stage A-F terlaksana dan diverifikasi pada 2026-07-13
 
 Bukti rilis: [`docs/RELEASE-QA-REPORT.md`](./RELEASE-QA-REPORT.md)
 
@@ -68,11 +68,11 @@ Gunakan format Codex dengan awalan `$`, bukan slash command. Tulis skill pada aw
 
 Skill wajib pada **setiap sesi** roadmap:
 
-- Skill `$using-superpowers` — memilih dan menjalankan skill sebelum tindakan lain.
-- Skill `$hypertaks` — menetapkan kontrak, membagi perspektif, dan mengintegrasikan hasil.
-- Skill `$karpathy-guidelines` — menjaga asumsi eksplisit, perubahan surgical, dan success criteria terukur.
-- Skill `$ponytail` — memakai solusi minimum yang benar dan menghindari abstraction/dependency yang tidak perlu.
-- Skill `$verification-before-completion` — melarang klaim selesai tanpa bukti baru dari test, runtime, dan visual inspection.
+- Skill `$using-superpowers` - memilih dan menjalankan skill sebelum tindakan lain.
+- Skill `$hypertaks` - menetapkan kontrak, membagi perspektif, dan mengintegrasikan hasil.
+- Skill `$karpathy-guidelines` - menjaga asumsi eksplisit, perubahan surgical, dan success criteria terukur.
+- Skill `$ponytail` - memakai solusi minimum yang benar dan menghindari abstraction/dependency yang tidak perlu.
+- Skill `$verification-before-completion` - melarang klaim selesai tanpa bukti baru dari test, runtime, dan visual inspection.
 
 Contoh pembuka sesi Stage A yang siap dipakai:
 
@@ -90,20 +90,20 @@ Skill $image-to-code
 Kerjakan Stage A dari docs/EXECUTION-ROADMAP-CONTINUATION.md sampai acceptance criteria stage tersebut terbukti.
 ```
 
-### Stage A — Visual contract dan reference images
+### Stage A - Visual contract dan reference images
 
-**Skill sesi Stage A — gunakan berurutan:**
+**Skill sesi Stage A - gunakan berurutan:**
 
-- Skill `$brainstorming` — mengunci arah visual dan membandingkan alternatif sebelum generate.
-- Skill `$ui-ux-pro-max` — menghasilkan design-system recommendation dan aturan UX/accessibility.
-- Skill `$high-end-visual-design` — mengarahkan kualitas luxury cyberpunk, hierarchy, dan restraint.
-- Skill `$design-an-interface` — menyusun information hierarchy dan interface concept per layar.
-- Skill `$theme-factory` — mendefinisikan empat dunia visual yang konsisten.
-- Skill `$imagegen-frontend-web` — menghasilkan reference UI standalone per layar.
-- Skill `$imagegen` — membuat atau mengedit bitmap reference yang benar-benar diperlukan.
-- Skill `$image-to-code` — mewajibkan image-first → deep analysis → implementation handoff.
-- Skill `$frontend-design` — menerjemahkan reference menjadi layout, typography, spacing, dan motion spec.
-- Skill `$prompt-preflight-advice` — memeriksa prompt generation sebelum biaya/iterasi image digunakan.
+- Skill `$brainstorming` - mengunci arah visual dan membandingkan alternatif sebelum generate.
+- Skill `$ui-ux-pro-max` - menghasilkan design-system recommendation dan aturan UX/accessibility.
+- Skill `$high-end-visual-design` - mengarahkan kualitas luxury cyberpunk, hierarchy, dan restraint.
+- Skill `$design-an-interface` - menyusun information hierarchy dan interface concept per layar.
+- Skill `$theme-factory` - mendefinisikan empat dunia visual yang konsisten.
+- Skill `$imagegen-frontend-web` - menghasilkan reference UI standalone per layar.
+- Skill `$imagegen` - membuat atau mengedit bitmap reference yang benar-benar diperlukan.
+- Skill `$image-to-code` - mewajibkan image-first → deep analysis → implementation handoff.
+- Skill `$frontend-design` - menerjemahkan reference menjadi layout, typography, spacing, dan motion spec.
+- Skill `$prompt-preflight-advice` - memeriksa prompt generation sebelum biaya/iterasi image digunakan.
 
 1. Generate satu gambar standalone beresolusi besar untuk setiap layar utama.
 2. Generate empat reference tambahan untuk layar yang sama dalam Minimalist, Brutalist, Glassmorph, dan Cyberpunk.
@@ -112,19 +112,19 @@ Kerjakan Stage A dari docs/EXECUTION-ROADMAP-CONTINUATION.md sampai acceptance c
 
 **Acceptance criteria:** semua text dan controls dapat dibaca; satu visual hero per layar; tidak ada fake metrics, decorative graph, gamer HUD, nested-card spam, atau neon overload.
 
-### Stage B — Theme architecture completion
+### Stage B - Theme architecture completion
 
-**Skill sesi Stage B — gunakan berurutan:**
+**Skill sesi Stage B - gunakan berurutan:**
 
-- Skill `$design-system` — memisahkan semantic tokens, component tokens, dan structural-mode tokens.
-- Skill `$theme-factory` — menjaga identitas Minimalist, Brutalist, Glassmorph, dan Cyberpunk.
-- Skill `$minimalist-ui` — mengaudit struktur, density, dan material mode Minimalist.
-- Skill `$industrial-brutalist-ui` — mengaudit geometry, border, typography, dan contrast mode Brutalist.
-- Skill `$frontend-design` — menerapkan treatment Glassmorph dan Cyberpunk tanpa UI generik.
-- Skill `$ui-ux-pro-max` — memvalidasi contrast, focus, touch target, responsive, dan reduced motion.
-- Skill `$component-refactoring` — merapikan komponen hanya ketika perbedaan mode membutuhkan boundary nyata.
-- Skill `$frontend-testing` — menguji theme switching, persistence, dan rendering state.
-- Skill `$web-design-guidelines` — review akhir konsistensi dan usability setiap mode.
+- Skill `$design-system` - memisahkan semantic tokens, component tokens, dan structural-mode tokens.
+- Skill `$theme-factory` - menjaga identitas Minimalist, Brutalist, Glassmorph, dan Cyberpunk.
+- Skill `$minimalist-ui` - mengaudit struktur, density, dan material mode Minimalist.
+- Skill `$industrial-brutalist-ui` - mengaudit geometry, border, typography, dan contrast mode Brutalist.
+- Skill `$frontend-design` - menerapkan treatment Glassmorph dan Cyberpunk tanpa UI generik.
+- Skill `$ui-ux-pro-max` - memvalidasi contrast, focus, touch target, responsive, dan reduced motion.
+- Skill `$component-refactoring` - merapikan komponen hanya ketika perbedaan mode membutuhkan boundary nyata.
+- Skill `$frontend-testing` - menguji theme switching, persistence, dan rendering state.
+- Skill `$web-design-guidelines` - review akhir konsistensi dan usability setiap mode.
 
 1. Pisahkan semantic tokens dari structural mode tokens.
 2. Buat variasi density, typography scale, border system, elevation, navigation treatment, dan graph rendering per mode.
@@ -132,20 +132,20 @@ Kerjakan Stage A dari docs/EXECUTION-ROADMAP-CONTINUATION.md sampai acceptance c
 
 **Acceptance criteria:** screenshot grayscale tetap menunjukkan empat identitas berbeda melalui struktur, bukan hanya warna.
 
-### Stage C — Today dan Project Workspace redesign
+### Stage C - Today dan Project Workspace redesign
 
-**Skill sesi Stage C — gunakan berurutan:**
+**Skill sesi Stage C - gunakan berurutan:**
 
-- Skill `$brainstorming` — mengunci user journey “continue yesterday's work”.
-- Skill `$domain-modeling` — menjaga hubungan Project, Task, Decision, Artifact, Agent, dan Memory.
-- Skill `$design-an-interface` — menyusun wireframe serta interaction hierarchy Today dan Project Workspace.
-- Skill `$imagegen-frontend-web` — menghasilkan reference terpisah untuk Today dan Project Workspace.
-- Skill `$image-to-code` — menjaga fidelity implementasi terhadap reference yang disetujui.
-- Skill `$frontend-design` — membangun UI responsif dan premium tanpa nested-card spam.
-- Skill `$ui-ux-pro-max` — memvalidasi navigation, forms, loading, empty, error, offline, dan keyboard flow.
-- Skill `$tdd` — menulis contract test sebelum mengubah projection/API behavior.
-- Skill `$frontend-testing` — menguji state dan interaksi React.
-- Skill `$e2e-testing` — membuktikan workflow dari membuka Today hingga melanjutkan project.
+- Skill `$brainstorming` - mengunci user journey “continue yesterday's work”.
+- Skill `$domain-modeling` - menjaga hubungan Project, Task, Decision, Artifact, Agent, dan Memory.
+- Skill `$design-an-interface` - menyusun wireframe serta interaction hierarchy Today dan Project Workspace.
+- Skill `$imagegen-frontend-web` - menghasilkan reference terpisah untuk Today dan Project Workspace.
+- Skill `$image-to-code` - menjaga fidelity implementasi terhadap reference yang disetujui.
+- Skill `$frontend-design` - membangun UI responsif dan premium tanpa nested-card spam.
+- Skill `$ui-ux-pro-max` - memvalidasi navigation, forms, loading, empty, error, offline, dan keyboard flow.
+- Skill `$tdd` - menulis contract test sebelum mengubah projection/API behavior.
+- Skill `$frontend-testing` - menguji state dan interaksi React.
+- Skill `$e2e-testing` - membuktikan workflow dari membuka Today hingga melanjutkan project.
 
 1. Today menampilkan last active project, one next action, approvals, recent output, dan system health tanpa dashboard clutter.
 2. Project Workspace mendapat Overview, Tasks, Memory, Files, Decisions, dan Activity yang jelas.
@@ -153,21 +153,21 @@ Kerjakan Stage A dari docs/EXECUTION-ROADMAP-CONTINUATION.md sampai acceptance c
 
 **Acceptance criteria:** user dapat melanjutkan pekerjaan kemarin dalam maksimal dua interaksi tanpa membuka terminal atau membaca JSONL.
 
-### Stage D — Neural Vault Cosmos v2
+### Stage D - Neural Vault Cosmos v2
 
-**Skill sesi Stage D — gunakan berurutan:**
+**Skill sesi Stage D - gunakan berurutan:**
 
-- Skill `$obsidian` — memahami struktur Vault dan kompatibilitas Obsidian tanpa menyentuh `.obsidian/`.
-- Skill `$obsidian-vault` — memvalidasi notes, wikilinks, backlinks, index, dan folder nyata.
-- Skill `$graphify` — memetakan dependency parser, API, engine, Canvas, dan view sebelum refactor.
-- Skill `$imagegen-frontend-web` — menghasilkan reference Neural Vault Parity dan Cosmos sebagai gambar standalone.
-- Skill `$imagegen` — menghasilkan visual exploration cosmos jika bitmap reference diperlukan.
-- Skill `$algorithmic-art` — merancang seeded, deterministic particle/cluster behavior tanpa random dekoratif.
-- Skill `$hyperframes-animation` — memilih motion rule untuk heartbeat, task flow, focus, dan dependency.
-- Skill `$ui-ux-pro-max` — memvalidasi chart/graph accessibility, legend, keyboard, dan table parity.
-- Skill `$frontend-design` — menerjemahkan art direction ke Canvas/SVG/CSS yang implementable.
-- Skill `$test-driven-development` — menguji graph truth, stable layout inputs, tiers, dan fallback.
-- Skill `$frontend-testing` — menguji controls, mode switch, search, layers, dan reduced motion.
+- Skill `$obsidian` - memahami struktur Vault dan kompatibilitas Obsidian tanpa menyentuh `.obsidian/`.
+- Skill `$obsidian-vault` - memvalidasi notes, wikilinks, backlinks, index, dan folder nyata.
+- Skill `$graphify` - memetakan dependency parser, API, engine, Canvas, dan view sebelum refactor.
+- Skill `$imagegen-frontend-web` - menghasilkan reference Neural Vault Parity dan Cosmos sebagai gambar standalone.
+- Skill `$imagegen` - menghasilkan visual exploration cosmos jika bitmap reference diperlukan.
+- Skill `$algorithmic-art` - merancang seeded, deterministic particle/cluster behavior tanpa random dekoratif.
+- Skill `$hyperframes-animation` - memilih motion rule untuk heartbeat, task flow, focus, dan dependency.
+- Skill `$ui-ux-pro-max` - memvalidasi chart/graph accessibility, legend, keyboard, dan table parity.
+- Skill `$frontend-design` - menerjemahkan art direction ke Canvas/SVG/CSS yang implementable.
+- Skill `$test-driven-development` - menguji graph truth, stable layout inputs, tiers, dan fallback.
+- Skill `$frontend-testing` - menguji controls, mode switch, search, layers, dan reduced motion.
 
 1. Gunakan satu dataset untuk Parity dan Cosmos.
 2. Implement stable seeded layout, cluster gravity, semantic node sizing, progressive detail, dan meaningful particles.
@@ -176,20 +176,20 @@ Kerjakan Stage A dari docs/EXECUTION-ROADMAP-CONTINUATION.md sampai acceptance c
 
 **Acceptance criteria:** jumlah node/edge identik dengan API; 1.000 nodes tetap interaktif; mode reduced-motion tetap informatif; setiap efek mewakili state nyata.
 
-### Stage E — Agent Map v2
+### Stage E - Agent Map v2
 
-**Skill sesi Stage E — gunakan berurutan:**
+**Skill sesi Stage E - gunakan berurutan:**
 
-- Skill `$agentic-os` — menjaga lifecycle, gateway, summon, telemetry, dan runtime truth.
-- Skill `$graphify` — menelusuri sumber relationship serta consumer topology sebelum perubahan.
-- Skill `$ontology` — menetapkan tipe node, edge, provenance, status, dan confidence secara eksplisit.
-- Skill `$automation-workflows` — memodelkan task routing, approval, dependency, dan agent communication.
-- Skill `$design-an-interface` — menyusun topology interaction dan contextual detail panel.
-- Skill `$imagegen-frontend-web` — menghasilkan reference Agent Map standalone.
-- Skill `$hyperframes-animation` — memetakan pulse, flow, orbit, urgency, dan transition hanya ke state nyata.
-- Skill `$frontend-design` — mengimplementasikan visual hierarchy dan responsive fallback.
-- Skill `$ui-ux-pro-max` — mengaudit legend, color-not-only, keyboard navigation, tooltip, dan table fallback.
-- Skill `$tdd` — menolak fabricated edge dan menguji provenance-backed relationship.
+- Skill `$agentic-os` - menjaga lifecycle, gateway, summon, telemetry, dan runtime truth.
+- Skill `$graphify` - menelusuri sumber relationship serta consumer topology sebelum perubahan.
+- Skill `$ontology` - menetapkan tipe node, edge, provenance, status, dan confidence secara eksplisit.
+- Skill `$automation-workflows` - memodelkan task routing, approval, dependency, dan agent communication.
+- Skill `$design-an-interface` - menyusun topology interaction dan contextual detail panel.
+- Skill `$imagegen-frontend-web` - menghasilkan reference Agent Map standalone.
+- Skill `$hyperframes-animation` - memetakan pulse, flow, orbit, urgency, dan transition hanya ke state nyata.
+- Skill `$frontend-design` - mengimplementasikan visual hierarchy dan responsive fallback.
+- Skill `$ui-ux-pro-max` - mengaudit legend, color-not-only, keyboard navigation, tooltip, dan table fallback.
+- Skill `$tdd` - menolak fabricated edge dan menguji provenance-backed relationship.
 
 1. Layout mengikuti topology nyata, bukan orbit default.
 2. Edge memiliki provenance dan legend: dependency, task, subagent, communication, approval.
@@ -198,21 +198,21 @@ Kerjakan Stage A dari docs/EXECUTION-ROADMAP-CONTINUATION.md sampai acceptance c
 
 **Acceptance criteria:** setiap edge dapat ditelusuri ke config, telemetry, task, atau subagent record.
 
-### Stage F — Release verification
+### Stage F - Release verification
 
-**Skill sesi Stage F — gunakan berurutan:**
+**Skill sesi Stage F - gunakan berurutan:**
 
-- Skill `$verification-before-completion` — menjalankan seluruh bukti dari kondisi bersih sebelum status selesai.
-- Skill `$qa` — melakukan exploratory QA pada workflow utama dan edge cases.
-- Skill `$webapp-testing` — menguji aplikasi nyata melalui browser.
-- Skill `$e2e-testing` — menjalankan workflow lintas UI/API/runtime.
-- Skill `$frontend-testing` — menjalankan component dan interaction regression.
-- Skill `$audit-website` — mengaudit accessibility, performance, SEO dasar, dan UX quality.
-- Skill `$frontend-code-review` — mereview React, state, event, rendering, dan accessibility.
-- Skill `$backend-code-review` — mereview API, filesystem boundary, process execution, dan error handling.
-- Skill `$ponytail-audit` — menemukan complexity/debt baru yang tidak diperlukan.
-- Skill `$requesting-code-review` — meminta review terpisah setelah implementasi hijau.
-- Skill `$graphify` — memperbarui dan memverifikasi architecture graph setelah perubahan.
+- Skill `$verification-before-completion` - menjalankan seluruh bukti dari kondisi bersih sebelum status selesai.
+- Skill `$qa` - melakukan exploratory QA pada workflow utama dan edge cases.
+- Skill `$webapp-testing` - menguji aplikasi nyata melalui browser.
+- Skill `$e2e-testing` - menjalankan workflow lintas UI/API/runtime.
+- Skill `$frontend-testing` - menjalankan component dan interaction regression.
+- Skill `$audit-website` - mengaudit accessibility, performance, SEO dasar, dan UX quality.
+- Skill `$frontend-code-review` - mereview React, state, event, rendering, dan accessibility.
+- Skill `$backend-code-review` - mereview API, filesystem boundary, process execution, dan error handling.
+- Skill `$ponytail-audit` - menemukan complexity/debt baru yang tidak diperlukan.
+- Skill `$requesting-code-review` - meminta review terpisah setelah implementasi hijau.
+- Skill `$graphify` - memperbarui dan memverifikasi architecture graph setelah perubahan.
 
 1. Unit dan HTTP integration tests.
 2. Browser smoke dan keyboard navigation.

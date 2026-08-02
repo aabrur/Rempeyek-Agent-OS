@@ -10,7 +10,7 @@ export function marketplaceAction(entry, operationState = {}) {
   if (operationState.runningId) {
     return {
       kind: "state",
-      label: operationState.runningId === entry.id ? "installing…" : "—",
+      label: operationState.runningId === entry.id ? "installing…" : "-",
       adapterId: null,
     };
   }

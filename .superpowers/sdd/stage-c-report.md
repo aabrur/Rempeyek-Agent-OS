@@ -1,4 +1,4 @@
-# Stage C — Today and Project Workspace Redesign Report
+# Stage C - Today and Project Workspace Redesign Report
 
 Date: 2026-07-13
 Base commit: `4dbb2d7`

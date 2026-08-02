@@ -52,7 +52,7 @@ export function useGateway(agents, refresh) {
     setTimeout(refresh, act === "status" ? 200 : 900);
   }, [agents, approve, refresh]);
 
-  /** summon | start | run — opens an elevated terminal. */
+  /** summon | start | run - opens an elevated terminal. */
   const runTerminal = useCallback(async (id, mode) => {
     setBusy(key(id, mode));
     const approvalId = await approve("terminal.open", id, `Open an elevated ${mode} terminal for ${agents?.[id]?.name || id}.`);

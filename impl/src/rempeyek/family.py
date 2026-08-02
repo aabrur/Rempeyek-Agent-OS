@@ -105,7 +105,7 @@ def _ensure_node_dirs(node_id: str, node: dict) -> None:
 
 def render_markdown() -> Path:
     reg = load_registry()
-    lines = ["# AI Family", "", f"Registry schema v{reg['schema_version']} — {len(reg['nodes'])} nodes", "",
+    lines = ["# AI Family", "", f"Registry schema v{reg['schema_version']} - {len(reg['nodes'])} nodes", "",
              "| Node | Agent | Provider | Role | Status | Last Seen |",
              "|------|-------|----------|------|--------|-----------|"]
     for n in reg["nodes"]:

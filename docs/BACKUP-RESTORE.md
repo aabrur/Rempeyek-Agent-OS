@@ -12,15 +12,15 @@ Rempeyek Agent OS features an automated backup system powered by `backup-engine.
 The backup engine selectively archives critical state and index files:
 
 * **Configuration Manifests (`config`)**:
-  * `runtime-manifest.json` — Core runtime identity and version settings.
-  * `family-registry.json` — AI agent family definitions and catalog metadata.
-  * `project-registry.json` — Workspace registry and project topology configurations.
-  * `skills-registry.json` — Registered agent skills and capabilities.
-  * `migration-journal.json` — Historical database migration execution journal.
-  * `access-policy.json` — Role-based permissions and access policies.
+  * `runtime-manifest.json` - Core runtime identity and version settings.
+  * `family-registry.json` - AI agent family definitions and catalog metadata.
+  * `project-registry.json` - Workspace registry and project topology configurations.
+  * `skills-registry.json` - Registered agent skills and capabilities.
+  * `migration-journal.json` - Historical database migration execution journal.
+  * `access-policy.json` - Role-based permissions and access policies.
 * **Vault Indexes (`vault`)**:
-  * `Memory/Shared/index.json` — Shared memory index records.
-  * `Graph/Indexes/graph-index.json` — Vault knowledge graph linkage index.
+  * `Memory/Shared/index.json` - Shared memory index records.
+  * `Graph/Indexes/graph-index.json` - Vault knowledge graph linkage index.
 
 > [!IMPORTANT]
 > System backups do **NOT** archive application source code, node_modules, or raw workspace project files. These remain managed via standard version control (Git) or local project paths to keep backup archives fast, minimal, and deterministic.

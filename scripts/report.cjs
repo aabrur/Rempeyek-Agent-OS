@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/* ROADMAP #3 — one-liner progress reporting to telemetry (lower friction → panels get filled).
+/* ROADMAP #3 - one-liner progress reporting to telemetry (lower friction → panels get filled).
    Usage:   node scripts/report.cjs <id> "<name>" [progress 0-100] [detail...]
             node scripts/report.cjs <id> "<name>" --type <type> [detail...]
    Wrapper: report.cmd <id> "<name>" [progress|--type <type>] [detail...]

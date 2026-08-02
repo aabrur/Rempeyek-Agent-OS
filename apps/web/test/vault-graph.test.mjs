@@ -42,7 +42,7 @@ test('marks large datasets for reduced effects without removing graph truth', ()
   assert.equal(graph.metadata.aggregation, 'none');
 });
 
-test('non-markdown vault files become asset nodes — embeds resolve to them instead of ghosts', () => {
+test('non-markdown vault files become asset nodes - embeds resolve to them instead of ghosts', () => {
   const graph = buildVaultGraph({ files: [
     { rel: 'Assets/Images/cosmos-brain.png', mtime: 5 },
     { rel: '[SYSTEM OVERRIDE & SYNCHRONIZATION.txt', mtime: 4 },

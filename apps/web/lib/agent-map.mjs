@@ -5,7 +5,7 @@ const RELATIONS = [
   { type: "task_assignment", label: "Task assignment", description: "Verified task routing" },
   { type: "communication", label: "Communication", description: "Verified agent-to-agent message" },
 ];
-// Symmetric relations carry no arrowhead — direction would be a lie.
+// Symmetric relations carry no arrowhead - direction would be a lie.
 const SYMMETRIC = new Set(["co_assignment"]);
 const STATUSES = [
   { status: "disabled", label: "Disabled" },

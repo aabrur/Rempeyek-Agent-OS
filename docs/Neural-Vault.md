@@ -1,7 +1,7 @@
 # Neural Vault
 
 The Obsidian Vault (`Obsidian Vault/`, gitignored) is the OS's shared memory layer.
-Agents write markdown; the dashboard reads it live — no database in the loop.
+Agents write markdown; the dashboard reads it live - no database in the loop.
 
 ## Vault contract
 
@@ -15,7 +15,7 @@ Agents write markdown; the dashboard reads it live — no database in the loop.
 | `Reports/` | generated dashboard reports |
 
 Workspace folders hold `project.md` (frontmatter: `goal`, `progress`, `status`, `agents`),
-`decisions.md` (append-only log — the dashboard and the memory-capture poller write here),
+`decisions.md` (append-only log - the dashboard and the memory-capture poller write here),
 and `next.md` (the resume pointer that leads the Continue brief).
 
 The dashboard only ever writes inside `Tasks/`, `Reports/`, `Inbox/`, `Brains/<lane>/`,
@@ -26,13 +26,13 @@ and `Projects/<slug>/` workspaces.
 `buildGraph()` in `apps/web/server.js` scans every `.md` (symlink-safe, code blocks
 stripped) and emits four toggleable edge layers:
 
-- **link** — real `[[wikilinks]]` / `[](note.md)` between existing notes
-- **ghost** — wikilinks whose target doesn't exist yet
-- **tag** — note → `#tag` hub (star topology, honest counts)
-- **folder** — structural skeleton (note → folder → parent)
+- **link** - real `[[wikilinks]]` / `[](note.md)` between existing notes
+- **ghost** - wikilinks whose target doesn't exist yet
+- **tag** - note → `#tag` hub (star topology, honest counts)
+- **folder** - structural skeleton (note → folder → parent)
 
 Link resolution follows Obsidian's order: exact path → suffix match → sibling →
-shallowest — duplicate basenames don't orphan notes.
+shallowest - duplicate basenames don't orphan notes.
 
 `apps/web/public/graph.js` renders it: force-directed canvas, starfield, plasma halos
 by degree, neural shockwaves, signal particles on wikilinks. Click a node → opens the

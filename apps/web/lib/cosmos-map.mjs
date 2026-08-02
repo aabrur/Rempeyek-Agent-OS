@@ -1,4 +1,4 @@
-/* Cosmos agent map view-model — projects the verified agent topology onto the
+/* Cosmos agent map view-model - projects the verified agent topology onto the
    Neural Cosmos stage (900×620): a Neural Vault core orb at the center, agents on
    an elliptical orbit, curved glowing edges, deterministic stars.
 
@@ -45,7 +45,7 @@ export function curvePath(x1, y1, x2, y2) {
   return `M ${x1.toFixed(1)} ${y1.toFixed(1)} Q ${(mx + nx).toFixed(1)} ${(my + ny).toFixed(1)} ${x2.toFixed(1)} ${y2.toFixed(1)}`;
 }
 
-/** Deterministic LCG starfield — same seed math every render, no Math.random. */
+/** Deterministic LCG starfield - same seed math every render, no Math.random. */
 export function starField(width = COSMOS_WIDTH, height = COSMOS_HEIGHT, count = 130) {
   return Array.from({ length: count }, (_, i) => {
     const seed = (i * 9301 + 49297) % 233280;

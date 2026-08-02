@@ -14,7 +14,7 @@ Status: READY - VERSION 2.3.3 POST-RELEASE HARDENED
 - Agent Map excludes subagents and unintended custom records.
 - Neural Vault projects the approved Vault and active repository without broad PC or secret-store scanning.
 
-## Phase 1 — root cause and containment
+## Phase 1 - root cause and containment
 
 Status: completed
 
@@ -29,7 +29,7 @@ Status: completed
 - Backup: `%LOCALAPPDATA%\Rempeyek-Agent-OS\backups\test-agent-leak-2026-07-28T17-04-09-094Z`
 - Reconciled live state: 8 primary agents, 0 unintended Custom Agent records, 0 top-level subagents.
 
-## Phase 2 — lifecycle and Marketplace
+## Phase 2 - lifecycle and Marketplace
 
 Status: completed
 
@@ -43,7 +43,7 @@ Status: completed
 - An unchanged Rempeyek-generated launcher is removed after successful uninstall; user-modified launchers are preserved.
 - Marketplace shows `Register to Rempeyek Agent OS` for installed but unregistered agents.
 
-## Phase 3 — Add Agent, profile controls, and ownership
+## Phase 3 - Add Agent, profile controls, and ownership
 
 Status: completed
 
@@ -56,7 +56,7 @@ Status: completed
 - Stop is enabled only for a stoppable owned process, summoned terminal, or native service.
 - Top-level state, process list, lifecycle, topology, and process-control routes exclude spawned subagents.
 
-## Phase 4 — Agent Map and Neural Vault
+## Phase 4 - Agent Map and Neural Vault
 
 Status: completed
 
@@ -68,7 +68,7 @@ Status: completed
 - Dataset identity is stable when source files do not change.
 - Security boundary: no whole-PC scan, credentials, browser profiles, wallets, `.env`, or secret stores.
 
-## Phase 5 — operational synchronization prompt
+## Phase 5 - operational synchronization prompt
 
 Status: completed
 

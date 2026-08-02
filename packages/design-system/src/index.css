@@ -1,4 +1,4 @@
-/* @rempeyek/design-system — the neural command deck stylesheet.
+/* @rempeyek/design-system - the neural command deck stylesheet.
    Base :root values are fallbacks; four structural modes override them and
    re-tune these tokens (see @rempeyek/theme-engine → themes.css).
    Every accent in the app flows from --acc via color-mix().
@@ -39,7 +39,7 @@
   --mono: "Cascadia Mono", "Cascadia Code", Consolas, monospace;
   --disp: Bahnschrift, "Segoe UI Semibold", "Segoe UI", sans-serif;
   --hero: Bahnschrift, "Segoe UI Variable Display", "Segoe UI Semibold", sans-serif;
-  --acc: #00E5FF; /* active accent — themes override this + the palette below */
+  --acc: #00E5FF; /* active accent - themes override this + the palette below */
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -59,7 +59,7 @@ body {
 
 /* background: grid + glow, static, does not capture the pointer */
 .bg-grid, .bg-glow { position: fixed; inset: 0; pointer-events: none; z-index: 0; }
-/* vortex flow-field canvas — mounted by React between the glow layers and the shell */
+/* vortex flow-field canvas - mounted by React between the glow layers and the shell */
 .bg-vortex { position: fixed; inset: 0; pointer-events: none; z-index: 0; opacity: .5; }
 .bg-grid {
   background:
@@ -74,7 +74,7 @@ body {
     radial-gradient(700px 360px at 85% -5%, color-mix(in srgb, var(--acc) 12%, transparent), transparent 65%),
     radial-gradient(600px 400px at -5% 100%, rgba(255, 61, 216, .10), transparent 65%);
 }
-/* drifting nebula plasma — two soft clouds slowly orbiting behind everything */
+/* drifting nebula plasma - two soft clouds slowly orbiting behind everything */
 .bg-glow::before {
   content: ""; position: absolute; inset: -20%;
   background:
@@ -640,7 +640,7 @@ body {
 *::-webkit-scrollbar-thumb:hover { background: var(--violet); }
 *::-webkit-scrollbar-track { background: transparent; }
 
-/* ---------------- COSMOS theme layer (overrides — keep last) ---------------- */
+/* ---------------- COSMOS theme layer (overrides - keep last) ---------------- */
 /* hero typography: Orbitron carries the cosmos identity on big display text only;
    small UI stays Bahnschrift so nothing wraps or crowds */
 .page-head h1 {
@@ -699,7 +699,7 @@ body {
 
 /* ---------------- add-agent modal ---------------- */
 .aa-box { width: min(820px, calc(100vw - 24px)); max-height: min(820px, calc(100dvh - 24px)); overflow-y: auto; overscroll-behavior: contain; }
-/* ＋ Add Agent — curated catalog grid (install path) above the custom form */
+/* ＋ Add Agent - curated catalog grid (install path) above the custom form */
 .aa-catalog { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 10px 0 4px; }
 .aa-cat-card {
   display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center;
@@ -761,7 +761,7 @@ body {
   .aa-actions .aa-hint { flex: 1 1 100%; margin-right: 0 !important; }
 }
 
-/* Update banner — silent unless GitHub has a strictly newer release */
+/* Update banner - silent unless GitHub has a strictly newer release */
 .update-banner {
   margin: 0 0 12px; padding: 10px 14px;
   background: var(--card); border: var(--surface-border-width) var(--surface-border-style) var(--acc);
@@ -856,7 +856,7 @@ body {
 .ws-continue { font-size: 13px; padding: 11px 22px; letter-spacing: .16em; }
 .ws-last { font-family: var(--mono); font-size: 10.5px; color: var(--muted); margin-top: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-/* progress rail — hero variant carries the one orchestrated motion moment (scan sweep) */
+/* progress rail - hero variant carries the one orchestrated motion moment (scan sweep) */
 .ws-prog { position: relative; height: 6px; border-radius: 999px; background: rgba(255, 255, 255, .07); overflow: hidden; margin: 8px 0 7px; }
 .ws-prog i {
   display: block; height: 100%; border-radius: 999px;

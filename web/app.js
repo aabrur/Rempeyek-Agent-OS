@@ -1,5 +1,5 @@
 /**
- * Rempeyek Agent OS — Web Application & Card Component Interactivity
+ * Rempeyek Agent OS - Web Application & Card Component Interactivity
  */
 
 // 21 Built-in Agents Dataset

@@ -1,4 +1,4 @@
-# Agentic OS Telemetry — progress reporting protocol
+# Agentic OS Telemetry - progress reporting protocol
 
 Any agent can report its work progress to the dashboard by **appending** one JSON line
 to `agentic-os\telemetry\<agent-id>.jsonl` (ids: `claude-code`, `hermes`, `openclaw`,
@@ -15,12 +15,12 @@ Format, one event per line:
 ```
 
 - `type`: `task_start` | `task_progress` | `task_done` | `subagent_start` | `subagent_done` | `info`
-- `progress`: optional, 0–100.
+- `progress`: optional, 0-100.
 - The dashboard reads the last 30 events per agent (agent detail → TELEMETRY).
 - **Claude Code** is special: the dashboard also reads its session transcripts directly
   from `.claude\projects\` (active sessions, last tool, subagent spawns) without this file.
 
-## The easy way — the `report` helper (recommended)
+## The easy way - the `report` helper (recommended)
 
 Instead of writing JSONL by hand, use the one-liner wrapper in the repo root:
 

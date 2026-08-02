@@ -63,8 +63,8 @@ test("returns an explicit empty state", () => {
 
 test("preserves real legacy decision history as context without making it actionable", () => {
   const decisions = legacyDecisionContext("apollo", [
-    "2026-07-10 — Keep the local-first runtime.",
-    "2026-07-11 — Use the Vault as shared memory.",
+    "2026-07-10 - Keep the local-first runtime.",
+    "2026-07-11 - Use the Vault as shared memory.",
   ]);
   const result = buildTodayProjection([{
     id: "apollo",

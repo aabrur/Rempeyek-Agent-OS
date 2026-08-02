@@ -1,4 +1,4 @@
-# Plan B — Project Intelligence Workspace Implementation Plan
+# Plan B - Project Intelligence Workspace Implementation Plan
 
 > Approved by founder on 2026-07-12. Implement incrementally; never write to the real Obsidian Vault during tests.
 

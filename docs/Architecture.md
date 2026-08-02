@@ -39,17 +39,17 @@ Fresh browser and desktop installations default private state to
 |---|---|
 | `npm install` | installs React/Vite, links the workspace packages |
 | `npm run dev` | builds the frontend, then starts the server on :4321 |
-| `npm run ui` | Vite dev server on :5173 (HMR), proxying `/api` → :4321 — run `npm run server` alongside |
+| `npm run ui` | Vite dev server on :5173 (HMR), proxying `/api` → :4321 - run `npm run server` alongside |
 | `npm run build` | emits `apps/web/dist/` |
 | `npm run desktop:dev` | starts the Electron shell against an owned local server |
 | `npm run desktop:pack` | creates an unpacked Windows test application |
 | `npm run desktop:dist` | creates unsigned Windows x64 NSIS and portable test artifacts |
 
-The **server itself stays dependency-free** — React/Vite are frontend-only. `server.js`
+The **server itself stays dependency-free** - React/Vite are frontend-only. `server.js`
 serves `dist/`, falling back to `public/`; `/avatars/*` always comes from `public/`, so
 runtime uploads survive a rebuild.
 
-## apps/desktop — native boundary
+## apps/desktop - native boundary
 
 Electron main owns the desktop lifecycle. It starts exactly one Node child from
 the packaged `apps/web` control plane on an operating-system-assigned loopback
@@ -89,21 +89,21 @@ SHA-512 update metadata all pass. Release actions are full-SHA pinned, signing
 secrets are step-scoped, prerelease tags cannot become stable latest, and an
 expiring exact advisory fingerprint rejects dependency-audit drift.
 
-## apps/web — the backend
+## apps/web - the backend
 
 One HTTP server (`server.js`, ~1300 lines, Node core modules only):
 
 - **Static serving** of `dist/` → `public/`, with a traversal guard and SPA fallback.
-- **`/api/state`** — the main poll: vault stats, agents (+ proc/term/uptime/avatar), review items, projects.
-- **Gateway control** — `/api/proc/:id/(start|stop|restart|status|run|terminal|stop-term)` runs each
+- **`/api/state`** - the main poll: vault stats, agents (+ proc/term/uptime/avatar), review items, projects.
+- **Gateway control** - `/api/proc/:id/(start|stop|restart|status|run|terminal|stop-term)` runs each
   agent's real gateway CLI; summoned terminals use a pid-file/kill-file handshake (see
   [Agent-System](Agent-System.md)).
-- **`/api/graph`** — Neural Vault graph built from the vault markdown (see [Neural-Vault](Neural-Vault.md)).
-- **`/api/agents/add`** — registers a new agent into `agents.config.json` (backup + cache invalidation).
-- **Reports, tasks, schedule, vault-health** — see the endpoint dispatch block in `server.js`.
-- **Auth** — header-only `x-dash-token`, constant-time compare, localhost bypass.
+- **`/api/graph`** - Neural Vault graph built from the vault markdown (see [Neural-Vault](Neural-Vault.md)).
+- **`/api/agents/add`** - registers a new agent into `agents.config.json` (backup + cache invalidation).
+- **Reports, tasks, schedule, vault-health** - see the endpoint dispatch block in `server.js`.
+- **Auth** - header-only `x-dash-token`, constant-time compare, localhost bypass.
 
-## apps/web — the frontend (React)
+## apps/web - the frontend (React)
 
 ```
 src/
@@ -122,7 +122,7 @@ src/
 └── views/                   # CommandCenter, AgentsView, SimpleViews
 ```
 
-The canvas graph engine stays **imperative** — `NeuralGraphCanvas` wraps
+The canvas graph engine stays **imperative** - `NeuralGraphCanvas` wraps
 `@rempeyek/neural-engine`, which owns the canvas and its own RAF loop; React only
 feeds it data, layer toggles, and the query. That's deliberate: a 60fps physics
 simulation has no business re-rendering through React.
@@ -138,11 +138,11 @@ Dashboard  ──(write)──> Vault Tasks/, Reports/, Inbox/ (alerts), agents.
 
 ## Design constraints
 
-1. **The server stays dependency-free** — `node apps/web/server.js` must run with no
+1. **The server stays dependency-free** - `node apps/web/server.js` must run with no
    `node_modules`. Build tooling is frontend-only.
-2. **The filesystem is the source of truth** — no database, no cloud store. (A Supabase
+2. **The filesystem is the source of truth** - no database, no cloud store. (A Supabase
    mirror was prototyped and removed; see [MCP](MCP.md).)
-3. **The vault is sacred** — the dashboard only appends/edits inside `Tasks/`, `Reports/`,
+3. **The vault is sacred** - the dashboard only appends/edits inside `Tasks/`, `Reports/`,
    `Inbox/`, and `Brains/<lane>/`; it never restructures the vault.
-4. **Styling flows from tokens** — components render design-system class names; no
+4. **Styling flows from tokens** - components render design-system class names; no
    per-component CSS, no inline colors outside `--ac`/`--tile-c` locals.

@@ -1,5 +1,5 @@
 ﻿"""
-Rempeyek Agent OS — Session lifecycle management.
+Rempeyek Agent OS - Session lifecycle management.
 
 Handles session creation, tracking, completion, interruption detection,
 and handoff generation for cross-agent continuity.

@@ -1,5 +1,5 @@
 /* Pure, testable telemetry + relationship helpers for the agent-detail screen and the
-   Agent Map. No fs, no process globals — server.js supplies the raw text/events and these
+   Agent Map. No fs, no process globals - server.js supplies the raw text/events and these
    functions shape them. Extracted from server.js so Stage 1/2 logic is unit-testable
    (the server module itself never binds under `node --test`). */
 
@@ -80,7 +80,7 @@ export function telemetryActivity(events) {
 /* agentNameIndex: normalized display-name / id / lane → canonical agent id. Task lines address
    agents by human name ("Kilo Code"), the registry keys them by id ("kilo-code"); this bridges
    the two without guessing. Agents not in the registry (e.g. a retired "Copilot CLI") resolve to
-   null and are dropped — that is the honest outcome, not an error. */
+   null and are dropped - that is the honest outcome, not an error. */
 function agentNameIndex(agents) {
   const norm = s => String(s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
   const index = new Map();
@@ -93,17 +93,17 @@ function agentNameIndex(agents) {
   return { resolve: raw => index.get(norm(raw)) || null };
 }
 
-/* triggerExe: the bare executable a gateway is summoned/probed by — the first token of `trigger`
+/* triggerExe: the bare executable a gateway is summoned/probed by - the first token of `trigger`
    (or of `bin` as a fallback). Drives the installed-state probe: a path is checked with existsSync,
    a bare name with `where`. Returns "" when nothing is configured (a dashboard-added agent with no
-   gateway yet) — which the probe reads as "not installed", routing the user to the install flow. */
+   gateway yet) - which the probe reads as "not installed", routing the user to the install flow. */
 export function triggerExe(gateway) {
   const g = gateway || {};
   const raw = g.trigger || (g.bin ? String(g.bin) : "");
   return String(raw).trim().split(/\s+/)[0] || "";
 }
 
-/* laneScaffold: the canonical Brains/<Lane>/ shape from the vault constitution — Identity, Memory,
+/* laneScaffold: the canonical Brains/<Lane>/ shape from the vault constitution - Identity, Memory,
    Rules + empty Knowledge/ and Notes/. Returned as entries so the server writes only what's missing
    (never clobbering a real brain). Pure, so the templates are unit-tested. */
 export function laneScaffold(name, { node = "", icon = "🤖", date = "" } = {}) {
@@ -122,7 +122,7 @@ const WORKSPACE_RE = /Projects\/([a-z0-9][a-z0-9-]*)\//i;
 const RESUME_RE = /Resume project:\s*([^-·\n]+?)\s*(?:[-·]|$)/i;
 
 /* coAssignments: two agents assigned to the same project/workspace are a *verified* working
-   relationship — provenance is the exact vault task line. This is the one honest source of
+   relationship - provenance is the exact vault task line. This is the one honest source of
    agent↔agent edges the system has today (no agent has yet reported a directed task/subagent/
    comm to another agent). Symmetric: emitted as sorted unordered pairs, deduped per project.
    `taskFiles` = [{ rel, text }] from the vault Tasks/ walk. */
@@ -140,7 +140,7 @@ export function coAssignments(taskFiles, agents) {
       if (ws) { key = ws[1].toLowerCase(); label = rp ? rp[1].trim() : ws[1]; }
       else if (rp) { key = "name:" + rp[1].toLowerCase().replace(/[^a-z0-9]/g, ""); label = rp[1].trim(); }
       if (!key) continue;   // only shared, identifiable projects can co-assign
-      const seg = body.split(/\s+[-—·]\s+/);   // "title - AGENT - date …"
+      const seg = body.split(/\s+[--·]\s+/);   // "title - AGENT - date …"
       if (seg.length < 2) continue;
       const assignees = seg[1].split(/[\/,&]| dan | and /i).map(resolve).filter(Boolean);
       if (!assignees.length) continue;

@@ -4,7 +4,7 @@ The visual constitution of REMPEYEK AGENT OS. Every UI change is measured agains
 
 ## Identity
 
-**Neural Cosmos** — a living command deck floating over a dim cosmos. Luxury cyberpunk,
+**Neural Cosmos** - a living command deck floating over a dim cosmos. Luxury cyberpunk,
 organic intelligence, Apple-grade restraint. The interface should feel like a premium
 instrument, not a game HUD.
 
@@ -15,15 +15,15 @@ motherboards, robots, literal brain illustrations.
 
 | Role | Face | Usage |
 |---|---|---|
-| Hero / display | **Orbitron** (900/700, fallback Bahnschrift) | page titles, brand, big numbers — gradient-filled, used sparingly |
+| Hero / display | **Orbitron** (900/700, fallback Bahnschrift) | page titles, brand, big numbers - gradient-filled, used sparingly |
 | UI | **Bahnschrift / Segoe UI Semibold** | buttons, nav, names |
-| Data | **Cascadia Mono** | labels, chips, logs, timestamps — uppercase + letter-spacing for eyebrows |
+| Data | **Cascadia Mono** | labels, chips, logs, timestamps - uppercase + letter-spacing for eyebrows |
 
 Rule: Orbitron only on display-size text. Small UI stays Bahnschrift so nothing crowds.
 
 ## Color
 
-One master accent (`--acc`) drives the whole deck through `color-mix()` — glows,
+One master accent (`--acc`) drives the whole deck through `color-mix()` - glows,
 borders, gradients, active states. Surfaces are a five-step dark stack
 (`--bg → --panel → --card → --card-hi → --line`). Semantic colors (lime=running,
 amber=waiting, red=error, muted=idle) never change meaning across themes.
@@ -33,10 +33,10 @@ See [Theme-System.md](Theme-System.md).
 
 ## Surfaces & depth
 
-Glass panels: translucent card gradients + `backdrop-filter: blur(7–10px)` over the
+Glass panels: translucent card gradients + `backdrop-filter: blur(7-10px)` over the
 living cosmos backdrop, hairline `--line` borders, soft accent glows
-(`box-shadow: 0 0 Npx color-mix(...)`). Radius scale: 7px (controls) · 9–10px (rows,
-boxes) · 12–14px (panels, cards).
+(`box-shadow: 0 0 Npx color-mix(...)`). Radius scale: 7px (controls) · 9-10px (rows,
+boxes) · 12-14px (panels, cards).
 
 ## Motion
 
@@ -51,9 +51,9 @@ always visible (`:focus-visible` outline in accent).
 
 ## Layout
 
-8pt-ish grid (gaps 6/8/10/14px, panel padding 14–16px). Auto-fit card grids
+8pt-ish grid (gaps 6/8/10/14px, panel padding 14-16px). Auto-fit card grids
 (`minmax(215px, 1fr)`). One clear hierarchy per view: eyebrow label → display title →
-meta line → content. Whitespace is part of the design — don't fill every corner.
+meta line → content. Whitespace is part of the design - don't fill every corner.
 
 ## Writing in the UI
 

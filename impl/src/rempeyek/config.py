@@ -1,5 +1,5 @@
 ﻿"""
-Rempeyek Agent OS — Config management.
+Rempeyek Agent OS - Config management.
 
 Creates and manages default configuration files for the system.
 """

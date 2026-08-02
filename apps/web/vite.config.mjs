@@ -5,7 +5,7 @@ import react from "@vitejs/plugin-react";
 const pkg = p => fileURLToPath(new URL(`../../packages/${p}`, import.meta.url));
 
 /* Dev:   vite (5173) proxies /api + /avatars to the Node server (4321).
-   Build: emits ./dist, which server.js serves directly — one origin, no proxy.
+   Build: emits ./dist, which server.js serves directly - one origin, no proxy.
 
    The @rempeyek/* aliases point at package SOURCE, not the node_modules symlinks
    workspaces create. Without them Vite treats the packages as prebundled deps and

@@ -1,4 +1,4 @@
-/* API client. Never throws — always resolves to an object, {error} on failure.
+/* API client. Never throws - always resolves to an object, {error} on failure.
    401 → the caller shows the token overlay (see App). */
 let TOKEN = "";
 try { TOKEN = localStorage.getItem("dashToken") || ""; } catch {}

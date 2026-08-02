@@ -1,4 +1,4 @@
-# Stage E — Agent Map v2 Report
+# Stage E - Agent Map v2 Report
 
 Date: 2026-07-13
 Base commit: `ee50b66`

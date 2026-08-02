@@ -1,8 +1,8 @@
-/* Release/update checking — pure logic shared by the server (/api/version repo slug) and the
+/* Release/update checking - pure logic shared by the server (/api/version repo slug) and the
    client update banner (semver compare). Malformed input NEVER claims an update: a garbage tag or
    version compares as equal, so the banner stays silent instead of nagging or lying. */
 
-/* parseRepoUrl: owner/repo from a GitHub remote URL (https or ssh, optional .git). GitHub only —
+/* parseRepoUrl: owner/repo from a GitHub remote URL (https or ssh, optional .git). GitHub only -
    the update banner queries the GitHub Releases API, so other hosts return null (no check). */
 export function parseRepoUrl(remote) {
   const m = String(remote || "").trim().match(/github\.com[/:]([^/\s]+)\/([^/\s]+?)(?:\.git)?$/i);

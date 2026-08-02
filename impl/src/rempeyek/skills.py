@@ -1,5 +1,5 @@
 ﻿"""
-Rempeyek Agent OS — Skills synchronization engine.
+Rempeyek Agent OS - Skills synchronization engine.
 
 Discovers, validates, and synchronizes skills from the central skill warehouse
 to agent-specific skill directories with capability matching and rollback support.

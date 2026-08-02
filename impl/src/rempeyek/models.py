@@ -1,5 +1,5 @@
 ﻿"""
-Rempeyek Agent OS — Data models, schemas, and validation.
+Rempeyek Agent OS - Data models, schemas, and validation.
 
 Pydantic-based models for registries, sessions, handoffs, memory,
 skills, graph nodes/edges, and commands.

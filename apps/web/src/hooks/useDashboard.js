@@ -5,7 +5,7 @@ import { setVaultAbs } from "../lib/obsidian";
 const visible = () => document.visibilityState === "visible";
 
 /** The main /api/state poll (6s, paused while the tab is hidden).
-    Also keeps the NETWORK LOAD rolling buffer — it advances every poll,
+    Also keeps the NETWORK LOAD rolling buffer - it advances every poll,
     even when the state itself didn't change. */
 export function useDashboard() {
   const [state, setState] = useState(null);

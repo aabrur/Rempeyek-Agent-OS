@@ -28,7 +28,7 @@
   --theme-orbitron:"Orbitron",Bahnschrift,"Segoe UI",sans-serif;
   --theme-rajdhani:"Rajdhani","Segoe UI",sans-serif;
   --theme-jbmono:"JetBrains Mono","Cascadia Mono",Consolas,monospace;
-  /* cosmos agent map — canon values are the Cyberpunk Cosmos donor palette */
+  /* cosmos agent map - canon values are the Cyberpunk Cosmos donor palette */
   --cosmos-canvas:#030918; --cosmos-canvas-mid:#07122a;
   --cosmos-panel:rgba(3,9,24,.92); --cosmos-line:rgba(0,212,255,.1);
   --cosmos-node-fill:#060f25; --cosmos-ink:#e0f0ff; --cosmos-name:#d4eeff;

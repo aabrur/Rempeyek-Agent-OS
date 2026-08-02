@@ -1,4 +1,4 @@
-# Stage B — Structural Theme Architecture Report
+# Stage B - Structural Theme Architecture Report
 
 Date: 2026-07-13
 Branch: `codex/roadmap-continuation`
@@ -147,7 +147,7 @@ The final DOM review found that several legacy design-system selectors still byp
 - ThemePicker dot and selected-state shadows;
 - project agent-dot shadows.
 
-Minimalist maps these components to solid fills and quiet rules with no box/text shadow or animated scan. Brutalist maps them to solid fills and optional hard one-to-three-pixel offset shadows only—never gradient or blurred glow. Glassmorph and Cyberpunk retain their prior luminous behavior through the default semantic profile. Existing status text, labels, icons, and borders remain unchanged, preserving non-color cues.
+Minimalist maps these components to solid fills and quiet rules with no box/text shadow or animated scan. Brutalist maps them to solid fills and optional hard one-to-three-pixel offset shadows only-never gradient or blurred glow. Glassmorph and Cyberpunk retain their prior luminous behavior through the default semantic profile. Existing status text, labels, icons, and borders remain unchanged, preserving non-color cues.
 
 ### DOM effect verification
 

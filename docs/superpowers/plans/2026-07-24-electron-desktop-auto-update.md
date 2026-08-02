@@ -33,38 +33,38 @@
 
 ### New desktop workspace
 
-- `apps/desktop/package.json` — pinned runtime/dev dependencies, desktop scripts, electron-builder config.
-- `apps/desktop/main.mjs` — app lifecycle, BrowserWindow, single instance, tray, IPC registration.
-- `apps/desktop/preload.mjs` — narrow `contextBridge` API.
-- `apps/desktop/server-process.mjs` — child server startup, ready IPC, timeout, and shutdown.
-- `apps/desktop/desktop-settings.mjs` — atomic native preferences.
-- `apps/desktop/update-service.mjs` — injected `electron-updater` state machine.
-- `apps/desktop/security.mjs` — external URL and navigation allowlists.
-- `apps/desktop/scripts/build-icon.mjs` — deterministic conversion of the existing WebP brand asset into Windows ICO sizes.
-- `apps/desktop/test/*.test.mjs` — process, settings, security, and updater tests.
-- `apps/desktop/assets/icon.ico` — mechanically derived from the existing Rempeyek brand asset; no new art direction.
+- `apps/desktop/package.json` - pinned runtime/dev dependencies, desktop scripts, electron-builder config.
+- `apps/desktop/main.mjs` - app lifecycle, BrowserWindow, single instance, tray, IPC registration.
+- `apps/desktop/preload.mjs` - narrow `contextBridge` API.
+- `apps/desktop/server-process.mjs` - child server startup, ready IPC, timeout, and shutdown.
+- `apps/desktop/desktop-settings.mjs` - atomic native preferences.
+- `apps/desktop/update-service.mjs` - injected `electron-updater` state machine.
+- `apps/desktop/security.mjs` - external URL and navigation allowlists.
+- `apps/desktop/scripts/build-icon.mjs` - deterministic conversion of the existing WebP brand asset into Windows ICO sizes.
+- `apps/desktop/test/*.test.mjs` - process, settings, security, and updater tests.
+- `apps/desktop/assets/icon.ico` - mechanically derived from the existing Rempeyek brand asset; no new art direction.
 
 ### Existing files modified
 
-- `package.json` — include `apps/desktop` workspace and desktop scripts.
-- `package-lock.json` — lock Electron dependencies.
-- `apps/web/server.js` — random-port ready IPC and desktop session-token enforcement.
-- `apps/web/lib/access-policy.cjs` and `.mjs` — desktop token policy.
-- `apps/web/lib/source-update.mjs` — typed sequential source update.
-- `apps/web/src/components/UpdateBanner.jsx` — packaged bridge versus source update.
-- `apps/web/src/views/SettingsView.jsx` — native settings/status inside existing panels.
-- `.github/workflows/ci.yml` — desktop tests.
-- `.github/workflows/release.yml` — Windows artifacts and update metadata.
-- `scripts/public-release-audit.mjs` — packaged-content and desktop-secret boundaries.
+- `package.json` - include `apps/desktop` workspace and desktop scripts.
+- `package-lock.json` - lock Electron dependencies.
+- `apps/web/server.js` - random-port ready IPC and desktop session-token enforcement.
+- `apps/web/lib/access-policy.cjs` and `.mjs` - desktop token policy.
+- `apps/web/lib/source-update.mjs` - typed sequential source update.
+- `apps/web/src/components/UpdateBanner.jsx` - packaged bridge versus source update.
+- `apps/web/src/views/SettingsView.jsx` - native settings/status inside existing panels.
+- `.github/workflows/ci.yml` - desktop tests.
+- `.github/workflows/release.yml` - Windows artifacts and update metadata.
+- `scripts/public-release-audit.mjs` - packaged-content and desktop-secret boundaries.
 - public documentation and checkpoints.
 
 ---
 
 ## Phase and checkpoint map
 
-- Phase D — Desktop runtime: Tasks 1–4.
-- Phase E — Verified updates and packaging: Tasks 5–7.
-- Phase F — Clean-machine acceptance and release-ready closure: Task 8.
+- Phase D - Desktop runtime: Tasks 1-4.
+- Phase E - Verified updates and packaging: Tasks 5-7.
+- Phase F - Clean-machine acceptance and release-ready closure: Task 8.
 
 At the end of Tasks 4, 7, and 8, before the listed commit:
 
@@ -1221,7 +1221,7 @@ release path:
 
 - `workflow_dispatch` may upload the unsigned files only as a short-retention
   GitHub Actions artifact named `unsigned-desktop-test`; it never creates a
-  GitHub Release and its job summary says `TEST ONLY — UNSIGNED`;
+  GitHub Release and its job summary says `TEST ONLY - UNSIGNED`;
 - a `v*` tag must fail before `electron-builder` when either signing secret is
   absent;
 - only the signed tag path may create a non-draft GitHub Release and upload

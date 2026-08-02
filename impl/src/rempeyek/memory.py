@@ -1,5 +1,5 @@
 ﻿"""
-Rempeyek Agent OS — Shared Memory Architecture.
+Rempeyek Agent OS - Shared Memory Architecture.
 
 Implements layered memory (session, private, project, shared, durable decisions)
 with promotion workflow and conflict detection.
