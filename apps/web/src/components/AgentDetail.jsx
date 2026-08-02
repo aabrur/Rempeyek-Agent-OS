@@ -70,7 +70,7 @@ function Subagents({ activity, isTele, showEmpty = true }) {
   return activity.subagents.map((s, i) => (
     <div key={i} className="subrow">
       <span className="ty">{s.type}</span>
-      <span className="nm">{s.desc}{s.detail ? ` — ${s.detail}` : ""}</span>
+      <span className="nm">{s.desc}{s.detail ? ` - ${s.detail}` : ""}</span>
       <span className={`st st-${s.status}`}>{s.status === "done" ? "✔ done" : "⟳ running"}</span>
     </div>
   ));
@@ -187,7 +187,7 @@ export function AgentDetail({ id, gw, refresh, onClose }) {
           </div>
           {d.term?.alive
             ? <div className="gw-note" style={{ color: "var(--ac)" }}>
-                ⧉ Summoned terminal active — pid {d.term.pid}
+                ⧉ Summoned terminal active - pid {d.term.pid}
                 {d.term.startedAt ? ` · since ${String(d.term.startedAt).slice(11, 19)}` : ""} · Stop terminal closes it
               </div>
             : d.term?.pending
@@ -260,7 +260,7 @@ export function AgentDetail({ id, gw, refresh, onClose }) {
         </div>
 
         <div className="dsec">
-          <h3>Vault lane — Brains/</h3>
+          <h3>Vault lane: Brains/</h3>
           <div className="dsec-body">
             {d.laneFiles.length ? (
               <div className="mini-list">
@@ -282,7 +282,7 @@ export function AgentDetail({ id, gw, refresh, onClose }) {
               const lines = live.lines.length ? live.lines : d.log;
               return lines.length
                 ? lines.map(l => `[${l.t}] ${l.s === "err" ? "⚠ " : ""}${l.line}`).join("\n")
-                : "(nothing yet — appears when you click Run / foreground)";
+                : "(nothing yet: appears when you click Run / foreground)";
             })()}
           </pre>
         </div>

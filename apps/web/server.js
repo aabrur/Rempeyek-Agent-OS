@@ -613,9 +613,9 @@ function createProject(body) {
     fs.writeFileSync(path.join(dir, "project.md"),
       `---\ntitle: ${JSON.stringify(name)}\nstatus: active\nprogress: 0\ncreated: ${date}\ngoal: ${JSON.stringify(goal || "(define the goal)")}\n---\n\n# ${name}\n\n${goal ? goal + "\n\n" : ""}## Milestones\n\n- [ ] Define the first milestone\n`, "utf8");
     fs.writeFileSync(path.join(dir, "decisions.md"),
-      `# Decisions — ${name}\n\n> Append-only log. ⚡auto entries are captured from agent telemetry.\n\n- **${localISO().slice(0, 16).replace("T", " ")}** · Dashboard — workspace created\n`, "utf8");
+      `# Decisions: ${name}\n\n> Append-only log. ⚡auto entries are captured from agent telemetry.\n\n- **${localISO().slice(0, 16).replace("T", " ")}** · Dashboard: workspace created\n`, "utf8");
     fs.writeFileSync(path.join(dir, "next.md"),
-      `# Next — ${name}\n\nDefine the next concrete step here. The Continue brief leads with it.\n`, "utf8");
+      `# Next: ${name}\n\nDefine the next concrete step here. The Continue brief leads with it.\n`, "utf8");
     sysEvent("dashboard", "ok", `project workspace created: ${slug}`);
     return { ok: true, slug };
   } catch (e) { return { error: `failed to create workspace: ${e.message}` }; }
@@ -624,15 +624,15 @@ function createProject(body) {
 function addDecision(slug, body) {
   const p = projectBySlug(slug);
   if (!p) return { error: `unknown project '${slug}'` };
-  if (p.kind !== "workspace") return { error: "flat note projects have no decision log — create a workspace" };
+  if (p.kind !== "workspace") return { error: "flat note projects have no decision log: create a workspace" };
   const text = String(body.text || "").trim().replace(/[\r\n]+/g, " ").slice(0, 400);
   if (!text) return { error: "decision text is empty" };
   const who = String(body.agent || "Boss").replace(/[\r\n|]+/g, " ").trim().slice(0, 40) || "Boss";
-  const line = `- **${localISO().slice(0, 16).replace("T", " ")}** · ${who} — ${text}\n`;
+  const line = `- **${localISO().slice(0, 16).replace("T", " ")}** · ${who} - ${text}\n`;
   try {
     const f = path.join(p.dir, "decisions.md");
     if (!fs.existsSync(f))
-      fs.writeFileSync(f, `# Decisions — ${slug}\n\n> Append-only log. ⚡auto entries are captured from agent telemetry.\n\n${line}`, "utf8");
+      fs.writeFileSync(f, `# Decisions: ${slug}\n\n> Append-only log. ⚡auto entries are captured from agent telemetry.\n\n${line}`, "utf8");
     else fs.appendFileSync(f, line, "utf8");
     return { ok: true, line: line.trim() };
   } catch (e) { return { error: `failed to write decision: ${e.message}` }; }
@@ -641,7 +641,7 @@ function addDecision(slug, body) {
 /* -------- project memory capture: telemetry task_done → decisions.md --------
    Watermarked per agent (telemetry/memory-capture.json) so nothing is written twice.
    An event lands in a workspace when it carries an explicit `project` field, or when
-   its name/detail mentions the workspace slug. Honest capture only — no inference. */
+   its name/detail mentions the workspace slug. Honest capture only: no inference. */
 const MEM_WM = path.join(TELEMETRY_DIR, "memory-capture.json");
 function captureMemory() {
   let cfg; try { cfg = loadConfig(); } catch { return; }
@@ -668,11 +668,11 @@ function captureMemory() {
       if (slug) hits.push({ slug, e, ts });
     }
     for (const { slug, e, ts } of hits.reverse()) {   // oldest first → chronological log
-      const line = `- **${new Date(ts).toISOString().slice(0, 16).replace("T", " ")}** · ${a.name} — ${String(e.name || "task").slice(0, 120)}${e.detail ? `: ${String(e.detail).replace(/[\r\n]+/g, " ").slice(0, 200)}` : ""} ⚡auto\n`;
+      const line = `- **${new Date(ts).toISOString().slice(0, 16).replace("T", " ")}** · ${a.name} - ${String(e.name || "task").slice(0, 120)}${e.detail ? `: ${String(e.detail).replace(/[\r\n]+/g, " ").slice(0, 200)}` : ""} ⚡auto\n`;
       try {
         const f = path.join(VAULT, "Projects", slug, "decisions.md");
         if (!fs.existsSync(f))
-          fs.writeFileSync(f, `# Decisions — ${slug}\n\n> Append-only log. ⚡auto entries are captured from agent telemetry.\n\n${line}`, "utf8");
+          fs.writeFileSync(f, `# Decisions: ${slug}\n\n> Append-only log. ⚡auto entries are captured from agent telemetry.\n\n${line}`, "utf8");
         else fs.appendFileSync(f, line, "utf8");
         sysEvent(a.id, "ok", `memory captured → Projects/${slug}`);
       } catch (err) { console.error("[memory]", err.message); }
@@ -685,12 +685,12 @@ function captureMemory() {
 const DEFAULT_WORKFLOWS = Object.freeze([
   { id: "openclaw", who: "OpenClaw", t: "Strategy & Business", d: "Business analysis, SWOT, founder-grade memos, persona-driven writing, multi-agent orchestration." },
   { id: "hermes", who: "Hermes", t: "Crypto & Market Ops", d: "Trading bot, market analysis, cron & heartbeat 24/7. Real-money moves only with Boss approval." },
-  { id: "kilo-code", who: "Kilo Code", t: "Build & Debug", d: "Terminal AI coding agent (kilo.ai) — code generation, task automation, 500+ models behind one CLI." },
+  { id: "kilo-code", who: "Kilo Code", t: "Build & Debug", d: "Terminal AI coding agent (kilo.ai) - code generation, task automation, 500+ models behind one CLI." },
   { id: "claude-code", who: "Claude Code", t: "Dev & Vault Ops", d: "Full dev, file ops, MCP, ecosystem integration, guardian of the vault constitution." },
-  { id: "cline", who: "Cline", t: "Autonomous Coding", d: "Autonomous coding agent (cline.bot) — interactive sessions, one-shot tasks, and kanban-driven runs." },
+  { id: "cline", who: "Cline", t: "Autonomous Coding", d: "Autonomous coding agent (cline.bot) - interactive sessions, one-shot tasks, and kanban-driven runs." },
   { id: "codex", who: "Codex", t: "Software Engineering", d: "Repository-aware coding agent for implementation, review, testing, and tool-driven development workflows." },
   { id: "antigravity", who: "Antigravity", t: "Agentic Integration", d: "Gemini-based advanced agentic coding, dashboard building, and knowledge-graph visualization." },
-  { id: "pi", who: "Pi", t: "Minimal Agent Ops", d: "Lean open-source coding agent (pi.dev) — read/write/edit/bash tools, subscription or API login, fast one-off runs." },
+  { id: "pi", who: "Pi", t: "Minimal Agent Ops", d: "Lean open-source coding agent (pi.dev) - read/write/edit/bash tools, subscription or API login, fast one-off runs." },
 ]);
 
 function buildState() {

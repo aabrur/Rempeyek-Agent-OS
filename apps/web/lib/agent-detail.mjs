@@ -107,7 +107,7 @@ export function triggerExe(gateway) {
    Rules + empty Knowledge/ and Notes/. Returned as entries so the server writes only what's missing
    (never clobbering a real brain). Pure, so the templates are unit-tested. */
 export function laneScaffold(name, { node = "", icon = "🤖", date = "" } = {}) {
-  const head = (kind) => `---\ntitle: "${name} — ${kind}"\nagent: ${name}\ntype: ${kind.toLowerCase()}\nnode: ${node}\ncreated: ${date}\ncreated_by: dashboard\nstatus: active\n---\n\n# ${icon} ${name} — ${kind}\n\n`;
+  const head = (kind) => `---\ntitle: "${name} - ${kind}"\nagent: ${name}\ntype: ${kind.toLowerCase()}\nnode: ${node}\ncreated: ${date}\ncreated_by: dashboard\nstatus: active\n---\n\n# ${icon} ${name} - ${kind}\n\n`;
   return [
     { rel: `Identity.md`, content: head("Identity") + `> Who this agent is, its role, and its operational + vault home.\n\n- **Node:** ${node}\n- **Registered:** ${date} (via dashboard)\n- **Vault lane:** \`Brains/${name}/\`\n` },
     { rel: `Memory.md`, content: head("Memory") + `> Durable facts this agent must carry across sessions. Mirror of its operational brain.\n` },
@@ -119,7 +119,7 @@ export function laneScaffold(name, { node = "", icon = "🤖", date = "" } = {})
 
 const TASK_LINE_RE = /^\s*[-*] \[[ xX]\]\s+(.*)/;
 const WORKSPACE_RE = /Projects\/([a-z0-9][a-z0-9-]*)\//i;
-const RESUME_RE = /Resume project:\s*([^—·\n]+?)\s*(?:[—·]|$)/i;
+const RESUME_RE = /Resume project:\s*([^-·\n]+?)\s*(?:[-·]|$)/i;
 
 /* coAssignments: two agents assigned to the same project/workspace are a *verified* working
    relationship — provenance is the exact vault task line. This is the one honest source of
@@ -140,7 +140,7 @@ export function coAssignments(taskFiles, agents) {
       if (ws) { key = ws[1].toLowerCase(); label = rp ? rp[1].trim() : ws[1]; }
       else if (rp) { key = "name:" + rp[1].toLowerCase().replace(/[^a-z0-9]/g, ""); label = rp[1].trim(); }
       if (!key) continue;   // only shared, identifiable projects can co-assign
-      const seg = body.split(/\s+—\s+/);   // "title — AGENT — date …"
+      const seg = body.split(/\s+[-—·]\s+/);   // "title - AGENT - date …"
       if (seg.length < 2) continue;
       const assignees = seg[1].split(/[\/,&]| dan | and /i).map(resolve).filter(Boolean);
       if (!assignees.length) continue;

@@ -116,7 +116,7 @@ test("laneScaffold emits the canonical Brains lane shape", () => {
   const entries = laneScaffold("Codex", { node: "Node-12", icon: "⬜", date: "2026-07-15" });
   const rels = entries.map(e => e.rel);
   assert.deepEqual(rels, ["Identity.md", "Memory.md", "Rules.md", "Knowledge/.gitkeep", "Notes/.gitkeep"]);
-  assert.match(entries[0].content, /# ⬜ Codex — Identity/);
+  assert.match(entries[0].content, /# ⬜ Codex - Identity/);
   assert.match(entries[0].content, /Node-12/);
   assert.equal(entries[3].content, "");   // gitkeeps are empty
 });
