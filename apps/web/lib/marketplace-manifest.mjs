@@ -5,10 +5,11 @@ const agent = (id, name, icon, role, trigger, home, sourceUrl, installers = [], 
   id,
   kind: "agent",
   name,
-  publisher: extra.publisher || new URL(sourceUrl).hostname,
+  publisher: extra.publisher || (sourceUrl ? new URL(sourceUrl).hostname : "unverified"),
   summary: role,
-  sourceUrl,
-  officialUrl: extra.officialUrl || sourceUrl,
+  sourceUrl: sourceUrl || null,
+  officialUrl: extra.officialUrl ?? sourceUrl ?? null,
+  manualSource: Boolean(extra.manualSource),
   curatedAt: "2026-07-24",
   compatibility: {
     platforms: extra.platforms || ["win32", "darwin", "linux"],
@@ -119,17 +120,6 @@ export const MARKETPLACE_ENTRIES = Object.freeze([
     "openclaw",
     ".openclaw",
     "https://github.com/aabrur/Rempeyek-Agent-OS",
-  ),
-  agent(
-    "gemini-cli",
-    "Gemini CLI",
-    "💎",
-    "Google terminal coding agent",
-    "gemini",
-    ".gemini",
-    "https://github.com/google-gemini/gemini-cli",
-    [{ id: "npm", type: "npm-global", package: "@google/gemini-cli" }],
-    { envAllow: ["GEMINI_API_KEY", "GOOGLE_API_KEY"] },
   ),
   agent(
     "github-copilot-cli",
@@ -262,6 +252,36 @@ export const MARKETPLACE_ENTRIES = Object.freeze([
         "One-click install is disabled until the public README and repository agree on the canonical install owner.",
     },
   ),
+  agent(
+    "grok-build",
+    "Grok Build",
+    "🚀",
+    "Grok terminal build agent",
+    "grok",
+    ".grok",
+    "https://github.com/xai-org/grok-build",
+    [{ id: "npm", type: "npm-global", package: "@xai-official/grok" }],
+    {
+      officialUrl: "https://docs.x.ai/build/overview",
+      envAllow: ["XAI_API_KEY"],
+      availabilityNote:
+        "The reviewed npm installer adds the grok CLI. First launch opens browser authentication unless XAI_API_KEY is configured.",
+    },
+  ),
+  agent(
+    "command-code",
+    "Command Code",
+    "⌨️",
+    "Command Code terminal agent",
+    "cmdc",
+    ".commandcode",
+    "https://commandcode.ai/docs/troubleshooting/windows",
+    [{ id: "npm", type: "npm-global", package: "command-code@latest" }],
+    {
+      availabilityNote:
+        "Native Windows support is alpha; WSL is recommended. Use cmdc, never cmd, to avoid cmd.exe collisions.",
+    },
+  ),
   {
     schemaVersion: 1,
     id: "hypertaks-agent",
@@ -335,7 +355,8 @@ export function validateMarketplace(entries = MARKETPLACE_ENTRIES) {
     if (!["agent", "plugin", "skill"].includes(entry.kind)) {
       errors.push(`${entry.id}: invalid kind`);
     }
-    if (!entry.name || !entry.sourceUrl || entry.schemaVersion !== 1) {
+    const manualSource = entry.kind === "agent" && entry.manualSource === true;
+    if (!entry.name || entry.schemaVersion !== 1 || (!entry.sourceUrl && !manualSource)) {
       errors.push(`${entry.id}: incomplete metadata`);
     }
   }

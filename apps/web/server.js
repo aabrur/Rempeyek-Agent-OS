@@ -99,6 +99,9 @@ MARKETPLACE_MOD.then(m => { marketplaceLib = m; }).catch(e => console.error("[ma
 const PROCESS_ADAPTERS_MOD = import("./lib/process-adapters.mjs");
 let processAdaptersLib = null;
 PROCESS_ADAPTERS_MOD.then(m => { processAdaptersLib = m; }).catch(e => console.error("[process-adapters]", e.message));
+const PROCESS_MANAGER_MOD = import("./lib/process-manager.mjs");
+let processManagerLib = null;
+PROCESS_MANAGER_MOD.then(m => { processManagerLib = m; }).catch(e => console.error("[process-manager]", e.message));
 const AGENT_LIFECYCLE_MOD = import("./lib/agent-lifecycle.mjs");
 let lifecycleLib = null;
 AGENT_LIFECYCLE_MOD.then(m => { lifecycleLib = m; }).catch(e => console.error("[agent-lifecycle]", e.message));
@@ -745,6 +748,27 @@ function detectRunning(text) {
 function procInfo(id) {
   const p = procs.get(id);
   const c = gwCache.get(id);
+  const managed = managedProcessManager?.status(id);
+  if (managed) {
+    return {
+      status: managed.runtimeState,
+      mode: "owned",
+      pid: managed.pid,
+      childPids: managed.childPids,
+      command: managed.command,
+      args: managed.args,
+      cwd: managed.workingDirectory,
+      actionType: managed.actionType,
+      startedAt: managed.startTime,
+      exitCode: managed.exitCode,
+      stdoutPath: managed.stdoutPath,
+      stderrPath: managed.stderrPath,
+      logSize: p ? p.seq : 0,
+      reason: managed.reason || null,
+      statusText: c && c.text || null,
+      checkedAt: c && new Date(c.at).toISOString() || null,
+    };
+  }
   // a dashboard-owned run process wins while it's still alive
   if (p && p.status === "running")
     return { status: "running", mode: "owned", pid: p.pid, startedAt: p.startedAt, exitCode: null, logSize: p.seq, reason: null, statusText: c && c.text || null, checkedAt: c && new Date(c.at).toISOString() || null };
@@ -812,6 +836,27 @@ function readDiskLog(id, n) {
   return out.slice(-n);
 }
 
+let managedProcessManager = null;
+function processManager() {
+  if (managedProcessManager || !processManagerLib) return managedProcessManager;
+  managedProcessManager = processManagerLib.createManagedProcessManager({
+    logDir: path.join(LOG_DIR, "managed"),
+    recordsPath: path.join(TELEMETRY_DIR, "managed-processes.json"),
+    spawnImpl: spawn,
+    execFileImpl: execFile,
+    onLog(record, stream, line) {
+      const p = procs.get(record.agentId);
+      if (p && p.runId === record.runId) return pushLog(p, stream, line);
+      appendDiskLog(record.agentId, [{
+        t: new Date().toISOString().slice(11, 19),
+        s: stream,
+        line: String(line).slice(0, 500),
+      }]);
+    },
+  });
+  return managedProcessManager;
+}
+
 /* R2: consistent tree-kill (Win: taskkill /T, POSIX: kill process group) — used by owned-run & gwCtl timeout */
 function killTree(pid, child) {
   if (!pid) { try { child && child.kill(); } catch {} return; }
@@ -866,78 +911,133 @@ function uptimeMap() {
   return out;
 }
 
-/* short commands: start/stop/restart/status → run `<bin> <action>`, capture the output */
+/* Native operations may run only when the adapter supplies a reviewed argv spec.
+   There is intentionally no fallback that concatenates a binary and action. */
+function runtimeAdapter(agent, action) {
+  if (!processAdaptersLib) return null;
+  return processAdaptersLib.resolveRuntimeAdapter({ agent, action, platform: process.platform });
+}
+
 function gwCtl(id, action, cb) {
   const agent = agentById(id);
   if (!agent) return cb({ error: `unknown agent '${id}'` });
-  const g = agent.gateway;
-  if (!agent.enabled || !g || !g.bin) return cb({ error: agent.note || `gateway '${id}' not ready (enabled:false)` });
-  if (!gwActions(agent).includes(action)) return cb({ error: `action '${action}' not supported by ${agent.name}` });
-  const cwd = g.cwd || loadConfig().workdir;
-  if (!fs.existsSync(cwd)) return cb({ error: `cwd does not exist: ${cwd}` });
+  if (!agent.enabled) return cb({ error: agent.note || `gateway '${id}' is disabled` });
+  const resolved = runtimeAdapter(agent, action);
+  if (!resolved) return cb({ error: "runtime adapters are still loading" });
 
-  const cmd = `${g.bin} ${action}`;
-  let out = "", done = false;
-  const finish = (obj) => { if (done) return; done = true; clearTimeout(timer); cb(obj); };
-  let child;
-  try { child = spawn(cmd, [], { cwd, shell: true, windowsHide: true, env: buildAgentEnv(agent, process.env, loadConfig().workdir) }); }
-  catch (e) { return cb({ error: `spawn failed: ${e.message}` }); }
-  const timer = setTimeout(() => { killTree(child.pid, child); finish({ error: `timeout 30s: ${cmd}` }); }, 30000);
-  child.stdout.on("data", d => { out += d; });
-  child.stderr.on("data", d => { out += d; });
-  child.on("error", err => finish({ error: `failed to run: ${err.message}` }));
-  child.on("exit", code => {
-    const text = out.trim().slice(0, 4000);
-    const complete = running => {
-      if (action === "status" || action === "start" || action === "restart") {
-        const prev = gwCache.get(id);
-        gwCache.set(id, { running, text, at: Date.now(), exitCode: code });
-        logUptime(id, running);
-        if (prev && prev.running && !running) { alertDown(id, `gateway went down (detected during ${action})`); if (action === "status") maybeWatchdog(id); }
-      } else if (action === "stop") { gwCache.set(id, { running: false, text, at: Date.now(), exitCode: code }); logUptime(id, false); }
-      if (action !== "status") sysEvent(id, code === 0 ? "ok" : "error", `gateway ${action} → ${running ? "running" : "stopped"}${code ? ` (exit ${code})` : ""}`);
-      finish({ ok: code === 0, code, action, running, output: text });
+  /* Task status is an observation, not a guessed native command. */
+  if (action === "status" && !resolved.available) {
+    const managed = processManager()?.status(id);
+    const detected = probeInstalled(agent);
+    const runtimeState = managed?.runtimeState || (detected ? "idle" : "unavailable");
+    const running = ["starting", "running", "waiting", "stopping"].includes(runtimeState);
+    const observed = Boolean(managed) || detected;
+    const detail = managed
+      ? `managed ${managed.actionType}: ${runtimeState}`
+      : detected ? `binary detected: ${resolved.binaryCandidates[0] || agent.gateway?.trigger}` : "binary not detected";
+    const complete = health => {
+      const healthOk = !health || health.ok;
+      const output = health ? `${detail}\nhealth: ${healthOk ? "ok" : "failed"}${health.output ? ` (${health.output})` : ""}` : detail;
+      gwCache.set(id, { running, text: output, at: Date.now(), exitCode: managed?.exitCode ?? null });
+      logUptime(id, running);
+      cb({ ok: observed && healthOk, code: observed && healthOk ? 0 : 1, action, running, runtimeState: healthOk ? runtimeState : "failed", output, native: false });
     };
-    if ((action === "start" || action === "restart") && g.probe?.port) {
-      clearTimeout(timer);
-      let attempts = 20;
-      const check = () => probePort(g.probe.host, g.probe.port, up => {
-        if (up || --attempts === 0) return complete(up);
-        setTimeout(check, 2500);
-      });
-      return check();
-    }
-    complete(detectRunning(text));
+    const health = runtimeAdapter(agent, "health-check");
+    if (health?.available) return gwCtl(id, "health-check", complete);
+    return complete(null);
+  }
+  if (!resolved.available) return cb({ error: resolved.reason, runtimeState: "unavailable" });
+
+  const cwd = agent.gateway?.workdir || agent.gateway?.cwd || loadConfig().workdir;
+  if (!cwd || !fs.existsSync(cwd)) return cb({ error: `cwd does not exist: ${cwd || "(unset)"}` });
+  const manager = processManager();
+  if (!manager) return cb({ error: "process manager is still loading" });
+  const actionType = ["start", "restart"].includes(action) ? "native-gateway-control" : `native-${action}`;
+  const started = manager.start({
+    agentId: id,
+    actionType,
+    command: resolved.command,
+    cwd,
+    env: buildAgentEnv(agent, process.env, loadConfig().workdir),
+  });
+  if (!started.ok) return cb({ error: started.error, runtimeState: started.record?.runtimeState || "failed" });
+  let done = false;
+  const finish = result => { if (done) return; done = true; clearTimeout(timer); cb(result); };
+  const timer = setTimeout(() => {
+    manager.stop(id, actionType).then(() => finish({ error: `timeout 30s: ${resolved.command.program}`, runtimeState: "failed" }));
+  }, 30000);
+  manager.waitForExit(id, actionType).then(record => {
+    if (done) return;
+    const finalize = health => {
+      if (done) return;
+    const text = manager.logs(id, 0, actionType).lines.map(line => line.line).join("\n").trim().slice(0, 4000);
+    const healthText = health ? manager.logs(id, 0, "native-health-check").lines.map(line => line.line).join("\n").trim().slice(0, 4000) : "";
+    const nativeRunning = action === "stop" ? false : detectRunning(text);
+    const owned = manager.status(id);
+    const running = nativeRunning || ["starting", "running", "waiting", "stopping"].includes(owned?.runtimeState);
+    const operationOk = record?.exitCode === 0 && (!health || health.exitCode === 0);
+    const runtimeState = !operationOk ? "failed" : running ? "running" : "stopped";
+      const statusParts = [text];
+      if (action === "status" && owned) statusParts.push(`managed ${owned.actionType}: ${owned.runtimeState}`);
+      if (health) statusParts.push(`health: ${health.exitCode === 0 ? "ok" : "failed"}${healthText ? ` (${healthText})` : ""}`);
+      const output = statusParts.filter(Boolean).join("\n");
+    gwCache.set(id, { running, text: output, at: Date.now(), exitCode: record?.exitCode ?? null });
+    logUptime(id, running);
+    if (action !== "status") sysEvent(id, record?.exitCode === 0 ? "ok" : "error", `gateway ${action}: ${runtimeState}`);
+    finish({ ok: operationOk, code: record?.exitCode, action, running, runtimeState, output, native: true });
+    };
+    if (action !== "status") return finalize(null);
+    const health = runtimeAdapter(agent, "health-check");
+    if (!health?.available) return finalize(null);
+    const healthStart = manager.start({
+      agentId: id,
+      actionType: "native-health-check",
+      command: health.command,
+      cwd,
+      env: buildAgentEnv(agent, process.env, loadConfig().workdir),
+    });
+    if (!healthStart.ok) return finalize({ exitCode: -1, reason: healthStart.error });
+    manager.waitForExit(id, "native-health-check").then(finalize);
   });
 }
 
-/* run: foreground, owned by the dashboard, live log */
+/* Gateway Run launches only an explicit, reviewed non-interactive command. */
 function gwRun(id) {
   const agent = agentById(id);
   if (!agent) return { error: `unknown agent '${id}'` };
-  const g = agent.gateway;
-  if (!agent.enabled || !g || !g.bin) return { error: agent.note || `gateway '${id}' not ready (enabled:false)` };
-  if (!gwActions(agent).includes("run")) return { error: `${agent.name} does not support 'run'` };
+  if (!agent.enabled) return { error: agent.note || `gateway '${id}' is disabled` };
+  const resolved = runtimeAdapter(agent, "gateway-run");
+  if (!resolved) return { error: "runtime adapters are still loading" };
+  if (!resolved.available) return { error: resolved.reason, runtimeState: "unavailable" };
+  const cwd = agent.gateway?.workdir || agent.gateway?.cwd || loadConfig().workdir;
+  if (!cwd || !fs.existsSync(cwd)) return { error: `cwd does not exist: ${cwd || "(unset)"}` };
+  const manager = processManager();
+  if (!manager) return { error: "process manager is still loading" };
   const existing = procs.get(id);
-  if (existing && existing.status === "running") return { error: `${id} is already running owned (pid ${existing.pid})` };
-  const cwd = g.cwd || loadConfig().workdir;
-  if (!fs.existsSync(cwd)) return { error: `cwd does not exist: ${cwd}` };
-
-  const cmd = g.runCmd || `${g.bin} run`;
-  const p = { id, log: [], seq: 0, status: "running", startedAt: new Date().toISOString(), exitCode: null };
-  pushLog(p, "sys", `[agentic-os] run (owned): ${cmd}  (cwd: ${cwd})`);
-  let child;
-  try { child = spawn(cmd, [], { cwd, shell: true, windowsHide: true, env: buildAgentEnv(agent, process.env, loadConfig().workdir) }); }
-  catch (e) { return { error: `spawn failed: ${e.message}` }; }
-  p.child = child; p.pid = child.pid;
-  child.stdout.on("data", d => pushLog(p, "out", d));
-  child.stderr.on("data", d => pushLog(p, "err", d));
-  child.on("exit", code => { p.status = "exited"; p.exitCode = code; pushLog(p, "sys", `[agentic-os] exit code ${code}`);
-    if (code !== 0) { const last = p.log.filter(l => l.s === "out" || l.s === "err").slice(-1)[0]; alertDown(id, `run (owned) exit code ${code}${last ? " — " + last.line : ""}`); } });
-  child.on("error", err => { p.status = "error"; p.exitCode = -1; pushLog(p, "sys", `[agentic-os] spawn error: ${err.message}`); });
+  if (existing && existing.status === "running") return { error: `${id} already has an owned process running (pid ${existing.pid})` };
+  const started = manager.start({
+    agentId: id,
+    actionType: "gateway-run",
+    command: resolved.command,
+    cwd,
+    env: buildAgentEnv(agent, process.env, loadConfig().workdir),
+  });
+  if (!started.ok) return { error: started.error, runtimeState: started.record?.runtimeState || "failed" };
+  const record = started.record;
+  const p = {
+    id,
+    runId: record.runId,
+    log: [],
+    seq: 0,
+    status: record.runtimeState,
+    startedAt: record.startTime,
+    exitCode: record.exitCode,
+    pid: record.pid,
+  };
   procs.set(id, p);
-  sysEvent(id, "ok", `gateway run (owned) pid ${child.pid}`);
-  return { ok: true, pid: child.pid, mode: "run (owned)" };
+  pushLog(p, "sys", `[agentic-os] managed gateway run: ${record.command} (cwd: ${record.workingDirectory})`);
+  sysEvent(id, "ok", `gateway run (managed) pid ${record.pid}`);
+  return { ok: true, pid: record.pid, mode: "run (managed)", runtimeState: record.runtimeState };
 }
 
 /* ---------------- summoned terminals (pid-file handshake + kill-file self-termination) ----------------
@@ -1004,47 +1104,42 @@ function gwTerminal(id, mode, cb) {
   if (!agent) return cb({ error: `unknown agent '${id}'` });
   const g = agent.gateway;
   if (!agent.enabled || !g) return cb({ error: agent.note || `gateway '${id}' not ready (enabled:false)` });
-  let dir, cmd;
-  if (mode === "summon") {
-    const profile = resolveSummonProfile(agent);
-    if (!profile.command) return cb({ error: `${agent.name} has no trigger to summon it with` });
-    dir = profile.cwd; cmd = profile.command;
-    const cur = summons.get(id);
-    if (cur && cur.alive) return cb({ error: `${agent.name} already has a summoned terminal (pid ${cur.pid}) — stop it first` });
-    // install gate: if the CLI is not on this machine, don't open a dead terminal —
-    // point the user at the agent's installer instead (gateway.install {cmd,url})
-    const exe = String(g.trigger).trim().split(/\s+/)[0];
-    const found = /[\\/]/.test(exe)
-      ? fs.existsSync(exe)
-      : spawnSync("where.exe", [exe], { windowsHide: true, timeout: 4000 }).status === 0;
-    if (!found) {
-      const inst = g.install || null;
-      return cb({
-        error: `${agent.name} CLI '${exe}' is not installed on this machine`,
-        notInstalled: true,
-        install: inst || { note: "no installer configured — add gateway.install {cmd,url} in agents.config.json" },
-      });
-    }
-  } else if (mode === "start") { if (!g.bin) return cb({ error: `${agent.name} has no gateway` }); dir = g.cwd || loadConfig().workdir; cmd = `${g.bin} start`; }
-  else if (mode === "run") { if (!g.bin) return cb({ error: `${agent.name} has no gateway` }); dir = g.cwd || loadConfig().workdir; cmd = g.runCmd || `${g.bin} run`; }
-  else return cb({ error: `unknown terminal mode '${mode}' (summon|start|run)` });
+  if (mode !== "summon") return cb({ error: "terminal supports Summon only; use Gateway Run for managed execution" });
+  const profile = resolveSummonProfile(agent);
+  const resolved = runtimeAdapter(agent, "summon");
+  if (!profile.command || !resolved?.available) {
+    return cb({ error: resolved?.reason || `${agent.name} has no safe summon command` });
+  }
+  const dir = profile.cwd;
+  const command = resolved.command;
+  const cmd = [command.program, ...command.args].join(" ");
+  const cur = summons.get(id);
+  if (cur && cur.alive) return cb({ error: `${agent.name} already has a summoned terminal (pid ${cur.pid}) - stop it first` });
+  const found = /[\\/]/.test(command.program)
+    ? fs.existsSync(command.program)
+    : spawnSync("where.exe", [command.program], { windowsHide: true, timeout: 4000 }).status === 0;
+  if (!found) {
+    const inst = g.install || null;
+    return cb({
+      error: `${agent.name} CLI '${command.program}' is not installed on this machine`,
+      notInstalled: true,
+      install: inst || { note: "no installer configured" },
+    });
+  }
   if (!fs.existsSync(dir)) {
-    if (mode === "summon" && g.home) { try { fs.mkdirSync(dir, { recursive: true }); } catch {} }
+    if (g.home) { try { fs.mkdirSync(dir, { recursive: true }); } catch {} }
     if (!fs.existsSync(dir)) return cb({ error: `folder does not exist: ${dir}` });
   }
 
-  // ponytail: dir & cmd come from config (trusted). Escape single quotes for the PowerShell strings.
   const q = s => String(s).replace(/'/g, "''");
+  const invoke = "& '" + q(command.program) + "'" + command.args.map(arg => " '" + q(arg) + "'").join("");
   // inner bootstrap runs INSIDE the (possibly elevated) terminal; -EncodedCommand avoids nested quoting
-  let inner = "Set-Location -LiteralPath '" + q(dir) + "'\n" + cmd + "\n";
-  if (mode === "summon") {
-    inner =
-      "$ErrorActionPreference='SilentlyContinue'\n" +
-      "Set-Content -LiteralPath '" + q(termPidFile(id)) + "' -Value ('{\"pid\":' + $PID + ',\"startedAt\":\"' + (Get-Date -Format o) + '\"}') -Encoding ASCII\n" +
-      "$null = Start-Job -ArgumentList $PID,'" + q(termKillFile(id)) + "' -ScriptBlock { param($p,$k) while($true){ if(Test-Path $k){ Remove-Item $k -Force; taskkill /PID $p /T /F | Out-Null }; Start-Sleep -Seconds 2 } }\n" +
-      "Set-Location -LiteralPath '" + q(dir) + "'\n" +
-      cmd + "\n";
-  }
+  const inner =
+    "$ErrorActionPreference='SilentlyContinue'\n" +
+    "Set-Content -LiteralPath '" + q(termPidFile(id)) + "' -Value ('{\"pid\":' + $PID + ',\"startedAt\":\"' + (Get-Date -Format o) + '\"}') -Encoding ASCII\n" +
+    "$null = Start-Job -ArgumentList $PID,'" + q(termKillFile(id)) + "' -ScriptBlock { param($p,$k) while($true){ if(Test-Path $k){ Remove-Item $k -Force; taskkill /PID $p /T /F | Out-Null }; Start-Sleep -Seconds 2 } }\n" +
+    "Set-Location -LiteralPath '" + q(dir) + "'\n" +
+    invoke + "\n";
   const b64 = Buffer.from(inner, "utf16le").toString("base64");
   const elevate = g.elevate !== false;
   const verb = elevate ? "-Verb RunAs " : "";
@@ -1053,32 +1148,28 @@ function gwTerminal(id, mode, cb) {
     `if ($wt) { Start-Process wt.exe ${verb}-ArgumentList '-d','${q(dir)}','powershell','-NoExit','-EncodedCommand','${b64}' } ` +
     `else { Start-Process powershell ${verb}-ArgumentList '-NoExit','-EncodedCommand','${b64}' }`;
 
-  if (mode === "summon") {
-    try { fs.unlinkSync(termPidFile(id)); } catch {}
-    try { fs.unlinkSync(termKillFile(id)); } catch {}
-    summons.set(id, { pid: null, startedAt: null, alive: false, launchedAt: Date.now() });
-  }
+  try { fs.unlinkSync(termPidFile(id)); } catch {}
+  try { fs.unlinkSync(termKillFile(id)); } catch {}
+  summons.set(id, { pid: null, startedAt: null, alive: false, launchedAt: Date.now() });
   // attached spawn (NOT detached): Start-Process -Verb RunAs throws when UAC is declined,
   // so the exit code + stderr tell us whether the terminal actually opened.
   let done = false, errOut = "", child;
   const finish = obj => { if (done) return; done = true; clearTimeout(timer); cb(obj); };
-  try { child = spawn("powershell", ["-NoProfile", "-Command", ps], { windowsHide: true, stdio: ["ignore", "ignore", "pipe"] }); }
-  catch (e) { if (mode === "summon") summons.delete(id); return cb({ error: `failed to open terminal: ${e.message}` }); }
+  try { child = spawn("powershell", ["-NoProfile", "-Command", ps], { shell: false, windowsHide: true, stdio: ["ignore", "ignore", "pipe"] }); }
+  catch (e) { summons.delete(id); return cb({ error: `failed to open terminal: ${e.message}` }); }
   // UAC prompts can sit unanswered — after 45s report "pending" and let the poll settle it later
   const timer = setTimeout(() => finish({ ok: true, mode, dir, cmd, terminal: true, pending: true, note: "waiting for UAC confirmation" }), 45000);
   child.stderr.on("data", d => { errOut += d; });
-  child.on("error", err => { if (mode === "summon") summons.delete(id); finish({ error: `failed to open terminal: ${err.message}` }); });
+  child.on("error", err => { summons.delete(id); finish({ error: `failed to open terminal: ${err.message}` }); });
   child.on("exit", code => {
     if (code === 0) {
-      if (mode === "summon") {
-        sysEvent(id, "ok", "summon terminal opened");
-        appendDiskLog(id, [{ t: new Date().toISOString().slice(11, 19), s: "sys", line: `[agentic-os] summon terminal opened (${elevate ? "admin" : "user"}): ${cmd}  (cwd: ${dir})` }]);
-        setTimeout(pollSummons, 4000); setTimeout(pollSummons, 12000);
-      }
+      sysEvent(id, "ok", "summon terminal opened");
+      appendDiskLog(id, [{ t: new Date().toISOString().slice(11, 19), s: "sys", line: `[agentic-os] summon terminal opened (${elevate ? "admin" : "user"}): ${cmd}  (cwd: ${dir})` }]);
+      setTimeout(pollSummons, 4000); setTimeout(pollSummons, 12000);
       return finish({ ok: true, mode, dir, cmd, terminal: true, elevated: elevate });
     }
     const msg = /canceled by the user/i.test(errOut) ? "UAC declined by user" : ((errOut.trim().split(/\r?\n/)[0] || `exit code ${code}`).slice(0, 200));
-    if (mode === "summon") { summons.delete(id); sysEvent(id, "error", `summon failed: ${msg}`); }
+    summons.delete(id); sysEvent(id, "error", `summon failed: ${msg}`);
     finish({ error: `terminal not opened: ${msg}` });
   });
 }
@@ -1120,22 +1211,43 @@ function gwStopTerm(id, cb) {
   });
 }
 
-/* kill the dashboard-owned run process (if any) */
+/* kill legacy owned installer/update processes. Gateway runs use processManager(). */
 function killOwned(id) {
   const p = procs.get(id);
+  if (p?.runId) return false;
   if (!p || p.status !== "running" || !p.pid) return false;
   pushLog(p, "sys", "[agentic-os] stop owned — tree-kill");
   killTree(p.pid, p.child);
   return true;
 }
 
-/* stop = kill the owned run (if any) + call the native `gateway stop` (if supported) */
+/* Stop only a process owned by Rempeyek, then optionally run a reviewed native stop. */
 function gwStop(id, cb) {
   const agent = agentById(id);
-  const killed = killOwned(id);
-  if (agent && gwActions(agent).includes("stop"))
-    return gwCtl(id, "stop", r => cb({ ...r, ownedKilled: killed }));
-  cb({ ok: true, ownedKilled: killed, note: killed ? "owned run process stopped" : `${agent ? agent.name : id} has no native stop & no owned process` });
+  if (!agent) return cb({ error: `unknown agent '${id}'` });
+  const manager = processManager();
+  const managed = manager?.status(id);
+  const native = runtimeAdapter(agent, "stop");
+  const finishNative = ownedKilled => {
+    if (native?.available) return gwCtl(id, "stop", result => cb({ ...result, ownedKilled }));
+    if (!ownedKilled) return cb({
+      error: native?.reason || `no managed process or verified native stop for ${agent.name}`,
+      runtimeState: managed?.runtimeState || "idle",
+    });
+    cb({ ok: true, ownedKilled: true, runtimeState: "stopped" });
+  };
+  if (!managed || !["starting", "running", "waiting", "stopping"].includes(managed.runtimeState)) {
+    return finishNative(false);
+  }
+  manager.stop(id).then(result => {
+    const p = procs.get(id);
+    if (p && result.record) {
+      p.status = result.record.runtimeState;
+      p.exitCode = result.record.exitCode;
+    }
+    if (!result.ok) return cb({ error: result.error, runtimeState: result.record?.runtimeState || "failed" });
+    finishNative(true);
+  });
 }
 
 /* R#7: real health probe — check that the TCP port is actually listening (more honest than matching status text).
@@ -1184,7 +1296,7 @@ function pollAllStatus() {
   for (const a of agents) {
     if (!a.enabled || !a.gateway) continue;
     if (a.gateway.probe && a.gateway.probe.port) { probeAndCache(a.id, a.gateway.probe); continue; }  // R#7: probe wins
-    if (gwActions(a).includes("status") && !polling.has(a.id)) {
+    if (runtimeAdapter(a, "status") && !polling.has(a.id)) {
       polling.add(a.id);
       gwCtl(a.id, "status", () => polling.delete(a.id));
     }
@@ -2410,6 +2522,7 @@ function withLifecycleModules(res, run) {
     AGENT_DETAIL,
     MARKETPLACE_MOD,
     PROCESS_ADAPTERS_MOD,
+    PROCESS_MANAGER_MOD,
     AGENT_LIFECYCLE_MOD,
     MANAGED_BUNDLE_MOD,
   ])
@@ -2957,7 +3070,20 @@ function requestHandler(req, res, services = DEFAULT_RUNTIME_SERVICES) {
         if (action === "log") {
           const p = procs.get(id);
           const since = Number(new URL(req.url, "http://x").searchParams.get("since") || 0);
-          return json(res, 200, { lines: p ? p.log.filter(l => l.i >= since) : [], next: p ? p.seq : 0, ...procInfo(id) });
+          const native = runtimeAdapter(routeAgent, "logs");
+          const respond = nativeResult => {
+            const manager = processManager();
+            const nativeLogs = manager?.logs(id, since, "native-logs");
+            const managed = manager?.logs(id, since);
+            return json(res, nativeResult?.error ? 400 : 200, {
+              lines: nativeLogs?.lines?.length ? nativeLogs.lines : managed?.lines?.length ? managed.lines : p ? p.log.filter(l => l.i >= since) : [],
+              next: nativeLogs?.next ?? managed?.next ?? p?.seq ?? 0,
+              ...(nativeResult ? { native: nativeResult } : {}),
+              ...procInfo(id),
+            });
+          };
+          if (native?.available) return gwCtl(id, "logs", respond);
+          return respond(null);
         }
         if (req.method !== "POST") return json(res, 405, { error: "POST only" });
         if (action === "status") return gwCtl(id, action, r => json(res, r.error ? 400 : 200, r));
@@ -3180,6 +3306,7 @@ let shuttingDown = false;
 function shutdown(sig) {
   if (shuttingDown) return; shuttingDown = true;
   console.error(`[agentic-os] shutdown (${sig}) — stopping owned processes`);
+  try { processManager()?.stopAll(); } catch {}
   for (const id of procs.keys()) killOwned(id);
   try { server.close(); } catch {}
   setTimeout(() => process.exit(0), 500);   // give async taskkill time to finish
@@ -3187,7 +3314,10 @@ function shutdown(sig) {
 for (const sig of ["SIGINT", "SIGTERM", "SIGHUP"]) process.on(sig, () => shutdown(sig));
 process.on("uncaughtException", e => { console.error("[uncaughtException]", (e && e.stack) || e); shutdown("uncaughtException"); });
 process.on("unhandledRejection", e => { console.error("[unhandledRejection]", (e && e.stack) || e); });
-process.on("exit", () => { for (const id of procs.keys()) killOwned(id); });
+process.on("exit", () => {
+  try { processManager()?.stopAll(); } catch {}
+  for (const id of procs.keys()) killOwned(id);
+});
 
 if (require.main === module) {
   server.on("error", e => {

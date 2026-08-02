@@ -12,6 +12,8 @@ const builtIns = Object.freeze({
   openclaw: [path.join(home, ".openclaw"), "openclaw"],
   pi: [path.join(home, ".pi"), "pi"],
   hermes: [path.join(process.env.LOCALAPPDATA || path.join(home, "AppData", "Local"), "hermes"), "hermes"],
+  "grok-build": [path.join(home, ".grok"), "grok"],
+  "command-code": [path.join(home, ".commandcode"), "cmdc"],
 });
 
 function resolveSummonProfile(agent = {}, options = {}) {

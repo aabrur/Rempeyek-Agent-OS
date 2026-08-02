@@ -17,6 +17,8 @@ const expected = [
   ["openclaw", path.join(home, ".openclaw"), "openclaw"],
   ["pi", path.join(home, ".pi"), "pi"],
   ["hermes", path.join(process.env.LOCALAPPDATA || path.join(home, "AppData", "Local"), "hermes"), "hermes"],
+  ["grok-build", path.join(home, ".grok"), "grok"],
+  ["command-code", path.join(home, ".commandcode"), "cmdc"],
 ];
 
 test("built-in agents summon from their requested homes with their requested CLIs", () => {

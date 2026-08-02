@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { MARKETPLACE_ENTRIES, marketplaceEntry } from "../lib/marketplace-manifest.mjs";
 import { resolveAdapter, resolveProbe } from "../lib/process-adapters.mjs";
 
-test("Marketplace entries contain all 21 catalog entries with valid structure", () => {
+test("Marketplace entries contain 21 agents plus the two Hypertaks entries", () => {
   const expectedIds = [
     "claude-code",
     "codex",
@@ -13,7 +13,6 @@ test("Marketplace entries contain all 21 catalog entries with valid structure", 
     "antigravity",
     "hermes",
     "openclaw",
-    "gemini-cli",
     "github-copilot-cli",
     "opencode",
     "aider",
@@ -25,6 +24,8 @@ test("Marketplace entries contain all 21 catalog entries with valid structure", 
     "cursor-agent",
     "crush",
     "crimson-odyssey",
+    "grok-build",
+    "command-code",
     "hypertaks-agent",
     "hypertaks-founder",
   ];
@@ -35,6 +36,11 @@ test("Marketplace entries contain all 21 catalog entries with valid structure", 
     assert.ok(entry.name, `${id} must have a display name`);
     assert.ok(entry.officialUrl, `${id} must have an official URL`);
   }
+  assert.deepEqual(marketplaceEntry("grok-build").installers.map(adapter => adapter.package), ["@xai-official/grok"]);
+  assert.deepEqual(marketplaceEntry("command-code").installers.map(adapter => adapter.package), ["command-code@latest"]);
+  assert.equal(marketplaceEntry("gemini-cli"), null);
+  assert.equal(marketplaceEntry("grok-build").agent.trigger, "grok");
+  assert.equal(marketplaceEntry("command-code").agent.trigger, "cmdc");
 
   // Ensure Hypertaks Agent is a plugin and Hypertaks Founder is a skill, not agent CLIs
   const hypertaksPlugin = marketplaceEntry("hypertaks-agent");

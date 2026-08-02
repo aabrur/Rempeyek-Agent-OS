@@ -7,7 +7,7 @@ export const AGENT_CATALOG = MARKETPLACE_ENTRIES
   .filter(entry => entry.kind === "agent")
   .map(entry => ({
     ...agentSeed(entry),
-    install: { url: entry.officialUrl },
+    ...(entry.officialUrl ? { install: { url: entry.officialUrl } } : {}),
   }));
 
 const CATALOG_BY_ID = new Map(AGENT_CATALOG.map(entry => [entry.id, entry]));

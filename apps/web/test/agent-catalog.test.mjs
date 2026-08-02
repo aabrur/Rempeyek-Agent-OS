@@ -5,18 +5,28 @@ import { AGENT_CATALOG, catalogEntry, buildAgentRecord } from '../lib/agent-cata
 
 const HOMEDIR = 'C:\\Users\\test';
 
-test('catalog exposes the exact 20 portable agent seeds', () => {
+test('catalog exposes the exact 21 portable agent seeds', () => {
   const ids = AGENT_CATALOG.map(e => e.id);
   assert.equal(new Set(ids).size, ids.length, 'ids must be unique');
-  assert.equal(ids.length, 20, 'the full curated agent roster ships in the catalog');
+  assert.equal(ids.length, 21, 'the full curated agent roster ships in the catalog');
   for (const e of AGENT_CATALOG) {
     assert.match(e.id, /^[a-z0-9][a-z0-9-]{1,31}$/, `${e.id}: id is a valid slug`);
     assert.ok(e.name && e.icon && e.role, `${e.id}: name/icon/role present`);
     assert.match(e.trigger, /^[a-z][a-z0-9-]*$/, `${e.id}: trigger is a single bare CLI token`);
     assert.ok(!/^[a-zA-Z]:[\\/]/.test(e.home), `${e.id}: home is relative (portable across machines)`);
     assert.ok(e.install?.url, `${e.id}: official URL is present`);
-    assert.equal(e.install.cmd, undefined, `${e.id}: executable commands are not projected`);
+    assert.equal(e.install?.cmd, undefined, `${e.id}: executable commands are not projected`);
   }
+});
+
+test('new catalog agents retain their distinct portable detection candidates', () => {
+  const grok = catalogEntry('grok-build');
+  const commandCode = catalogEntry('command-code');
+  assert.equal(grok.trigger, 'grok');
+  assert.equal(grok.home, '.grok');
+  assert.equal(commandCode.trigger, 'cmdc');
+  assert.notEqual(commandCode.trigger, 'cmd');
+  assert.equal(commandCode.home, '.commandcode');
 });
 
 test('compatibility catalog never exposes executable installer strings', () => {

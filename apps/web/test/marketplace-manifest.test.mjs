@@ -10,17 +10,34 @@ import {
 
 const AGENT_IDS = [
   "claude-code", "codex", "kilo-code", "cline", "pi", "antigravity",
-  "hermes", "openclaw", "gemini-cli", "github-copilot-cli", "opencode",
+  "hermes", "openclaw", "github-copilot-cli", "opencode",
   "aider", "goose", "openhands", "qwen-code", "kimi-code",
-  "mistral-vibe", "cursor-agent", "crush", "crimson-odyssey",
+  "mistral-vibe", "cursor-agent", "crush", "crimson-odyssey", "grok-build",
+  "command-code",
 ];
 
-test("launch manifest contains the exact curated 20 agents", () => {
+test("launch manifest contains the exact curated 21 agents", () => {
   assert.deepEqual(
     MARKETPLACE_ENTRIES.filter(entry => entry.kind === "agent").map(entry => entry.id),
     AGENT_IDS,
   );
   assert.deepEqual(validateMarketplace(MARKETPLACE_ENTRIES), { ok: true, errors: [] });
+  assert.equal(marketplaceEntry("gemini-cli"), null);
+});
+
+test("new agents expose official sources, reviewed installers, and safe detection candidates", () => {
+  const grok = marketplaceEntry("grok-build");
+  const commandCode = marketplaceEntry("command-code");
+  assert.equal(grok.sourceUrl, "https://github.com/xai-org/grok-build");
+  assert.equal(grok.officialUrl, "https://docs.x.ai/build/overview");
+  assert.deepEqual(grok.installers, [{ id: "npm", type: "npm-global", package: "@xai-official/grok" }]);
+  assert.equal(grok.agent.trigger, "grok");
+  assert.equal(grok.agent.home, ".grok");
+  assert.equal(commandCode.sourceUrl, "https://commandcode.ai/docs/troubleshooting/windows");
+  assert.deepEqual(commandCode.installers, [{ id: "npm", type: "npm-global", package: "command-code@latest" }]);
+  assert.equal(commandCode.agent.trigger, "cmdc");
+  assert.notEqual(commandCode.agent.trigger, "cmd");
+  assert.equal(commandCode.agent.home, ".commandcode");
 });
 
 test("Hypertaks is featured and exposes one public skill child", () => {

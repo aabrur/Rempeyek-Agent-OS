@@ -5,6 +5,7 @@ import { marketplaceEntry } from "../lib/marketplace-manifest.mjs";
 import {
   resolveAdapter,
   resolveProbe,
+  resolveRuntimeAdapter,
   startResolvedProcess,
 } from "../lib/process-adapters.mjs";
 
@@ -102,14 +103,85 @@ test("platform-limited adapters become official-link only", () => {
   );
 });
 
-test("probes contain a fixed program and argument array", () => {
+test("probes contain fixed program and distinct Grok / Command Code arguments", () => {
   assert.deepEqual(resolveProbe({
-    entry: marketplaceEntry("gemini-cli"),
+    entry: marketplaceEntry("grok-build"),
     platform: "win32",
   }), {
     program: "where.exe",
-    args: ["gemini"],
+    args: ["grok"],
   });
+  assert.deepEqual(resolveProbe({
+    entry: marketplaceEntry("command-code"),
+    platform: "win32",
+  }), {
+    program: "where.exe",
+    args: ["cmdc"],
+  });
+});
+
+test("Grok Build and Command Code installers resolve to reviewed npm commands", () => {
+  assert.deepEqual(resolveAdapter({
+    entry: marketplaceEntry("grok-build"), adapterId: "npm", action: "install", platform: "win32",
+  }), {
+    program: "npm.cmd",
+    args: ["install", "--global", "@xai-official/grok"],
+    display: "npm install --global @xai-official/grok",
+    probe: { program: "where.exe", args: ["grok"] },
+  });
+  assert.deepEqual(resolveAdapter({
+    entry: marketplaceEntry("command-code"), adapterId: "npm", action: "install", platform: "win32",
+  }), {
+    program: "npm.cmd",
+    args: ["install", "--global", "command-code@latest"],
+    display: "npm install --global command-code@latest",
+    probe: { program: "where.exe", args: ["cmdc"] },
+  });
+});
+
+test("runtime adapters never synthesize binary-plus-action commands", () => {
+  const commandCode = resolveRuntimeAdapter({
+    agent: { id: "command-code", gateway: { trigger: "cmdc" } },
+    action: "summon",
+    platform: "win32",
+  });
+  assert.deepEqual(commandCode.command, { program: "cmdc", args: [] });
+  assert.equal(commandCode.runtimeType, "task");
+  assert.equal(commandCode.windowsSupport, "alpha");
+  assert.equal(commandCode.wslFallback, true);
+  assert.equal(commandCode.available, true);
+
+  const run = resolveRuntimeAdapter({
+    agent: { id: "command-code", gateway: { trigger: "cmdc" } },
+    action: "gateway-run",
+    platform: "win32",
+  });
+  assert.equal(run.available, false);
+  assert.match(run.reason, /not verified/i);
+});
+
+test("runtime adapters allow only an explicitly reviewed structured service command", () => {
+  const agent = {
+    id: "service-agent",
+    gateway: {
+      trigger: "service-agent",
+      runtime: {
+        type: "service",
+        commands: {
+          gatewayRun: { verified: true, program: "service-agent", args: ["gateway", "run"] },
+          nativeStop: { verified: true, program: "service-agent", args: ["gateway", "stop"] },
+          healthCheck: { verified: true, program: "service-agent", args: ["health"] },
+        },
+      },
+    },
+  };
+  assert.deepEqual(resolveRuntimeAdapter({ agent, action: "gateway-run" }).command, {
+    program: "service-agent", args: ["gateway", "run"],
+  });
+  assert.deepEqual(resolveRuntimeAdapter({ agent, action: "stop" }).command, {
+    program: "service-agent", args: ["gateway", "stop"],
+  });
+  assert.equal(resolveRuntimeAdapter({ agent, action: "status" }).available, false);
 });
 
 test("resolved processes never delegate to a shell", () => {

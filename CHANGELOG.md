@@ -56,7 +56,7 @@ against the latest GitHub Release of this repository — tag releases as `v<vers
 - Terminal-first visible Marketplace installation opening in `%LOCALAPPDATA%\Rempeyek-Agent-OS`.
 - Summon terminals default to the same canonical state root.
 - Safe launcher alias delegation (`kilocode` delegating to `kilo` without CMD recursion).
-- Expanded Marketplace catalog (20 agent CLIs + Hypertaks plugin/skill) and 9 typed installer adapters.
+- Expanded Marketplace catalog (21 agent CLIs + Hypertaks plugin/skill) and typed installer adapters.
 - Truthful lifecycle telemetry with honest `"Not reported by this agent"` status for unsupported task and subagent states.
 - Local Vault scaffolding (`scaffoldVaultStructure`) and Graphify AST index integration.
 - Desktop updater isolation guarding restarts against active lifecycle operations and redacting raw network errors.

@@ -5,6 +5,7 @@
 export const ACCENT = {
   "claude-code": "#00E5FF", hermes: "#A6FF3C", openclaw: "#4C9BFF", "kilo-code": "#8C5BFF",
   codex: "#FFB01F", copilot: "#FFB01F", cline: "#F2FF3C", pi: "#3CFFC8", antigravity: "#FF8A3C",
+  "grok-build": "#FF4D6A", "command-code": "#00E5FF",
 };
 export const TILE_C = ["#00E5FF", "#FF3DD8", "#A6FF3C", "#FFB01F"];
 export const PALETTE = ["#00E5FF", "#FF3DD8", "#A6FF3C", "#FFB01F", "#8C5BFF", "#FF4D6A", "#3CFFC8", "#FF8A3C", "#4C9BFF", "#F2FF3C"];

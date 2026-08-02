@@ -124,7 +124,8 @@ export function createUnifiedCommandRouter({ env = process.env, agents = [], pla
               const knownAgentDirs = [
                 { dir: '.claude', provider: 'claude', name: 'Claude Code' },
                 { dir: '.commandcode', provider: 'command-code', name: 'Command Code' },
-                { dir: '.gemini', provider: 'gemini', name: 'Antigravity / Gemini' },
+                { dir: '.gemini', provider: 'antigravity', name: 'Antigravity' },
+                { dir: '.grok', provider: 'grok-build', name: 'Grok Build' },
                 { dir: '.cursor', provider: 'cursor', name: 'Cursor' },
                 { dir: '.continue', provider: 'continue', name: 'Continue' },
                 { dir: '.codeium', provider: 'codeium', name: 'Codeium' }

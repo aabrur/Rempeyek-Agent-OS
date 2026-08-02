@@ -14,6 +14,8 @@ const ICONS = {
   pi: Sigma,
   antigravity: Atom,
   copilot: Bot,
+  "grok-build": Bot,
+  "command-code": Terminal,
 };
 
 /** The Neural Vault core node. */

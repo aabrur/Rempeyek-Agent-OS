@@ -38,9 +38,17 @@ describe('/agents command', () => {
     const resp = await router.executeCommand({ command: '/agents', operation: 'discover' });
     assert.strictEqual(resp.success, true);
     assert.ok(resp.result.discovered.length > 0);
-    const gemini = resp.result.discovered.find(d => d.provider === 'gemini');
-    assert.ok(gemini, 'Should discover .gemini directory');
-    assert.strictEqual(gemini.path, path.join(tmpDir, '.gemini'));
+    const antigravity = resp.result.discovered.find(d => d.provider === 'antigravity');
+    assert.ok(antigravity, 'Should discover .gemini as Antigravity state');
+    assert.strictEqual(antigravity.path, path.join(tmpDir, '.gemini'));
+  });
+
+  it('should discover Grok Build and Command Code home directories', async () => {
+    fs.mkdirSync(path.join(tmpDir, '.grok'), { recursive: true });
+    fs.mkdirSync(path.join(tmpDir, '.commandcode'), { recursive: true });
+    const resp = await router.executeCommand({ command: '/agents', operation: 'discover' });
+    assert.ok(resp.result.discovered.some(d => d.provider === 'grok-build'));
+    assert.ok(resp.result.discovered.some(d => d.provider === 'command-code'));
   });
 
   it('should register a new agent', async () => {

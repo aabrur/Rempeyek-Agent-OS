@@ -62,7 +62,7 @@ The desktop updater supports automated background checks, release manifest verif
   turn off glow and particles entirely, and the system reduce-motion preference is
   always respected
 - **Public Marketplace** — browse separate **Agents**, **Plugins**, and
-  **Skills** filters. The dated 2026-07-24 launch curation contains 20 agent
+  **Skills** filters. The current launch curation contains 21 agent
   projects for portable discovery; it is maintained product curation, not a
   ranking or performance claim
 - **Safe install boundary** — reviewed adapters execute fixed programs and

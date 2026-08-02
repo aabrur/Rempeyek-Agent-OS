@@ -123,14 +123,17 @@ async function mutation(base, url, {
   });
 }
 
-test("Marketplace response is redacted, aliased, and contains exactly 20 agents", async () => {
+test("Marketplace response is redacted, aliased, and contains exactly 21 agents", async () => {
   await withServer(async ({ base }) => {
     for (const route of ["/api/marketplace", "/api/catalog"]) {
       const response = await fetch(`${base}${route}`);
       assert.equal(response.status, 200);
       const body = await response.json();
       assert.equal(body.schemaVersion, 1);
-      assert.equal(body.entries.filter(entry => entry.kind === "agent").length, 20);
+      const agentIds = body.entries.filter(entry => entry.kind === "agent").map(entry => entry.id);
+      assert.equal(agentIds.length, 21);
+      assert.equal(agentIds.includes("gemini-cli"), false);
+      assert.deepEqual(agentIds.slice(-2), ["grok-build", "command-code"]);
       assert.equal(JSON.stringify(body).includes("\"program\""), false);
       assert.equal(JSON.stringify(body).includes("\"package\""), false);
       assert.equal(JSON.stringify(body).includes("\"packageId\""), false);
