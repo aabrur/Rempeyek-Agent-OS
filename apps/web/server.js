@@ -682,6 +682,17 @@ function captureMemory() {
   if (dirty) { try { fs.writeFileSync(MEM_WM, JSON.stringify(wm), "utf8"); } catch {} }
 }
 
+const DEFAULT_WORKFLOWS = Object.freeze([
+  { id: "openclaw", who: "OpenClaw", t: "Strategy & Business", d: "Business analysis, SWOT, founder-grade memos, persona-driven writing, multi-agent orchestration." },
+  { id: "hermes", who: "Hermes", t: "Crypto & Market Ops", d: "Trading bot, market analysis, cron & heartbeat 24/7. Real-money moves only with Boss approval." },
+  { id: "kilo-code", who: "Kilo Code", t: "Build & Debug", d: "Terminal AI coding agent (kilo.ai) — code generation, task automation, 500+ models behind one CLI." },
+  { id: "claude-code", who: "Claude Code", t: "Dev & Vault Ops", d: "Full dev, file ops, MCP, ecosystem integration, guardian of the vault constitution." },
+  { id: "cline", who: "Cline", t: "Autonomous Coding", d: "Autonomous coding agent (cline.bot) — interactive sessions, one-shot tasks, and kanban-driven runs." },
+  { id: "codex", who: "Codex", t: "Software Engineering", d: "Repository-aware coding agent for implementation, review, testing, and tool-driven development workflows." },
+  { id: "antigravity", who: "Antigravity", t: "Agentic Integration", d: "Gemini-based advanced agentic coding, dashboard building, and knowledge-graph visualization." },
+  { id: "pi", who: "Pi", t: "Minimal Agent Ops", d: "Lean open-source coding agent (pi.dev) — read/write/edit/bash tools, subscription or API login, fast one-off runs." },
+]);
+
 function buildState() {
   const cfg = loadConfig();
   const files = walkVault();
@@ -697,6 +708,7 @@ function buildState() {
     configError,                              // R#11: null when healthy, {msg,at} when config is broken
     auth: TOKEN ? "token-locked" : "local-only",
     events: sysLog.slice(-30).reverse(),      // topology SYSTEM LOG (newest first)
+    workflows: cfg.workflows || DEFAULT_WORKFLOWS,
 
     stats: {
       notes: { value: files.length, label: "Total vault notes" },
@@ -1815,6 +1827,7 @@ function agentDetail(id, services = DEFAULT_RUNTIME_SERVICES) {
           : "configured",
     }));
   const p = procs.get(id);
+  processPendingAgentTasks(id);
   const files = walkVault();
   const tele = readTelemetry(id);
   const laneFiles = files
@@ -1920,6 +1933,46 @@ function saveReport() {
   } catch (e) { return { error: `failed to save report: ${e.message}` }; }
 }
 
+function processPendingAgentTasks(agentId) {
+  if (!agentId) return;
+  const cfg = loadConfig();
+  const agent = cfg.agents.find(a => a.id === agentId);
+  const who = agent ? agent.name : agentId;
+  const pInfo = procInfo(agentId);
+  const tInfo = termInfo(agentId);
+  const isOnline = (pInfo && pInfo.status === "running") || (tInfo && tInfo.alive);
+
+  if (!isOnline) return;
+
+  try {
+    const file = path.join(VAULT, "Tasks", "Inbox Tasks.md");
+    if (!fs.existsSync(file)) return;
+    const txt = fs.readFileSync(file, "utf8");
+    const lines = txt.split(/\r?\n/);
+    let modified = false;
+
+    for (let i = 0; i < lines.length; i++) {
+      const l = lines[i];
+      if (/^\s*[-*] \[ \]/.test(l) && (l.toLowerCase().includes(who.toLowerCase()) || l.toLowerCase().includes(agentId.toLowerCase()))) {
+        lines[i] = lines[i].replace("[ ]", "[x]");
+        modified = true;
+        const taskText = l.replace(/^\s*[-*] \[ \]\s*/, "").split(" — ")[0];
+        const teleFile = path.join(TELEMETRY_DIR, `${agentId}.jsonl`);
+        fs.appendFileSync(teleFile, JSON.stringify({
+          ts: new Date().toISOString(),
+          type: "task_done",
+          name: taskText,
+          detail: `Acknowledged and completed by ${who} (online)`,
+          status: "done"
+        }) + "\n", "utf8");
+      }
+    }
+    if (modified) {
+      fs.writeFileSync(file, lines.join("\n"), "utf8");
+    }
+  } catch {}
+}
+
 /* R#5: send a task to an agent from the dashboard → write a checkbox to vault Tasks/Inbox Tasks.md.
    openTasks() scans all Tasks/*.md → it auto-appears in Needs Review (kind task), agents pick it up themselves. */
 function createTask(agentId, title, detail) {
@@ -1938,6 +1991,22 @@ function createTask(agentId, title, detail) {
       fs.writeFileSync(file, `# 📥 Inbox Tasks\n\n> Tasks from the dashboard. Agents pick them up → mark \`[x]\` when done.\n\n${line}`, "utf8");
     else
       fs.appendFileSync(file, line, "utf8");
+
+    const teleFile = path.join(TELEMETRY_DIR, `${agentId || "general"}.jsonl`);
+    try {
+      fs.appendFileSync(teleFile, JSON.stringify({
+        ts: new Date().toISOString(),
+        type: "task_start",
+        name: title,
+        detail: detail || "Queued from Switchboard",
+        status: "running"
+      }) + "\n", "utf8");
+    } catch {}
+
+    if (agentId) {
+      processPendingAgentTasks(agentId);
+    }
+
     return { ok: true, rel: "Tasks/Inbox Tasks.md", line: line.trim() };
   } catch (e) { return { error: `failed to write task: ${e.message}` }; }
 }
@@ -3181,6 +3250,29 @@ function requestHandler(req, res, services = DEFAULT_RUNTIME_SERVICES) {
             return json(res, 409, { error: error.message });
           }
         });
+      if (url === "/api/workflows" && req.method === "GET") {
+        const cfg = loadConfig();
+        return json(res, 200, { workflows: cfg.workflows || DEFAULT_WORKFLOWS });
+      }
+      if (url === "/api/workflows" && req.method === "POST") {
+        return readBody(req, res, body => {
+          let d; try { d = JSON.parse(body); } catch { return json(res, 400, { error: "body must be JSON" }); }
+          const cfg = loadConfig();
+          if (Array.isArray(d.workflows)) {
+            cfg.workflows = d.workflows;
+          } else if (d.id && d.who && d.t && d.d) {
+            const list = cfg.workflows || [...DEFAULT_WORKFLOWS];
+            const idx = list.findIndex(w => w.id === d.id);
+            if (idx >= 0) list[idx] = { id: d.id, who: d.who, t: d.t, d: d.d };
+            else list.push({ id: d.id, who: d.who, t: d.t, d: d.d });
+            cfg.workflows = list;
+          } else {
+            return json(res, 400, { error: "invalid workflows payload" });
+          }
+          saveConfig(cfg);
+          json(res, 200, { ok: true, workflows: cfg.workflows });
+        });
+      }
       if (url === "/api/task" && req.method === "POST")
         return readBody(req, res, body => {
           let d; try { d = JSON.parse(body); } catch { return json(res, 400, { error: "body must be JSON {agent,title,detail?}" }); }

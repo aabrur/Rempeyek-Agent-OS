@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rempeyek Agent OS — Dashboard</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Rempeyek Agent OS</h1>
+      <div id="status-badge" style="font-size: 0.875rem; color: var(--text-muted);">21 Registered Agents</div>
+    </header>
+
+    <main>
+      <!-- Agent Grid Section -->
+      <section>
+        <div id="agent-grid" class="agent-grid">
+          <!-- Dynamically populated by app.js -->
+        </div>
+      </section>
+
+      <!-- Agent Profile Section -->
+      <section id="agent-profile-section" class="profile-section hidden">
+        <div class="profile-header">
+          <span id="profile-icon" class="agent-icon">🟢</span>
+          <div>
+            <h2 id="profile-heading" class="profile-heading" tabindex="-1">Agent Profile</h2>
+            <div id="profile-node-id" class="agent-node">Node-1</div>
+          </div>
+        </div>
+
+        <div class="profile-details-grid">
+          <div class="detail-card">
+            <div class="detail-title">Role</div>
+            <div id="profile-role" class="detail-value">Operations</div>
+          </div>
+          <div class="detail-card">
+            <div class="detail-title">Provider & Runtime</div>
+            <div id="profile-provider" class="detail-value">Hermes (Service)</div>
+          </div>
+          <div class="detail-card">
+            <div class="detail-title">Home Directory</div>
+            <div id="profile-home" class="detail-value">~/.hermes</div>
+          </div>
+          <div class="detail-card">
+            <div class="detail-title">Capabilities</div>
+            <div id="profile-capabilities" class="detail-value">research, operations, crypto</div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

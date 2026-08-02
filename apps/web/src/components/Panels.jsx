@@ -1,5 +1,7 @@
-import { Empty, Panel, Skeleton } from "@rempeyek/ui";
+import { useState } from "react";
+import { Btn, Empty, Panel, Skeleton } from "@rempeyek/ui";
 import { agentAccent, TILE_C, WORKFLOWS } from "../lib/agents";
+import { api } from "../api";
 
 export function StatTiles({ stats }) {
   return (
@@ -15,15 +17,87 @@ export function StatTiles({ stats }) {
   );
 }
 
-export function WorkflowCards() {
+export function WorkflowCards({ workflows, refresh }) {
+  const list = (workflows && Array.isArray(workflows) && workflows.length) ? workflows : WORKFLOWS;
+  const [editingId, setEditingId] = useState(null);
+  const [editForm, setEditForm] = useState({ who: "", t: "", d: "" });
+  const [busy, setBusy] = useState(false);
+
+  const startEdit = (w) => {
+    setEditingId(w.id);
+    setEditForm({ who: w.who, t: w.t, d: w.d });
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditForm({ who: "", t: "", d: "" });
+  };
+
+  const saveEdit = async (id) => {
+    setBusy(true);
+    const updated = list.map(w => w.id === id ? { ...w, ...editForm } : w);
+    const r = await api("/api/workflows", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ workflows: updated }),
+    });
+    setBusy(false);
+    if (r.error) alert(r.error);
+    else {
+      setEditingId(null);
+      refresh?.();
+    }
+  };
+
   return (
     <Panel title="PRIMARY WORKFLOWS" chip="routing">
       <div className="workflow-grid">
-        {WORKFLOWS.map(w => (
+        {list.map(w => (
           <div key={w.id} className="wf" style={{ "--ac": agentAccent(w.id) }}>
-            <span className="who" style={{ color: agentAccent(w.id) }}>{w.who}</span>
-            <div className="t">{w.t}</div>
-            <div className="d">{w.d}</div>
+            {editingId === w.id ? (
+              <div className="wf-edit-form" style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <input
+                  type="text"
+                  value={editForm.who}
+                  onChange={e => setEditForm(prev => ({ ...prev, who: e.target.value }))}
+                  placeholder="Agent / Label"
+                  style={{ background: "var(--bg-card)", color: "var(--fg)", border: "1px solid var(--border)", padding: "4px 8px", borderRadius: 4, fontSize: "0.85rem" }}
+                />
+                <input
+                  type="text"
+                  value={editForm.t}
+                  onChange={e => setEditForm(prev => ({ ...prev, t: e.target.value }))}
+                  placeholder="Workflow Title"
+                  style={{ background: "var(--bg-card)", color: "var(--fg)", border: "1px solid var(--border)", padding: "4px 8px", borderRadius: 4, fontSize: "0.85rem" }}
+                />
+                <textarea
+                  value={editForm.d}
+                  onChange={e => setEditForm(prev => ({ ...prev, d: e.target.value }))}
+                  placeholder="Description"
+                  rows={2}
+                  style={{ background: "var(--bg-card)", color: "var(--fg)", border: "1px solid var(--border)", padding: "4px 8px", borderRadius: 4, fontSize: "0.8rem", resize: "vertical" }}
+                />
+                <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
+                  <Btn variant="run" className="btn-mini" disabled={busy} onClick={() => saveEdit(w.id)}>
+                    {busy ? "…" : "✓ Save"}
+                  </Btn>
+                  <Btn variant="dim" className="btn-mini" onClick={cancelEdit}>
+                    Cancel
+                  </Btn>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span className="who" style={{ color: agentAccent(w.id) }}>{w.who}</span>
+                  <Btn variant="dim" className="btn-mini" style={{ fontSize: "0.75rem", padding: "2px 6px" }} onClick={() => startEdit(w)}>
+                    ✏ edit
+                  </Btn>
+                </div>
+                <div className="t">{w.t}</div>
+                <div className="d">{w.d}</div>
+              </>
+            )}
           </div>
         ))}
       </div>
@@ -31,7 +105,7 @@ export function WorkflowCards() {
   );
 }
 
-const ageLabel = h => h == null ? "—" : h < 1 ? "<1 hour" : h < 48 ? `${h} hours` : `${Math.round(h / 24)} days`;
+const ageLabel = h => h == null ? "-" : h < 1 ? "<1 hour" : h < 48 ? `${h} hours` : `${Math.round(h / 24)} days`;
 
 export function VaultHealth({ health }) {
   return (
@@ -73,7 +147,7 @@ export function ScheduleList({ schedule }) {
                 <span className={`dot ${t.error ? "error" : t.ok ? "running" : "exited"}`} />
                 <span className="sched-a">{t.icon} {t.agent}</span>
                 <span className="sched-d">
-                  {t.error ? t.error : `last: ${t.lastRun || "—"} · result ${t.lastResult ?? "—"} · next ${t.nextRun || "—"}`}
+                  {t.error ? t.error : `last: ${t.lastRun || "-"} · result ${t.lastResult ?? "-"} · next ${t.nextRun || "-"}`}
                 </span>
               </div>
             ))}
@@ -86,14 +160,14 @@ export function ConfigBanner({ configError, stateError }) {
   if (stateError) {
     return (
       <div className="config-banner">
-        ⚠ <b>Failed to load state</b> — {stateError}. Try reloading the page; if you use a token, make sure it is correct.
+        ⚠ <b>Failed to load state</b>: {stateError}. Try reloading the page; if you use a token, make sure it is correct.
       </div>
     );
   }
   if (!configError) return null;
   return (
     <div className="config-banner">
-      ⚠ <b>agents.config.json is broken</b> — using the last valid config. <code>{configError.msg}</code> · fix the file and the dashboard auto-reloads.
+      ⚠ <b>agents.config.json is broken</b>: using the last valid config. <code>{configError.msg}</code> · fix the file and the dashboard auto-reloads.
     </div>
   );
 }

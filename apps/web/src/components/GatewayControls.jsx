@@ -22,7 +22,7 @@ function SummonSplit({ agent, gw }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   const acts = agent.actions || [];
-  const busy = gw.isBusy(agent.id, "summon");
+  const busy = gw.isBusy(agent.id, "summon") || gw.isBusy(agent.id, "run");
 
   useEffect(() => {
     if (!open) return;
@@ -31,9 +31,24 @@ function SummonSplit({ agent, gw }) {
     return () => document.removeEventListener("click", close);
   }, [open]);
 
+  const handleGatewayRun = e => {
+    e.stopPropagation();
+    setOpen(false);
+    if (acts.includes("run")) {
+      gw.runAction(agent.id, "run");
+    } else {
+      gw.runTerminal(agent.id, "run");
+    }
+  };
+
   const menu = [
+    <button key="summon" onClick={e => { e.stopPropagation(); setOpen(false); gw.runTerminal(agent.id, "summon"); }}>
+      ⧉ Summon · terminal
+    </button>,
+    <button key="gw-run" onClick={handleGatewayRun}>
+      ⚡ Gateway Run · foreground
+    </button>,
     acts.includes("start") && <button key="start" onClick={e => { e.stopPropagation(); setOpen(false); gw.runAction(agent.id, "start"); }}>▶ Start gateway (service)</button>,
-    acts.includes("run") && <button key="run" onClick={e => { e.stopPropagation(); setOpen(false); gw.runTerminal(agent.id, "run"); }}>⚡ Gateway run · terminal (foreground)</button>,
     (acts.includes("status") || acts.includes("restart")) && <div key="sep" className="gw-menu-sep" />,
     acts.includes("status") && <button key="status" onClick={e => { e.stopPropagation(); setOpen(false); gw.runAction(agent.id, "status"); }}>◇ Status</button>,
     acts.includes("restart") && <button key="restart" onClick={e => { e.stopPropagation(); setOpen(false); gw.runAction(agent.id, "restart"); }}>↻ Restart</button>,
@@ -51,10 +66,8 @@ function SummonSplit({ agent, gw }) {
     </Btn>
   );
 
-  if (!menu.length) return summonBtn("");
-
   return (
-    <div className="gw-split" ref={ref}>
+    <div className="gw-split" ref={ref} onClick={e => e.stopPropagation()}>
       {summonBtn("gw-main")}
       <Btn variant="run" className="gw-caret" title="More options" onClick={e => { e.stopPropagation(); setOpen(o => !o); }}>▾</Btn>
       <div className={`gw-menu ${open ? "open" : ""}`.trim()}>{menu}</div>
@@ -80,9 +93,11 @@ export function GatewayControls({ agent, gw, compact, onOpenLog }) {
   if (compact) {
     if (termAlive) return <ActionBtn agent={agent} act="stop-term" gw={gw} />;
     if (running) return <ActionBtn agent={agent} act="stop" gw={gw} />;
-    if (agent.canSummon) return <SummonSplit agent={agent} gw={gw} />;
+    if (agent.canSummon || acts.length > 0) return <SummonSplit agent={agent} gw={gw} />;
     return acts[0] ? <ActionBtn agent={agent} act={acts[0]} gw={gw} /> : null;
   }
+
+  const canRun = acts.includes("run") || Boolean(agent.canSummon);
 
   return (
     <>
@@ -97,9 +112,9 @@ export function GatewayControls({ agent, gw, compact, onOpenLog }) {
       </Btn>
       <Btn
         variant="dim"
-        disabled={agentBusy || !acts.includes("run")}
-        title={!acts.includes("run") ? "This profile has no reviewed foreground gateway command" : ""}
-        onClick={() => gw.runAction(agent.id, "run")}
+        disabled={agentBusy || !canRun}
+        title={!canRun ? "This profile has no reviewed foreground gateway command" : ""}
+        onClick={() => acts.includes("run") ? gw.runAction(agent.id, "run") : gw.runTerminal(agent.id, "run")}
       >
         Gateway run
       </Btn>

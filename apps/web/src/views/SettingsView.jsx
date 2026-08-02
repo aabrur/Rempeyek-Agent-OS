@@ -110,9 +110,9 @@ export function SettingsView({ theme, onTheme, state }) {
             <ThemePicker theme={theme} onPick={onTheme} />
           </div>
           <p className="settings-note">
-            {active ? `${active.name} — ${active.description}.` : ""}{" "}
+            {active ? `${active.name}: ${active.description}.` : ""}{" "}
             Minimalist and Brutalist switch off glow, stars, and particles by
-            design; the system “reduce motion” preference is always respected.
+            design; the system "reduce motion" preference is always respected.
           </p>
         </Panel>
 
@@ -203,11 +203,11 @@ export function SettingsView({ theme, onTheme, state }) {
           <div className="settings-facts">
             <div>
               <span>VERSION</span>
-              <b>{shownVersion ? `v${shownVersion}` : "—"}</b>
+              <b>{shownVersion ? `v${shownVersion}` : "-"}</b>
             </div>
             <div>
               <span>REVISION</span>
-              <b>{version?.rev || (nativeRuntime?.packaged ? "packaged" : "—")}</b>
+              <b>{version?.rev || (nativeRuntime?.packaged ? "packaged" : "-")}</b>
             </div>
             <div>
               <span>REPOSITORY</span>

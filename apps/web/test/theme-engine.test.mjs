@@ -50,3 +50,22 @@ test("theme keyboard navigation supports Home and End without consuming other ke
   assert.equal(themeSelectionFromKey("brutalist", "Enter"), null);
   assert.equal(themeSelectionFromKey("unknown", "ArrowRight"), "minimalist");
 });
+
+test("themes.css contains explicit readable surface and pill tokens for minimalist and brutalist", async () => {
+  const fs = await import("node:fs/promises");
+  const css = await fs.readFile(new URL("../../../packages/theme-engine/src/themes.css", import.meta.url), "utf8");
+  assert.match(css, /:root\[data-theme="minimalist"\]\s*\{[^}]*--pill-bg:#e4d9c9/);
+  assert.match(css, /:root\[data-theme="brutalist"\]\s*\{[^}]*--pill-bg:#ffe574/);
+  assert.match(css, /:root\[data-theme="minimalist"\]\s*:is\(\.tile,\.panel,\.agent-card,\.ws-card,\.today-panel,\.dsec,\.wf,\.approval-queue,\.aa-cat-card\)\s*\{[^}]*background:var\(--card\)/);
+});
+
+test("glassmorph and cyberpunk themes have distinct visual tokens, backgrounds, and geometry", async () => {
+  const fs = await import("node:fs/promises");
+  const css = await fs.readFile(new URL("../../../packages/theme-engine/src/themes.css", import.meta.url), "utf8");
+  assert.match(css, /:root\[data-theme="glassmorph"\]\s*\{[^}]*--acc:#38bdf8/);
+  assert.match(css, /:root\[data-theme="glassmorph"\]\s*\{[^}]*--surface-blur:22px/);
+  assert.match(css, /:root\[data-theme="cyberpunk"\]\s*\{[^}]*--bg:#02040a/);
+  assert.match(css, /:root\[data-theme="cyberpunk"\]\s*\{[^}]*--magenta:#ff0055/);
+});
+
+

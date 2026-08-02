@@ -85,9 +85,9 @@ export const MARKETPLACE_ENTRIES = Object.freeze([
     "🌀",
     "Minimal open-source coding agent",
     "pi",
-    ".pi",
+    ".pi/agent",
     "https://github.com/badlogic/pi-mono",
-    [{ id: "npm", type: "npm-global", package: "@mariozechner/pi-coding-agent" }],
+    [{ id: "npm", type: "npm-global", package: "@earendil-works/pi-coding-agent" }],
   ),
   agent(
     "antigravity",

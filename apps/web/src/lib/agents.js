@@ -1,4 +1,4 @@
-/* Agent presentation logic — colors, gateway state, workflow routing. */
+/* Agent presentation logic: colors, gateway state, workflow routing. */
 
 /* Built-in accents. An agent's own `accent` field (agents.config.json) wins over this;
    agents added from the dashboard always carry one. */
@@ -19,12 +19,12 @@ export function agentAccent(agent) {
 export const WORKFLOWS = [
   { id: "openclaw", who: "OpenClaw", t: "Strategy & Business", d: "Business analysis, SWOT, founder-grade memos, persona-driven writing, multi-agent orchestration." },
   { id: "hermes", who: "Hermes", t: "Crypto & Market Ops", d: "Trading bot, market analysis, cron & heartbeat 24/7. Real-money moves only with Boss approval." },
-  { id: "kilo-code", who: "Kilo Code", t: "Build & Debug", d: "Terminal AI coding agent (kilo.ai) — code generation, task automation, 500+ models behind one CLI." },
+  { id: "kilo-code", who: "Kilo Code", t: "Build & Debug", d: "Terminal AI coding agent (kilo.ai) - code generation, task automation, 500+ models behind one CLI." },
   { id: "claude-code", who: "Claude Code", t: "Dev & Vault Ops", d: "Full dev, file ops, MCP, ecosystem integration, guardian of the vault constitution." },
-  { id: "cline", who: "Cline", t: "Autonomous Coding", d: "Autonomous coding agent (cline.bot) — interactive sessions, one-shot tasks, and kanban-driven runs." },
+  { id: "cline", who: "Cline", t: "Autonomous Coding", d: "Autonomous coding agent (cline.bot) - interactive sessions, one-shot tasks, and kanban-driven runs." },
   { id: "codex", who: "Codex", t: "Software Engineering", d: "Repository-aware coding agent for implementation, review, testing, and tool-driven development workflows." },
   { id: "antigravity", who: "Antigravity", t: "Agentic Integration", d: "Gemini-based advanced agentic coding, dashboard building, and knowledge-graph visualization." },
-  { id: "pi", who: "Pi", t: "Minimal Agent Ops", d: "Lean open-source coding agent (pi.dev) — read/write/edit/bash tools, subscription or API login, fast one-off runs." },
+  { id: "pi", who: "Pi", t: "Minimal Agent Ops", d: "Lean open-source coding agent (pi.dev) - read/write/edit/bash tools, subscription or API login, fast one-off runs." },
 ];
 
 /** Normalize the server's proc info into {cls,label,tip} for pills. */

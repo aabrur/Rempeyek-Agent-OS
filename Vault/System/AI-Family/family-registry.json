@@ -1,0 +1,473 @@
+{
+  "schema_version": 1,
+  "updated_at": "2026-08-02T03:52:51.613Z",
+  "node_count": 21,
+  "nodes": [
+    {
+      "node_id": "Node-1",
+      "agent_id": "hermes",
+      "display_name": "Hermes",
+      "provider": "hermes",
+      "role": "Crypto, research, and operations agent",
+      "capabilities": [
+        "research",
+        "operations",
+        "crypto"
+      ],
+      "status": "active",
+      "created_at": "2026-08-02T03:14:03.038514+00:00",
+      "last_seen_at": "2026-08-02T03:14:03.038514+00:00",
+      "skills_manifest": "",
+      "memory_scope": [
+        "shared",
+        "project",
+        "private"
+      ],
+      "trust_level": "standard",
+      "schema_version": 1
+    },
+    {
+      "node_id": "Node-2",
+      "agent_id": "openclaw",
+      "display_name": "OpenClaw",
+      "provider": "openclaw",
+      "role": "Strategy and business analysis agent",
+      "capabilities": [
+        "strategy",
+        "analysis",
+        "business"
+      ],
+      "status": "active",
+      "created_at": "2026-08-02T03:14:03.042817+00:00",
+      "last_seen_at": "2026-08-02T03:14:03.042817+00:00",
+      "skills_manifest": "",
+      "memory_scope": [
+        "shared",
+        "project",
+        "private"
+      ],
+      "trust_level": "standard",
+      "schema_version": 1
+    },
+    {
+      "node_id": "Node-3",
+      "agent_id": "antigravity",
+      "display_name": "Antigravity",
+      "provider": "gemini",
+      "role": "Advanced agentic coding and integration",
+      "capabilities": [
+        "coding",
+        "integration",
+        "design"
+      ],
+      "status": "active",
+      "created_at": "2026-08-02T03:14:03.046324+00:00",
+      "last_seen_at": "2026-08-02T03:14:03.046324+00:00",
+      "skills_manifest": "",
+      "memory_scope": [
+        "shared",
+        "project",
+        "private"
+      ],
+      "trust_level": "standard",
+      "schema_version": 1
+    },
+    {
+      "node_id": "Node-4",
+      "agent_id": "cline",
+      "display_name": "Cline",
+      "provider": "claude",
+      "role": "Autonomous coding agent",
+      "capabilities": [
+        "coding",
+        "implementation"
+      ],
+      "status": "active",
+      "created_at": "2026-08-02T03:14:03.049518+00:00",
+      "last_seen_at": "2026-08-02T03:14:03.049518+00:00",
+      "skills_manifest": "",
+      "memory_scope": [
+        "shared",
+        "project",
+        "private"
+      ],
+      "trust_level": "standard",
+      "schema_version": 1
+    },
+    {
+      "node_id": "Node-5",
+      "agent_id": "codex",
+      "display_name": "Codex",
+      "provider": "openai",
+      "role": "Repository-aware software engineering agent",
+      "capabilities": [
+        "coding",
+        "engineering",
+        "audit"
+      ],
+      "status": "active",
+      "created_at": "2026-08-02T03:14:03.052394+00:00",
+      "last_seen_at": "2026-08-02T03:14:03.052394+00:00",
+      "skills_manifest": "",
+      "memory_scope": [
+        "shared",
+        "project",
+        "private"
+      ],
+      "trust_level": "standard",
+      "schema_version": 1
+    },
+    {
+      "node_id": "Node-6",
+      "agent_id": "claude-code",
+      "display_name": "Claude Code",
+      "provider": "claude",
+      "role": "Coding & technical specialist",
+      "capabilities": [
+        "coding",
+        "technical"
+      ],
+      "status": "active",
+      "created_at": "2026-08-02T03:14:03.055818+00:00",
+      "last_seen_at": "2026-08-02T03:14:03.055818+00:00",
+      "skills_manifest": "",
+      "memory_scope": [
+        "shared",
+        "project",
+        "private"
+      ],
+      "trust_level": "standard",
+      "schema_version": 1
+    },
+    {
+      "node_id": "Node-7",
+      "agent_id": "github-copilot-cli",
+      "display_name": "GitHub Copilot CLI",
+      "provider": "github",
+      "role": "GitHub Copilot terminal assistant",
+      "capabilities": [
+        "coding",
+        "cli"
+      ],
+      "status": "active",
+      "created_at": "2026-08-02T03:14:03.058359+00:00",
+      "last_seen_at": "2026-08-02T03:14:03.058359+00:00",
+      "skills_manifest": "",
+      "memory_scope": [
+        "shared",
+        "project",
+        "private"
+      ],
+      "trust_level": "standard",
+      "schema_version": 1
+    },
+    {
+      "node_id": "Node-8",
+      "agent_id": "opencode",
+      "display_name": "OpenCode",
+      "provider": "opencode",
+      "role": "Open-source terminal AI coding assistant",
+      "capabilities": [
+        "coding",
+        "open-source"
+      ],
+      "status": "active",
+      "created_at": "2026-08-02T03:14:03.061525+00:00",
+      "last_seen_at": "2026-08-02T03:14:03.061525+00:00",
+      "skills_manifest": "",
+      "memory_scope": [
+        "shared",
+        "project",
+        "private"
+      ],
+      "trust_level": "standard",
+      "schema_version": 1
+    },
+    {
+      "node_id": "Node-9",
+      "agent_id": "qwen-code",
+      "display_name": "Qwen Code",
+      "provider": "qwen",
+      "role": "Open-source Qwen terminal coding agent",
+      "capabilities": [
+        "coding",
+        "open-source"
+      ],
+      "status": "active",
+      "created_at": "2026-08-02T03:14:03.064621+00:00",
+      "last_seen_at": "2026-08-02T03:14:03.064621+00:00",
+      "skills_manifest": "",
+      "memory_scope": [
+        "shared",
+        "project",
+        "private"
+      ],
+      "trust_level": "standard",
+      "schema_version": 1
+    },
+    {
+      "node_id": "Node-10",
+      "agent_id": "aider",
+      "display_name": "Aider",
+      "provider": "aider",
+      "role": "AI pair programming terminal agent",
+      "capabilities": [
+        "coding",
+        "pair-programming"
+      ],
+      "status": "active",
+      "created_at": "2026-08-02T03:14:03.067630+00:00",
+      "last_seen_at": "2026-08-02T03:14:03.067630+00:00",
+      "skills_manifest": "",
+      "memory_scope": [
+        "shared",
+        "project",
+        "private"
+      ],
+      "trust_level": "standard",
+      "schema_version": 1
+    },
+    {
+      "node_id": "Node-11",
+      "agent_id": "goose",
+      "display_name": "Goose",
+      "provider": "goose",
+      "role": "Open-source AI developer agent",
+      "capabilities": [
+        "coding",
+        "automation"
+      ],
+      "status": "active",
+      "created_at": "2026-08-02T03:14:03.069631+00:00",
+      "last_seen_at": "2026-08-02T03:14:03.069631+00:00",
+      "skills_manifest": "",
+      "memory_scope": [
+        "shared",
+        "project",
+        "private"
+      ],
+      "trust_level": "standard",
+      "schema_version": 1
+    },
+    {
+      "node_id": "Node-12",
+      "agent_id": "openhands",
+      "display_name": "OpenHands",
+      "provider": "openhands",
+      "role": "Autonomous AI software engineer",
+      "capabilities": [
+        "coding",
+        "engineering"
+      ],
+      "status": "active",
+      "created_at": "2026-08-02T03:14:03.073770+00:00",
+      "last_seen_at": "2026-08-02T03:14:03.073770+00:00",
+      "skills_manifest": "",
+      "memory_scope": [
+        "shared",
+        "project",
+        "private"
+      ],
+      "trust_level": "standard",
+      "schema_version": 1
+    },
+    {
+      "node_id": "Node-13",
+      "agent_id": "mistral-vibe",
+      "display_name": "Mistral Vibe",
+      "provider": "mistral",
+      "role": "Mistral terminal coding assistant",
+      "capabilities": [
+        "coding",
+        "terminal"
+      ],
+      "status": "active",
+      "created_at": "2026-08-02T03:14:03.076772+00:00",
+      "last_seen_at": "2026-08-02T03:14:03.076772+00:00",
+      "skills_manifest": "",
+      "memory_scope": [
+        "shared",
+        "project",
+        "private"
+      ],
+      "trust_level": "standard",
+      "schema_version": 1
+    },
+    {
+      "node_id": "Node-14",
+      "agent_id": "cursor-agent",
+      "display_name": "Cursor Agent",
+      "provider": "cursor",
+      "role": "Cursor terminal and IDE agent",
+      "capabilities": [
+        "coding",
+        "ide"
+      ],
+      "status": "active",
+      "created_at": "2026-08-02T03:14:03.080217+00:00",
+      "last_seen_at": "2026-08-02T03:14:03.080217+00:00",
+      "skills_manifest": "",
+      "memory_scope": [
+        "shared",
+        "project",
+        "private"
+      ],
+      "trust_level": "standard",
+      "schema_version": 1
+    },
+    {
+      "node_id": "Node-15",
+      "agent_id": "crush",
+      "display_name": "Crush",
+      "provider": "crush",
+      "role": "Charm terminal AI coding agent",
+      "capabilities": [
+        "coding",
+        "terminal"
+      ],
+      "status": "active",
+      "created_at": "2026-08-02T03:14:03.083855+00:00",
+      "last_seen_at": "2026-08-02T03:14:03.083855+00:00",
+      "skills_manifest": "",
+      "memory_scope": [
+        "shared",
+        "project",
+        "private"
+      ],
+      "trust_level": "standard",
+      "schema_version": 1
+    },
+    {
+      "node_id": "Node-16",
+      "agent_id": "crimson-odyssey",
+      "display_name": "Crimson Odyssey",
+      "provider": "crimson",
+      "role": "Crimson Odyssey specialized agent",
+      "capabilities": [
+        "coding",
+        "specialized"
+      ],
+      "status": "active",
+      "created_at": "2026-08-02T03:14:03.086864+00:00",
+      "last_seen_at": "2026-08-02T03:14:03.086864+00:00",
+      "skills_manifest": "",
+      "memory_scope": [
+        "shared",
+        "project",
+        "private"
+      ],
+      "trust_level": "standard",
+      "schema_version": 1
+    },
+    {
+      "node_id": "Node-17",
+      "agent_id": "kimi-code",
+      "display_name": "Kimi Code",
+      "provider": "moonshot",
+      "role": "Moonshot terminal AI agent",
+      "capabilities": [
+        "coding",
+        "terminal"
+      ],
+      "status": "active",
+      "created_at": "2026-08-02T03:14:03.090627+00:00",
+      "last_seen_at": "2026-08-02T03:14:03.090627+00:00",
+      "skills_manifest": "",
+      "memory_scope": [
+        "shared",
+        "project",
+        "private"
+      ],
+      "trust_level": "standard",
+      "schema_version": 1
+    },
+    {
+      "node_id": "Node-18",
+      "agent_id": "kilo-code",
+      "display_name": "Kilo Code",
+      "provider": "kilo",
+      "role": "Development agent for coding and debugging",
+      "capabilities": [
+        "coding",
+        "debugging"
+      ],
+      "status": "active",
+      "created_at": "2026-08-02T03:14:03.093740+00:00",
+      "last_seen_at": "2026-08-02T03:14:03.093740+00:00",
+      "skills_manifest": "",
+      "memory_scope": [
+        "shared",
+        "project",
+        "private"
+      ],
+      "trust_level": "standard",
+      "schema_version": 1
+    },
+    {
+      "node_id": "Node-19",
+      "agent_id": "pi",
+      "display_name": "Pi",
+      "provider": "pi",
+      "role": "Minimal open-source coding agent",
+      "capabilities": [
+        "coding",
+        "minimal"
+      ],
+      "status": "active",
+      "created_at": "2026-08-02T03:14:03.097508+00:00",
+      "last_seen_at": "2026-08-02T03:14:03.097508+00:00",
+      "skills_manifest": "",
+      "memory_scope": [
+        "shared",
+        "project",
+        "private"
+      ],
+      "trust_level": "standard",
+      "schema_version": 1
+    },
+    {
+      "node_id": "Node-20",
+      "agent_id": "grok-build",
+      "display_name": "Grok Build",
+      "provider": "xai",
+      "role": "xAI Grok terminal build agent",
+      "capabilities": [
+        "coding",
+        "build"
+      ],
+      "status": "active",
+      "created_at": "2026-08-02T03:14:03.099990+00:00",
+      "last_seen_at": "2026-08-02T03:14:03.099990+00:00",
+      "skills_manifest": "",
+      "memory_scope": [
+        "shared",
+        "project",
+        "private"
+      ],
+      "trust_level": "standard",
+      "schema_version": 1
+    },
+    {
+      "node_id": "Node-21",
+      "agent_id": "command-code",
+      "display_name": "Command Code",
+      "provider": "commandcode",
+      "role": "Command Code terminal agent",
+      "capabilities": [
+        "coding",
+        "terminal"
+      ],
+      "status": "active",
+      "created_at": "2026-08-02T03:14:03.104139+00:00",
+      "last_seen_at": "2026-08-02T03:14:03.104139+00:00",
+      "skills_manifest": "",
+      "memory_scope": [
+        "shared",
+        "project",
+        "private"
+      ],
+      "trust_level": "standard",
+      "schema_version": 1
+    }
+  ]
+}

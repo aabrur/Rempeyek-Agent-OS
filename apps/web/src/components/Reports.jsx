@@ -128,7 +128,7 @@ export function Reports({ accent }) {
                           <td>{a.laneNotes}</td>
                           <td>{a.touched7d}</td>
                           <td><div className="rep-bar"><i style={{ width: `${Math.round(a.touched7d / maxT * 100)}%` }} /></div></td>
-                          <td style={{ fontFamily: "var(--mono)", fontSize: 10 }}>{a.lastSeen || "—"}</td>
+                          <td style={{ fontFamily: "var(--mono)", fontSize: 10 }}>{a.lastSeen || "-"}</td>
                           <td><span className={`lbl-${a.gw === "running" ? "running" : "idle"}`} style={{ fontFamily: "var(--mono)", fontSize: 10 }}>{a.gw}</span></td>
                         </tr>
                       ))}

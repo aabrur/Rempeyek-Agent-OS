@@ -10,7 +10,7 @@ const builtIns = Object.freeze({
   antigravity: [path.join(home, ".gemini"), "agy"],
   "kilo-code": [path.join(home, ".kilocode"), "kilo"],
   openclaw: [path.join(home, ".openclaw"), "openclaw"],
-  pi: [path.join(home, ".pi"), "pi"],
+  pi: [path.join(home, ".pi", "agent"), "pi"],
   hermes: [path.join(process.env.LOCALAPPDATA || path.join(home, "AppData", "Local"), "hermes"), "hermes"],
   "grok-build": [path.join(home, ".grok"), "grok"],
   "command-code": [path.join(home, ".commandcode"), "cmdc"],

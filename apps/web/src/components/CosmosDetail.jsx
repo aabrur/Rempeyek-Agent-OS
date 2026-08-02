@@ -27,7 +27,7 @@ function SignalBar({ label, value, suffix = "%", color }) {
           />
         )}
       </div>
-      <span className="cd-bar-value" style={{ color }}>{value === null ? "—" : `${value}${suffix}`}</span>
+      <span className="cd-bar-value" style={{ color }}>{value === null ? "-" : `${value}${suffix}`}</span>
     </div>
   );
 }
@@ -58,45 +58,40 @@ function Chips({ items }) {
 
 function PanelShell({ children, panelKey }) {
   return (
-    <m.div
+    <m.aside
       key={panelKey}
-      className="cd-body"
-      initial={{ opacity: 0, x: 16 }}
+      className="cosmos-detail-panel"
+      initial={{ opacity: 0, x: 20 }}
       animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: 8 }}
-      transition={{ duration: 0.22 }}
+      exit={{ opacity: 0, x: 20 }}
+      transition={{ duration: 0.22, ease: "easeOut" }}
+      aria-label="Selection details"
     >
       {children}
-    </m.div>
+    </m.aside>
   );
 }
 
 function Header({ icon: Icon, color, statusColorVar, name, subtitle, badges, onClear }) {
   return (
-    <div className="cd-head">
-      <div className="cd-head-row">
-        <div className="cd-icon-tile" style={{ "--cd-c": color }}>
-          <Icon size={20} color={color} strokeWidth={1.5} aria-hidden="true" />
-          <span className="cd-status-dot" style={{ background: `var(${statusColorVar})` }} aria-hidden="true" />
-        </div>
-        <div className="cd-title">
-          <h3>{name}</h3>
-          <span style={{ color }}>{subtitle}</span>
-        </div>
-        {onClear && (
-          <button type="button" className="cd-more" onClick={onClear} title="Clear selection" aria-label="Clear selection">
-            <MoreHorizontal size={14} aria-hidden="true" />
-          </button>
-        )}
+    <div className="cd-head" style={{ "--cd-accent": color }}>
+      <div className="cd-head-badge" style={{ color: `var(${statusColorVar})` }}>
+        <Icon size={18} aria-hidden="true" />
       </div>
-      <div className="cd-badges">{badges}</div>
+      <div className="cd-head-main">
+        <div className="cd-sub">{subtitle}</div>
+        <h2>{name}</h2>
+        {badges && <div className="cd-badges">{badges}</div>}
+      </div>
+      <Btn variant="dim" aria-label="Close detail panel" onClick={onClear}>✕</Btn>
     </div>
   );
 }
 
-function AgentPanel({ row, node, map, onOpenAgent, onSelect, onClear }) {
-  const color = agentAccent(node);
+function AgentPanel({ node, map, onSelect, onOpenAgent, onClear }) {
+  const row = map.rows.find(r => r.kind === "agent" && r.id === node.id);
   const Icon = iconFor(node.id);
+  const color = agentAccent(node);
   const incidents = map.rows.filter(r => r.kind === "relationship" && (r.source === node.id || r.target === node.id));
   const chips = [
     ...(node.mode ? [node.mode.toUpperCase()] : []),
@@ -104,7 +99,7 @@ function AgentPanel({ row, node, map, onOpenAgent, onSelect, onClear }) {
     ...((node.actions || []).map(a => a.toUpperCase())),
   ].slice(0, 6);
   const description = node.role || node.note
-    ? [node.role, node.note].filter(Boolean).join(" — ")
+    ? [node.role, node.note].filter(Boolean).join(" - ")
     : "No operator note recorded for this agent yet. Role and notes come straight from agents.config.json.";
 
   return (
@@ -155,9 +150,9 @@ function AgentPanel({ row, node, map, onOpenAgent, onSelect, onClear }) {
           ["AGENT ID", node.id],
           ["NODE", node.node],
           ["LANE", node.lane ? `Brains/${node.lane}/` : "not configured"],
-          ["MODE", node.mode || "—"],
+          ["MODE", node.mode || "-"],
           ["LAST VAULT WRITE", node.lastSeen || "never observed"],
-          ["UPTIME 24H", node.signals.uptimePct === null ? "—" : `${node.signals.uptimePct}%`],
+          ["UPTIME 24H", node.signals.uptimePct === null ? "-" : `${node.signals.uptimePct}%`],
         ]} />
       </Section>
 
@@ -182,7 +177,7 @@ function CorePanel({ map, vault, onSelect, onClear }) {
         </>}
       />
       <div className="cd-desc">
-        The shared Obsidian vault — long-term memory and coordination surface for every agent.
+        The shared Obsidian vault: long-term memory and coordination surface for every agent.
         Lanes below are drawn only from observed vault activity, never inferred.
       </div>
 
@@ -206,7 +201,7 @@ function CorePanel({ map, vault, onSelect, onClear }) {
 
       <Section icon={Database} title="METADATA">
         <MetaRows rows={[
-          ["VAULT", vault || "—"],
+          ["VAULT", vault || "-"],
           ["AGENTS", map.metadata.nodeCount],
           ["VERIFIED LINKS", map.metadata.edgeCount],
           ["EXCLUDED RECORDS", map.metadata.droppedRelations || 0],
@@ -216,9 +211,9 @@ function CorePanel({ map, vault, onSelect, onClear }) {
   );
 }
 
-function EdgePanel({ row, onClear }) {
+function EdgePanel({ edge, map, onSelect, onOpenAgent, onClear }) {
   return (
-    <PanelShell panelKey={row.id}>
+    <PanelShell panelKey={edge.id}>
       <Header
         icon={Network} color="var(--cosmos-conn-strong)" statusColorVar="--cosmos-status-running"
         name={RELATION_LABEL[row.type] || row.type} subtitle="RELATIONSHIP EVIDENCE"

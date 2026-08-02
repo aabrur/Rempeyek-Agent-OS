@@ -52,7 +52,7 @@ describe('Desktop Update Migration 002', () => {
     await migration002.up({ configDir, vaultPath });
 
     const updated = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-    assert.strictEqual(updated.applicationVersion, '2.3.4');
+    assert.strictEqual(updated.applicationVersion, '2.3.5');
     assert.strictEqual(updated.runtimeSchemaVersion, 2);
   });
 

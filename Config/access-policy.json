@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "allowed_roots": [],
+  "denied_roots": [],
+  "allowed_extensions": [
+    ".md",
+    ".txt",
+    ".json",
+    ".yaml",
+    ".yml",
+    ".js",
+    ".mjs",
+    ".cjs",
+    ".ts",
+    ".tsx",
+    ".jsx",
+    ".py"
+  ],
+  "denied_extensions": [
+    ".exe",
+    ".dll",
+    ".bat",
+    ".cmd",
+    ".ps1",
+    ".vbs",
+    ".msi",
+    ".com",
+    ".scr"
+  ],
+  "max_file_size": 10485760,
+  "follow_symlinks": false,
+  "allow_network_paths": false,
+  "allow_hidden_files": false,
+  "require_approval_for": [
+    "execute_process",
+    "network_access",
+    "write_project_files"
+  ],
+  "redaction_patterns": [
+    "password",
+    "secret",
+    "api_key",
+    "token",
+    "seed",
+    "mnemonic",
+    "private_key"
+  ],
+  "agent_overrides": {}
+}

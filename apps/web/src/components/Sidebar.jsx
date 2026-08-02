@@ -68,7 +68,7 @@ export function Sidebar({ view, onView, agents = [], agency, vault }) {
           <span className="side-health-label">SYSTEM HEALTH</span>
           <div className="side-health-row">
             <div className="side-health-bar"><i style={{ width: `${health ?? 0}%` }} /></div>
-            <b>{health === null ? "—" : `${health}%`}</b>
+            <b>{health === null ? "-" : `${health}%`}</b>
           </div>
           <span className={`side-health-note ${issues ? "is-warn" : ""}`.trim()}>
             ● {health === null ? "NO UPTIME DATA YET" : issues ? `${issues} GATEWAY ISSUE${issues > 1 ? "S" : ""}` : "ALL SYSTEMS NOMINAL"}

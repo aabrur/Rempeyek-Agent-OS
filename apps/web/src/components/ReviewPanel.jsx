@@ -59,7 +59,7 @@ export function ReviewPanel({ review, agents, refresh }) {
       </form>
 
       <div className="review-list">
-        {!review.length && <Empty>Empty — add a note to <b>Inbox/</b> or a checkbox in <b>Tasks/</b> and it shows up here.</Empty>}
+        {!review.length && <Empty>Empty: add a note to <b>Inbox/</b> or a checkbox in <b>Tasks/</b> and it shows up here.</Empty>}
         {review.slice(0, 8).map((r, i) => (
           <div key={i} className="review-item">
             <div>

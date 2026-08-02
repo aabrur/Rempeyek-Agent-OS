@@ -1,6 +1,6 @@
 import { NeuralGraphCanvas } from "../components/NeuralGraphCanvas";
 
-/** Memory — the Neural Vault knowledge graph (notes + wikilinks). */
+/** Memory: the Neural Vault knowledge graph (notes + wikilinks). */
 export function NeuralVaultView({ active, theme }) {
   return (
     <section className="view view-flush active">

@@ -67,7 +67,7 @@ function Legend({ legend }) {
       ))}
       {legend.tiers.map(item => (
         <span key={item.tier} className={`lg lg-tier tier-${item.tier}`} title={item.description}>
-          {item.tier === "data" ? "--" : item.tier === "lane" ? "··" : "—"} {item.label}
+          {item.tier === "data" ? "--" : item.tier === "lane" ? "··" : "-"} {item.label}
         </span>
       ))}
     </div>
@@ -82,7 +82,7 @@ function EvidenceTable({ map, onSelect }) {
     <div className="topo-table-scroll">
       <table><caption>Same data shown in the Agent Map</caption><thead><tr><th>Kind</th><th>Name / route</th><th>Status</th><th>Mode / type</th><th>Provenance</th><th>Inspect</th></tr></thead>
         <tbody>
-          {agents.map(row => <tr key={row.id}><td>Agent</td><td>{row.label}</td><td>{row.status}</td><td>{row.mode || "—"}</td><td>Runtime agent record</td><td><button type="button" onClick={() => onSelect(row.id)}>Inspect {row.label}</button></td></tr>)}
+          {agents.map(row => <tr key={row.id}><td>Agent</td><td>{row.label}</td><td>{row.status}</td><td>{row.mode || "-"}</td><td>Runtime agent record</td><td><button type="button" onClick={() => onSelect(row.id)}>Inspect {row.label}</button></td></tr>)}
           {relationships.map(row => <tr key={row.id}><td>Relationship</td><td>{row.sourceLabel} → {row.targetLabel}</td><td>{row.status}</td><td>{RELATION_LABEL[row.type] || row.type}</td><td>{row.provenanceSource}: {row.provenanceId}</td><td><button type="button" onClick={() => onSelect(row.id)}>Inspect relationship</button></td></tr>)}
         </tbody>
       </table>
@@ -90,7 +90,7 @@ function EvidenceTable({ map, onSelect }) {
   </details>;
 }
 
-/** The Agent Map — the cosmos constellation view. Default landing view. */
+/** The Agent Map: the cosmos constellation view. Default landing view. */
 export function AgentMapView({ state, load, onOpenAgent, onView }) {
   const agents = state.agents || [];
   const reducedMotion = Boolean(useReducedMotion());

@@ -3,7 +3,7 @@ import { Btn, PageHead, Panel, SectionRow } from "@rempeyek/ui";
 import { CatalogGrid } from "../components/CatalogGrid";
 import { AddAgentModal } from "../components/AddAgentModal";
 
-/** Marketplace — reviewed agents, plugins, skills, and custom registration. */
+/** Marketplace: reviewed agents, plugins, skills, and custom registration. */
 export function MarketplaceView({ refresh }) {
   const [adding, setAdding] = useState(false);
   const [kind, setKind] = useState("all");
@@ -11,7 +11,7 @@ export function MarketplaceView({ refresh }) {
   return (
     <section className="view active">
       <PageHead title="MARKETPLACE">
-        Known agents install with one approved click — adapters are reviewed server-side and never typed here.
+        Known agents install with one approved click: adapters are reviewed server-side and never typed here.
       </PageHead>
 
       <SectionRow label="AGENT CATALOG">

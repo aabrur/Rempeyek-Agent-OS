@@ -1,0 +1,19 @@
+{
+  "product": "Rempeyek Agent OS",
+  "installationId": "b0858e44-fa70-49ff-8bdd-7fce53ccdd71",
+  "runtimeSchemaVersion": 1,
+  "vaultSchemaVersion": 1,
+  "graphSchemaVersion": 1,
+  "memorySchemaVersion": 1,
+  "createdAt": "2026-08-02T03:52:51.584Z",
+  "updatedAt": "2026-08-02T03:52:51.627Z",
+  "mode": "installed",
+  "platform": "win32",
+  "architecture": "x64",
+  "applicationVersion": "2.3.3",
+  "vaultPath": "Vault",
+  "bootstrapCompleted": true,
+  "lastStartupAt": null,
+  "lastShutdownAt": null,
+  "migrationVersion": 0
+}

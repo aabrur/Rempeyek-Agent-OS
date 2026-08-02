@@ -13,24 +13,44 @@ export function ThemePicker({ theme, onPick }) {
   };
 
   return (
-    <>
-      <div className="side-label">APPEARANCE</div>
-      <div className="theme-pick" role="radiogroup" aria-label="Appearance theme">
-        {THEMES.map((t, index) => (
-          <button type="button" key={t.id}
-            ref={node => { buttons.current[index] = node; }}
-            className={`theme-sw ${t.id === theme ? "on" : ""}`.trim()}
-            style={{ "--sw": t.sw, "--sw-bg": t.bg }}
-            title={`${t.name} — ${t.description}`} role="radio"
-            aria-label={`${t.name}: ${t.description}`} aria-checked={t.id === theme}
-            tabIndex={t.id === theme ? 0 : -1}
-            onKeyDown={navigate}
-            onClick={() => onPick(t.id)}>
-            <span className="theme-sw-label">{t.name}</span>
-          </button>
-        ))}
+    <div className="theme-picker-container">
+      <div className="side-label">APPEARANCE MODE</div>
+      <div className="theme-grid" role="radiogroup" aria-label="Appearance theme">
+        {THEMES.map((t, index) => {
+          const isSelected = t.id === theme;
+          return (
+            <button
+              type="button"
+              key={t.id}
+              ref={node => { buttons.current[index] = node; }}
+              className={`theme-card-option ${t.id} ${isSelected ? "active" : ""}`.trim()}
+              role="radio"
+              aria-label={`${t.name}: ${t.description}`}
+              aria-checked={isSelected}
+              tabIndex={isSelected ? 0 : -1}
+              onKeyDown={navigate}
+              onClick={() => onPick(t.id)}
+            >
+              <div className="theme-card-header">
+                <div className="theme-card-title">
+                  <span className="theme-dot-swatch" style={{ color: t.sw, background: t.sw }} />
+                  <span className="theme-card-name">{t.name}</span>
+                </div>
+                {isSelected ? <span className="theme-active-chip">ACTIVE</span> : null}
+              </div>
+              <div className="theme-preview-box" data-theme-preview={t.id}>
+                <div className="preview-bar" />
+                <div className="preview-content">
+                  <div className="preview-pill" />
+                </div>
+              </div>
+              <div className="theme-card-desc">{t.description}</div>
+            </button>
+          );
+        })}
       </div>
       <div className="theme-name" aria-live="polite">{active?.name || theme}</div>
-    </>
+    </div>
   );
 }
+

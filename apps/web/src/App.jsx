@@ -38,7 +38,7 @@ export default function App() {
   const gw = useGateway(agentsById, refresh);
 
   useEffect(() => {
-    if (state?.agency) document.title = `${state.agency} — Neural Command Deck`;
+    if (state?.agency) document.title = `${state.agency} - Neural Command Deck`;
   }, [state?.agency]);
 
   /** Clicking an agent anywhere jumps to its detail panel. */

@@ -2,7 +2,7 @@ import { PageHead } from "@rempeyek/ui";
 import { Reports } from "../components/Reports";
 import { StatTiles, VaultHealth } from "../components/Panels";
 
-/** Observatory — live telemetry: vault stats, health, and generated reports. */
+/** Observatory: live telemetry: vault stats, health, and generated reports. */
 export function ObservatoryView({ state, accent, ops }) {
   return (
     <section className="view active">

@@ -80,18 +80,36 @@ export function AgentDetail({ id, gw, refresh, onClose }) {
   const [d, setD] = useState(null);
   const [live, setLive] = useState({ lines: [] });
   const [addingSubagent, setAddingSubagent] = useState(false);
+  const [highlight, setHighlight] = useState(false);
   const { pick, input } = useAvatarUpload(() => { load(); refresh(); });
   const logRef = useRef(null);
+  const detailRef = useRef(null);
+  const headingRef = useRef(null);
 
   const load = async () => setD(await api(`/api/agent/${id}/detail`));
 
   useEffect(() => {
     setD(null);
     setAddingSubagent(false);
+    setHighlight(false);
     load();
-    const t = setInterval(() => { if (document.visibilityState === "visible") load(); }, 5000);
+    const t = setInterval(() => { if (document.visibilityState === "visible") load(); }, 2000);
     return () => clearInterval(t);
   }, [id]);
+
+  useEffect(() => {
+    if (!d || d.id !== id) return;
+    const frame = requestAnimationFrame(() => {
+      if (detailRef.current) {
+        detailRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+        headingRef.current?.focus({ preventScroll: true });
+        setHighlight(true);
+        const timer = setTimeout(() => setHighlight(false), 2000);
+        return () => clearTimeout(timer);
+      }
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [d?.id, id]);
 
   // Live run log: tail /api/proc/:id/log?since=cursor every 2s so an owned `run` streams in real time
   // (the 5s detail poll only carried a 40-line snapshot). Falls back to the disk seed d.log when idle.
@@ -128,7 +146,7 @@ export function AgentDetail({ id, gw, refresh, onClose }) {
   };
 
   return (
-    <div className="detail" style={{ "--ac": acc }}>
+    <div ref={detailRef} className={`detail ${highlight ? "detail-highlight" : ""}`.trim()} style={{ "--ac": acc }}>
       {input}
       <SubagentModal
         open={addingSubagent}
@@ -142,7 +160,7 @@ export function AgentDetail({ id, gw, refresh, onClose }) {
       <div className="detail-head">
         <Avatar agent={d} accent={acc} large onEdit={pick} />
         <div>
-          <h2>{d.name}</h2>
+          <h2 ref={headingRef} tabIndex="-1" style={{ outline: "none" }}>{d.name}</h2>
           <div className="detail-meta">{d.role} · {d.node} · <code>{d.bin || "gateway N/A"}</code></div>
           <div className="pill-row" style={{ marginTop: 7 }}>
             <Pill status={d.vaultStatus} />
@@ -182,7 +200,7 @@ export function AgentDetail({ id, gw, refresh, onClose }) {
               ? <Empty><b>{d.name}</b> CLI <code>{d.bin || d.id}</code> is not installed on this machine.{d.install?.cmd ? <> Install it with <code>{d.install.cmd}</code>, or use <b>＋ Add Agent</b>.</> : <> Add a <code>gateway.install</code> entry, or install its CLI, to summon it.</>}</Empty>
               : d.actions?.includes("status")
                 ? <Empty>Click <b>Status</b> to check the gateway through its own command.</Empty>
-                : <Empty>Observe-only agent — no service gateway to poll. Its live state comes from telemetry and summoned terminals.</Empty>}
+                : <Empty>Observe-only agent: no service gateway to poll. Its live state comes from telemetry and summoned terminals.</Empty>}
         </div>
 
         <div className="dsec">
@@ -212,7 +230,7 @@ export function AgentDetail({ id, gw, refresh, onClose }) {
               <div key={child.id} className="subrow">
                 <span className="ty">profile</span>
                 <span className="nm">
-                  {child.name}{child.domain ? ` — ${child.domain}` : ""}
+                  {child.name}{child.domain ? ` - ${child.domain}` : ""}
                 </span>
                 <span className={`st st-${child.status}`}>{child.status}</span>
               </div>
@@ -232,7 +250,7 @@ export function AgentDetail({ id, gw, refresh, onClose }) {
               <div key={i} className="subrow">
                 <span className="ty">{t.type}</span>
                 <span className="nm">
-                  {t.name || ""}{t.detail ? ` — ${t.detail}` : ""}
+                  {t.name || ""}{t.detail ? ` - ${t.detail}` : ""}
                   {t.progress != null && <span className="tele-bar"><i style={{ width: `${Math.min(100, t.progress)}%` }} /></span>}
                 </span>
                 <span className="st">{(t.ts || "").slice(11, 16)}</span>
