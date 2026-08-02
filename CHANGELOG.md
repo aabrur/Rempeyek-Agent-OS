@@ -3,6 +3,18 @@
 All notable changes to Rempeyek Agent OS. The in-app update banner compares the local version
 against the latest GitHub Release of this repository — tag releases as `v<version>`.
 
+## [2.3.4] - 2026-08-02
+
+### Added
+
+- Public unsigned Windows update release with NSIS installer, portable package,
+  `latest.yml`, blockmap, and `SHA256SUMS.txt` verification file.
+
+### Changed
+
+- Published the reviewed 21-agent registry, marketplace metadata, command
+  adapters, and owned process lifecycle changes in the desktop update feed.
+
 ## [2.3.3] - 2026-07-29
 
 - **Navigation Renaming**: Renamed "TEAMS" to "PROJECTS" and "PROTOCOLS" to "SWITCHBOARD" across sidebar and workspace views.
