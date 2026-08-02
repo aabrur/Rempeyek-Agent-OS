@@ -3,6 +3,20 @@
 All notable changes to Rempeyek Agent OS. The in-app update banner compares the local version
 against the latest GitHub Release of this repository - tag releases as `v<version>`.
 
+## [2.3.6] - 2026-08-02
+
+### Changed
+
+- Separated Cyberpunk from Glassmorph: it is now an opaque lime-and-violet
+  signal-grid terminal with hard 6px geometry and no glass blur.
+- Moved public installer ZIP input to `apps/desktop/dist`, keeping generated
+  release executables out of the repository root.
+
+### Release note
+
+- Windows artifacts are an unsigned manual-install prerelease. They are not a
+  stable auto-update feed and must be verified with the published checksum.
+
 ## [2.3.4] - 2026-08-02
 
 ### Added

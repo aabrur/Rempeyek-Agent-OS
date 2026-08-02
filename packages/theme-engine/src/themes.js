@@ -3,7 +3,7 @@ export const THEMES = Object.freeze([
   { id: "minimalist", name: "Minimalist", description: "Calm, quiet, and content-first", sw: "#805B3E", bg: "#F4EFE6" },
   { id: "brutalist", name: "Brutalist", description: "Direct, high-contrast, and utilitarian", sw: "#FF4D00", bg: "#F2EBDD" },
   { id: "glassmorph", name: "Glassmorph", description: "Translucent depth with restrained light", sw: "#7DD3FC", bg: "#07111F" },
-  { id: "cyberpunk", name: "Cyberpunk", description: "Neural Cosmos with meaningful energy", sw: "#00D4FF", bg: "#030918" },
+  { id: "cyberpunk", name: "Cyberpunk", description: "Signal-grid terminal with controlled neon", sw: "#C6FF39", bg: "#080A0D" },
 ]);
 
 export const DEFAULT_THEME = "cyberpunk";

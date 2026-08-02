@@ -7,6 +7,9 @@ test("registry exposes exactly the four approved structural modes", () => {
   assert.deepEqual(THEMES.find(({ id }) => id === "minimalist"), {
     id: "minimalist", name: "Minimalist", description: "Calm, quiet, and content-first", sw: "#805B3E", bg: "#F4EFE6",
   });
+  assert.deepEqual(THEMES.find(({ id }) => id === "cyberpunk"), {
+    id: "cyberpunk", name: "Cyberpunk", description: "Signal-grid terminal with controlled neon", sw: "#C6FF39", bg: "#080A0D",
+  });
 });
 test("unknown and malformed persisted values fail safely", () => {
   assert.equal(normalizeTheme(undefined), DEFAULT_THEME);
@@ -59,13 +62,16 @@ test("themes.css contains explicit readable surface and pill tokens for minimali
   assert.match(css, /:root\[data-theme="minimalist"\]\s*:is\(\.tile,\.panel,\.agent-card,\.ws-card,\.today-panel,\.dsec,\.wf,\.approval-queue,\.aa-cat-card\)\s*\{[^}]*background:var\(--card\)/);
 });
 
-test("glassmorph and cyberpunk themes have distinct visual tokens, backgrounds, and geometry", async () => {
+test("glassmorph and cyberpunk themes keep distinct material, color, and geometry", async () => {
   const fs = await import("node:fs/promises");
   const css = await fs.readFile(new URL("../../../packages/theme-engine/src/themes.css", import.meta.url), "utf8");
   assert.match(css, /:root\[data-theme="glassmorph"\]\s*\{[^}]*--acc:#38bdf8/);
   assert.match(css, /:root\[data-theme="glassmorph"\]\s*\{[^}]*--surface-blur:22px/);
-  assert.match(css, /:root\[data-theme="cyberpunk"\]\s*\{[^}]*--bg:#02040a/);
-  assert.match(css, /:root\[data-theme="cyberpunk"\]\s*\{[^}]*--magenta:#ff0055/);
+  assert.match(css, /:root\[data-theme="glassmorph"\]\s*\{[^}]*--surface-radius:18px/);
+  assert.match(css, /:root\[data-theme="cyberpunk"\]\s*\{[^}]*--acc:#c6ff39/);
+  assert.match(css, /:root\[data-theme="cyberpunk"\]\s*\{[^}]*--surface-blur:0px;\s*--surface-radius:6px;\s*--control-radius:3px/);
+  assert.match(css, /:root\[data-theme="cyberpunk"\]\s*:is\(\.tile,\.panel,\.agent-card,\.ws-card,\.today-panel,\.dsec,\.wf,\.approval-queue,\.aa-cat-card\)\s*\{[^}]*backdrop-filter:none/);
+  assert.match(css, /:root\[data-theme="cyberpunk"\]\s+\.agent-card\s*\{[^}]*border-left:2px solid color-mix\(in srgb,var\(--ac,var\(--cyan\)\) 72%,transparent\)/);
 });
 
 

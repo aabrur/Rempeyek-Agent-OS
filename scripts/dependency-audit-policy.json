@@ -1,27 +1,9 @@
 {
   "schema": 1,
-  "reviewedAt": "2026-07-26",
+  "reviewedAt": "2026-08-02",
   "expiresOn": "2026-08-31",
-  "scope": "Development-only findings in the pinned desktop build toolchain.",
-  "reviewedFindingCount": 17,
-  "reviewedFingerprint": "bb5557c1f85e720856eccf862b88e48a8402d704c8cf9e8685160d006135bcc9",
-  "reviewedPackages": [
-    "@electron/asar",
-    "@electron/universal",
-    "app-builder-lib",
-    "brace-expansion",
-    "dir-compare",
-    "dmg-builder",
-    "ejs",
-    "electron-builder",
-    "electron-builder-squirrel-windows",
-    "electron-winstaller",
-    "filelist",
-    "glob",
-    "jake",
-    "minimatch",
-    "postcss",
-    "rimraf",
-    "temp"
-  ]
+  "scope": "No known production or development dependency findings in the pinned release lockfile.",
+  "reviewedFindingCount": 0,
+  "reviewedFingerprint": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "reviewedPackages": []
 }
