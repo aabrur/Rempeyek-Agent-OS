@@ -61,10 +61,13 @@ test("writeAgentLauncher supports kilocode delegating to kilo without self-recur
     assert.equal(result.path, path.join(tmp, "kilocode.cmd"));
 
     const content = fs.readFileSync(result.path, "utf8");
-    // Must delegate to kilo, not kilocode
-    assert.ok(content.includes('where "kilo" >nul 2>nul') || content.includes('kilo'));
+    // Must delegate to the upstream kilo, not kilocode, via PATH-entry-only resolution.
+    assert.match(content, /for %%G in \("%PATH:;=" "%"\) do/);
+    assert.match(content, /if exist "%%~G\\kilo\.(exe|cmd|bat)"/);
+    assert.match(content, /"%REALCMD%"\s+%\*/m);
+    // Never a bare direct call that could re-invoke the launcher itself.
     assert.ok(!content.includes('"kilocode" %*'));
-    assert.ok(content.includes('"kilo" %*') || content.includes('kilo %*'));
+    assert.ok(!content.includes('"kilo" %*'));
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }

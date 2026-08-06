@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import * as migration002 from '../lib/migrations/002-unified-memory-neural-fabric.mjs';
+import { APP_VERSION } from '../lib/version.mjs';
 
 describe('Desktop Update Migration 002', () => {
   let tmpDir;
@@ -52,7 +53,7 @@ describe('Desktop Update Migration 002', () => {
     await migration002.up({ configDir, vaultPath });
 
     const updated = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-    assert.strictEqual(updated.applicationVersion, '2.3.6');
+    assert.strictEqual(updated.applicationVersion, APP_VERSION);
     assert.strictEqual(updated.runtimeSchemaVersion, 2);
   });
 

@@ -18,8 +18,12 @@ test("writes a state-root launcher for a safe bare trigger", () => {
     });
     const script = fs.readFileSync(result.path, "utf8");
     assert.match(script, new RegExp(`cd /d "${stateRoot.replace(/[\\^$.*+?()[\]{}|]/g, "\\$&")}"`));
-    assert.match(script, /where "codex" >nul 2>nul/);
-    assert.match(script, /^"codex" %\*$/m);
+    // PATH-entry-only resolution: search real CLI across PATH, never shadow by cwd.
+    assert.match(script, /for %%G in \("%PATH:;=" "%"\) do/);
+    assert.match(script, /"%REALCMD%"\s+%\*/m);
+    // No bare direct call that could hit the launcher itself (self-recursion).
+    assert.doesNotMatch(script, /where "codex" >nul 2>nul/);
+    assert.doesNotMatch(script, /^"codex" %\*$/m);
   } finally {
     fs.rmSync(stateRoot, { recursive: true, force: true });
   }

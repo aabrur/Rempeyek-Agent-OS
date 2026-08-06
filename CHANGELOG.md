@@ -3,6 +3,39 @@
 All notable changes to Rempeyek Agent OS. The in-app update banner compares the local version
 against the latest GitHub Release of this repository - tag releases as `v<version>`.
 
+## [2.3.7] - 2026-08-06
+
+### Fixed
+
+- **Agent launcher self-recursion**: `where <name>` + bare `"<name>"` call in
+  each `.cmd` launcher could shadow the real CLI with the launcher itself and
+  recurse forever when the launcher sat in the current directory. Launchers now
+  resolve the upstream CLI from PATH entries only and invoke the resolved
+  absolute path (`"%REALCMD%"`). Applied to the generator
+  (`apps/web/lib/agent-launcher.cjs`) and the tracked root launchers.
+- **Public hygiene**: the tracked launcher `.cmd` files no longer hardcode an
+  owner-specific `C:\Users\...` path (`cd /d "%~dp0"` instead); the public
+  release hygiene check now covers `.cmd` files so a personal path cannot
+  reappear.
+
+### Changed
+
+- Published the 23-total marketplace manifest unchanged; the shipped public
+  registry (`agents.config.example.json`) still starts with zero agents, and
+  agent registration remains gated on a user-directed, install-detected
+  `agents.add` approval.
+
+### Added
+
+- Consent contract test (`apps/web/test/no-auto-register.test.mjs`): fresh and
+  legacy runs never seed an agent registry; importing the marketplace catalog
+  has no registration side effect.
+
+### Release note
+
+- Windows artifacts are an unsigned manual-install prerelease. They are not a
+  stable auto-update feed and must be verified with the published checksum.
+
 ## [2.3.6] - 2026-08-02
 
 ### Changed

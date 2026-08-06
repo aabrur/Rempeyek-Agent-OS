@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
+import { APP_VERSION } from "../../web/lib/version.mjs";
 
 const DESKTOP = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const ROOT = path.resolve(DESKTOP, "..", "..");
@@ -17,7 +18,7 @@ test("root, web, and desktop report the same release version", () => {
   const desktopPackage = JSON.parse(
     fs.readFileSync(path.join(DESKTOP, "package.json"), "utf8"),
   );
-  assert.equal(rootPackage.version, "2.3.6");
+  assert.equal(rootPackage.version, APP_VERSION);
   assert.equal(webPackage.version, rootPackage.version);
   assert.equal(desktopPackage.version, rootPackage.version);
 });
