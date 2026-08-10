@@ -31,7 +31,11 @@ function copyFileSafe(src, dest) {
   return true;
 }
 
-export function createBackupEngine({ configDir, vaultPath, backupsDir }) {
+export function createBackupEngine(opts = {}) {
+  const stateRoot = opts.services?.stateRoot || opts.stateRoot || process.cwd();
+  const configDir = opts.configDir || opts.services?.configDir || path.dirname(opts.services?.configPath || path.join(stateRoot, "agents.config.json"));
+  const vaultPath = opts.vaultPath || opts.services?.vaultPath || path.join(stateRoot, "Vault");
+  const backupsDir = opts.backupsDir || opts.services?.backupsDir || path.join(stateRoot, "Backups");
   fs.mkdirSync(backupsDir, { recursive: true });
 
   const getBackupPath = (backupId) => path.join(backupsDir, backupId);

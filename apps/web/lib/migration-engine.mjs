@@ -5,7 +5,11 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-export function createMigrationEngine({ configDir, vaultPath, backupsDir }) {
+export function createMigrationEngine(opts = {}) {
+  const stateRoot = opts.services?.stateRoot || opts.stateRoot || process.cwd();
+  const configDir = opts.configDir || opts.services?.configDir || path.dirname(opts.services?.configPath || path.join(stateRoot, "agents.config.json"));
+  const vaultPath = opts.vaultPath || opts.services?.vaultPath || path.join(stateRoot, "Vault");
+  const backupsDir = opts.backupsDir || opts.services?.backupsDir || path.join(stateRoot, "Backups");
   const journalPath = path.join(configDir, 'migration-journal.json');
   const lockPath = path.join(configDir, '.migration-lock');
   const defaultMigrationsDir = path.join(__dirname, 'migrations');
