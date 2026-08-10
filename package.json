@@ -1,6 +1,6 @@
 {
   "name": "rempeyek-agent-os",
-  "version": "2.3.9",
+  "version": "2.4.0",
   "description": "REMPEYEK AGENT OS - Neural Cosmos Edition. Agentic operating system: command center dashboard reading live from the Obsidian Vault.",
   "private": true,
   "bin": {

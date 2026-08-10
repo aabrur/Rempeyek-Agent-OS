@@ -114,6 +114,7 @@ function createMainWindow(origin) {
     minWidth: 375,
     minHeight: 640,
     show: false,
+    backgroundColor: "#0b0f17",
     icon: iconPath,
     webPreferences: {
       preload: path.join(import.meta.dirname, "preload.cjs"),

@@ -3,6 +3,14 @@
 All notable changes to Rempeyek Agent OS. The in-app update banner compares the local version
 against the latest GitHub Release of this repository - tag releases as `v<version>`.
 
+## [2.4.0] - 2026-08-10
+
+### Added
+- **Pop-Up Auto Update & Self-Repair**: Interactive pop-up dialog that automatically opens when an update is available or ready. Allows single-click update, download progress visualization, and self-repair cache cleaning.
+
+### Fixed
+- **White Screen Prevention**: Added `ErrorBoundary` component, pre-paint inline styles (`html, body { background-color: #0b0f17; }`), and Electron `backgroundColor: "#0b0f17"` to eliminate blank white window crashes ([Image #1]).
+
 ## [2.3.9] - 2026-08-10
 
 Public installer hotfix (requested as 2.3.8.1). Uses `2.3.9` because electron-updater

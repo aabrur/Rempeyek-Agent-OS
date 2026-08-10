@@ -4,6 +4,7 @@ import { api } from "../api";
 import { desktopRuntime } from "../lib/desktop-runtime.mjs";
 import { approveAction } from "../hooks/useGateway";
 import { releaseState } from "../../lib/release-check.mjs";
+import { AutoUpdateModal } from "./AutoUpdateModal";
 
 const CHECK_KEY = "aos-release-check";
 const CHECK_TTL = 12 * 3600 * 1000;
@@ -17,6 +18,7 @@ export function UpdateBanner() {
   const [desktopInfo, setDesktopInfo] = useState(null);
   const [desktopUpdate, setDesktopUpdate] = useState(null);
   const [desktopBusy, setDesktopBusy] = useState(false);
+  const [showModal, setShowModal] = useState(false);
   const [rel, setRel] = useState(null);
   const [phase, setPhase] = useState("idle");
   const [tail, setTail] = useState([]);
@@ -34,7 +36,12 @@ export function UpdateBanner() {
         }
       });
       const unsubscribe = runtime.onUpdateState(value => {
-        if (alive.current) setDesktopUpdate(value);
+        if (alive.current) {
+          setDesktopUpdate(value);
+          if (value?.phase === "available" || value?.phase === "ready") {
+            setShowModal(true);
+          }
+        }
       });
       return () => {
         alive.current = false;
@@ -88,7 +95,10 @@ export function UpdateBanner() {
         url: cached.url,
         notes: cached.notes,
       });
-      if (state.updateAvailable) setRel(state);
+      if (state.updateAvailable) {
+        setRel(state);
+        setShowModal(true);
+      }
     })();
     return () => {
       alive.current = false;
@@ -136,27 +146,74 @@ export function UpdateBanner() {
   };
 
   const desktopAction = async () => {
-      setDesktopBusy(true);
-      try {
-        if (desktopUpdate?.phase === "ready") {
-          await runtime.restartToUpdate();
-        } else if (desktopUpdate?.phase === "available") {
-          const next = await runtime.downloadUpdate();
-          if (next) setDesktopUpdate(next);
-        } else {
-          const next = await runtime.checkForUpdates();
-          if (next) setDesktopUpdate(next);
-        }
-      } catch (error) {
-        setDesktopUpdate({
-          ...desktopUpdate,
-          phase: "error",
-          error: DESKTOP_UPDATE_ERROR,
-        });
-      } finally {
-        setDesktopBusy(false);
+    setDesktopBusy(true);
+    try {
+      if (desktopUpdate?.phase === "ready") {
+        await runtime.restartToUpdate();
+      } else if (desktopUpdate?.phase === "available") {
+        const next = await runtime.downloadUpdate();
+        if (next) setDesktopUpdate(next);
+      } else {
+        const next = await runtime.checkForUpdates();
+        if (next) setDesktopUpdate(next);
       }
-    };
+    } catch (error) {
+      setDesktopUpdate({
+        ...desktopUpdate,
+        phase: "error",
+        error: DESKTOP_UPDATE_ERROR,
+      });
+    } finally {
+      setDesktopBusy(false);
+    }
+  };
+
+  const desktopCheck = async () => {
+    setDesktopBusy(true);
+    try {
+      const next = await runtime.checkForUpdates();
+      if (next) setDesktopUpdate(next);
+    } catch (error) {
+      setDesktopUpdate({
+        ...desktopUpdate,
+        phase: "error",
+        error: DESKTOP_UPDATE_ERROR,
+      });
+    } finally {
+      setDesktopBusy(false);
+    }
+  };
+
+  const desktopDownload = async () => {
+    setDesktopBusy(true);
+    try {
+      const next = await runtime.downloadUpdate();
+      if (next) setDesktopUpdate(next);
+    } catch (error) {
+      setDesktopUpdate({
+        ...desktopUpdate,
+        phase: "error",
+        error: DESKTOP_UPDATE_ERROR,
+      });
+    } finally {
+      setDesktopBusy(false);
+    }
+  };
+
+  const desktopRestart = async () => {
+    setDesktopBusy(true);
+    try {
+      await runtime.restartToUpdate();
+    } catch (error) {
+      setDesktopUpdate({
+        ...desktopUpdate,
+        phase: "error",
+        error: DESKTOP_UPDATE_ERROR,
+      });
+    } finally {
+      setDesktopBusy(false);
+    }
+  };
 
   if (runtime.desktop) {
     if (!desktopInfo?.packaged) return null;
@@ -164,124 +221,140 @@ export function UpdateBanner() {
     if (updatePhase === "idle" || updatePhase === "not-available") return null;
     const percent = desktopUpdate?.percent;
     return (
-      <div
-        className={`update-banner phase-${updatePhase}`}
-        role="status"
-        aria-live="polite"
-      >
-        <div className="update-banner-row">
-          <span className="update-banner-badge" aria-hidden="true">⬆</span>
-          {updatePhase === "ready" ? (
-            <span>
-              <b>v{desktopUpdate.version} is verified and ready.</b>{" "}
-              Restart is a separate user action.
-            </span>
-          ) : updatePhase === "downloading" ? (
-            <span>
-              <b>Downloading v{desktopUpdate.version || "update"}.</b>{" "}
-              {Number.isFinite(percent) ? `${percent}%` : ""}
-            </span>
-          ) : updatePhase === "error" ? (
-            <span>
-              <b>Desktop update check failed.</b>{" "}
-              {DESKTOP_UPDATE_ERROR}
-            </span>
-          ) : (
-            <span>
-              <b>
-                {updatePhase === "checking"
-                  ? "Checking for a verified desktop update."
-                  : `v${desktopUpdate.version} is available.`}
-              </b>
-            </span>
-          )}
-          {(updatePhase === "ready" || updatePhase === "error" || updatePhase === "available") && (
-                      <Btn
-                        variant="primary"
-                        disabled={desktopBusy}
-                        onClick={desktopAction}
-                      >
-                        {desktopBusy
-                          ? "Working…"
-                          : updatePhase === "ready"
-                            ? "Restart to update"
-                            : updatePhase === "available"
-                              ? "Download update"
-                              : "Check again"}
-                      </Btn>
-                    )}
-          {(updatePhase === "checking" || updatePhase === "downloading") && (
-            <span className="update-banner-spin">
-              {updatePhase === "checking" ? "checking…" : "downloading…"}
-            </span>
-          )}
+      <>
+        <div
+          className={`update-banner phase-${updatePhase}`}
+          role="status"
+          aria-live="polite"
+        >
+          <div className="update-banner-row">
+            <span className="update-banner-badge" aria-hidden="true">⬆</span>
+            {updatePhase === "ready" ? (
+              <span>
+                <b>v{desktopUpdate.version} is verified and ready.</b>{" "}
+                Restart is a separate user action.
+              </span>
+            ) : updatePhase === "downloading" ? (
+              <span>
+                <b>Downloading v{desktopUpdate.version || "update"}.</b>{" "}
+                {Number.isFinite(percent) ? `${percent}%` : ""}
+              </span>
+            ) : updatePhase === "error" ? (
+              <span>
+                <b>Desktop update check failed.</b>{" "}
+                {DESKTOP_UPDATE_ERROR}
+              </span>
+            ) : (
+              <span>
+                <b>
+                  {updatePhase === "checking"
+                    ? "Checking for a verified desktop update."
+                    : `v${desktopUpdate.version} is available.`}
+                </b>
+              </span>
+            )}
+            {(updatePhase === "ready" || updatePhase === "error" || updatePhase === "available") && (
+              <Btn
+                variant="primary"
+                disabled={desktopBusy}
+                onClick={() => setShowModal(true)}
+              >
+                {desktopBusy ? "Working…" : "Open Auto Update"}
+              </Btn>
+            )}
+            {(updatePhase === "checking" || updatePhase === "downloading") && (
+              <span className="update-banner-spin">
+                {updatePhase === "checking" ? "checking…" : "downloading…"}
+              </span>
+            )}
+          </div>
         </div>
-      </div>
+        <AutoUpdateModal
+          open={showModal}
+          onClose={() => setShowModal(false)}
+          desktopUpdate={desktopUpdate}
+          desktopBusy={desktopBusy}
+          onCheck={desktopCheck}
+          onDownload={desktopDownload}
+          onRestart={desktopRestart}
+        />
+      </>
     );
   }
 
   if (!rel) return null;
   return (
-    <div
-      className={`update-banner phase-${phase}`}
-      role="status"
-      aria-live="polite"
-    >
-      <div className="update-banner-row">
-        <span className="update-banner-badge" aria-hidden="true">⬆</span>
-        {phase === "done" ? (
-          <span>
-            <b>Updated to v{rel.latest}.</b> UI assets are live; restart the
-            source server to load backend changes.
-          </span>
-        ) : phase === "failed" ? (
-          <span>
-            <b>Update did not complete.</b> Dirty or diverged checkouts stop
-            before changes are applied.
-          </span>
-        ) : (
-          <span>
-            <b>v{rel.latest} tersedia</b> (you run v{rel.current}).
-          </span>
+    <>
+      <div
+        className={`update-banner phase-${phase}`}
+        role="status"
+        aria-live="polite"
+      >
+        <div className="update-banner-row">
+          <span className="update-banner-badge" aria-hidden="true">⬆</span>
+          {phase === "done" ? (
+            <span>
+              <b>Updated to v{rel.latest}.</b> UI assets are live; restart the
+              source server to load backend changes.
+            </span>
+          ) : phase === "failed" ? (
+            <span>
+              <b>Update did not complete.</b> Dirty or diverged checkouts stop
+              before changes are applied.
+            </span>
+          ) : (
+            <span>
+              <b>v{rel.latest} tersedia</b> (you run v{rel.current}).
+            </span>
+          )}
+          {phase === "idle" && (
+            <>
+              {rel.notes && (
+                <button
+                  type="button"
+                  className="update-banner-link"
+                  onClick={() => setShowNotes(value => !value)}
+                >
+                  {showNotes ? "hide changelog" : "changelog"}
+                </button>
+              )}
+              {rel.url && (
+                <a
+                  className="update-banner-link"
+                  href={rel.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  release ↗
+                </a>
+              )}
+              <Btn variant="primary" onClick={() => setShowModal(true)}>Open Auto Update</Btn>
+            </>
+          )}
+          {phase === "updating" && (
+            <span className="update-banner-spin">updating…</span>
+          )}
+        </div>
+        {showNotes && phase === "idle" && (
+          <pre className="update-banner-notes">{rel.notes}</pre>
         )}
-        {phase === "idle" && (
-          <>
-            {rel.notes && (
-              <button
-                type="button"
-                className="update-banner-link"
-                onClick={() => setShowNotes(value => !value)}
-              >
-                {showNotes ? "hide changelog" : "changelog"}
-              </button>
-            )}
-            {rel.url && (
-              <a
-                className="update-banner-link"
-                href={rel.url}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                release ↗
-              </a>
-            )}
-            <Btn variant="primary" onClick={sourceUpdate}>Update now</Btn>
-          </>
-        )}
-        {phase === "updating" && (
-          <span className="update-banner-spin">updating…</span>
+        {(phase === "updating" || phase === "failed") && tail.length > 0 && (
+          <pre className="update-banner-notes">
+            {tail.map(line => (
+              `[${line.t}] ${line.s === "err" ? "⚠ " : ""}${line.line}`
+            )).join("\n")}
+          </pre>
         )}
       </div>
-      {showNotes && phase === "idle" && (
-        <pre className="update-banner-notes">{rel.notes}</pre>
-      )}
-      {(phase === "updating" || phase === "failed") && tail.length > 0 && (
-        <pre className="update-banner-notes">
-          {tail.map(line => (
-            `[${line.t}] ${line.s === "err" ? "⚠ " : ""}${line.line}`
-          )).join("\n")}
-        </pre>
-      )}
-    </div>
+      <AutoUpdateModal
+        open={showModal}
+        onClose={() => setShowModal(false)}
+        desktopUpdate={{ phase: "available", version: rel.latest }}
+        desktopBusy={phase === "updating"}
+        onDownload={sourceUpdate}
+        onRestart={sourceUpdate}
+        onCheck={() => {}}
+      />
+    </>
   );
 }
