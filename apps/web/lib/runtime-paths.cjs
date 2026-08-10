@@ -12,26 +12,33 @@ function resolveRuntimePaths({ env = process.env, root, home, platform = process
   const defaultStateRoot = platform === "win32" && env.LOCALAPPDATA
     ? (p.basename(env.LOCALAPPDATA) === "Rempeyek-Agent-OS" ? env.LOCALAPPDATA : p.join(env.LOCALAPPDATA, "Rempeyek-Agent-OS"))
     : p.join(appDataRoot, "Rempeyek-Agent-OS");
+  const legacyPath = p.join(root, "agents.config.json");
+  // Existence checks must use host-native separators. Simulated path.win32 strings
+  // break existsSync on Linux/macOS CI hosts.
   const legacyPathNative = path.join(root, "agents.config.json");
-    // Existence must use host-native separators. path.win32 strings break existsSync on Linux/macOS.
-    const legacyConfig = !env.AGENTS_CONFIG && exists(legacyPathNative);
-    const stateRoot = env.AGENT_STATE_DIR || (legacyConfig ? root : defaultStateRoot);
-    const managedStateRoot = env.AGENT_STATE_DIR || defaultStateRoot;
-    const legacyVault = p.join(root, "Obsidian Vault");
-    const legacyVaultNative = path.join(root, "Obsidian Vault");
+  const legacyConfig = !env.AGENTS_CONFIG && exists(legacyPathNative);
+  const stateRoot = env.AGENT_STATE_DIR || (legacyConfig ? root : defaultStateRoot);
+  const managedStateRoot = env.AGENT_STATE_DIR || defaultStateRoot;
+  const legacyVault = p.join(root, "Obsidian Vault");
+  const legacyVaultNative = path.join(root, "Obsidian Vault");
 
-    return {
-      stateRoot,
-      legacyConfig,
-      configPath: env.AGENTS_CONFIG || (legacyConfig ? legacyPathNative : p.join(stateRoot, "agents.config.json")),
-      vaultPath: env.VAULT_PATH || (legacyConfig && exists(legacyVaultNative) ? legacyVaultNative : p.join(stateRoot, "Vault")),
-      telemetryDir: legacyConfig ? path.join(root, "telemetry") : p.join(stateRoot, "telemetry"),
-      avatarDir: legacyConfig ? path.join(root, "runtime", "avatars") : p.join(stateRoot, "avatars"),
-      receiptDir: p.join(managedStateRoot, "receipts"),
-      installCacheDir: p.join(managedStateRoot, "install-cache"),
-      tombstoneDir: p.join(managedStateRoot, "tombstones"),
-      bundleRoot: path.join(root, "marketplace", "bundles"),
-    };
+  return {
+    stateRoot,
+    legacyConfig,
+    // Prefer host-native path when the file was detected on this host so readers can open it.
+    configPath: env.AGENTS_CONFIG || (legacyConfig
+      ? (platform === process.platform ? legacyPathNative : legacyPath)
+      : p.join(stateRoot, "agents.config.json")),
+    vaultPath: env.VAULT_PATH || (legacyConfig && exists(legacyVaultNative)
+      ? (platform === process.platform ? legacyVaultNative : legacyVault)
+      : p.join(stateRoot, "Vault")),
+    telemetryDir: legacyConfig ? p.join(root, "telemetry") : p.join(stateRoot, "telemetry"),
+    avatarDir: legacyConfig ? p.join(root, "runtime", "avatars") : p.join(stateRoot, "avatars"),
+    receiptDir: p.join(managedStateRoot, "receipts"),
+    installCacheDir: p.join(managedStateRoot, "install-cache"),
+    tombstoneDir: p.join(managedStateRoot, "tombstones"),
+    bundleRoot: p.join(root, "marketplace", "bundles"),
+  };
 }
 
 function ensureEmptyConfig(configPath, { home, agency = "REMPEYEK AGENT OS" } = {}) {
