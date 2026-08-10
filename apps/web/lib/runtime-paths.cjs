@@ -12,26 +12,30 @@ function resolveRuntimePaths({ env = process.env, root, home, platform = process
   const defaultStateRoot = platform === "win32" && env.LOCALAPPDATA
     ? (p.basename(env.LOCALAPPDATA) === "Rempeyek-Agent-OS" ? env.LOCALAPPDATA : p.join(env.LOCALAPPDATA, "Rempeyek-Agent-OS"))
     : p.join(appDataRoot, "Rempeyek-Agent-OS");
+
+  // Probe both platform-shaped and host-native path strings. Unit tests inject
+  // path.win32 candidates on Linux CI; real hosts need native separators.
+  const pathPresent = platformPath => {
+    if (exists(platformPath)) return true;
+    const nativePath = path.join(root, ...platformPath
+      .slice(String(root).length)
+      .split(/[\\/]+/)
+      .filter(Boolean));
+    return nativePath !== platformPath && exists(nativePath);
+  };
+
   const legacyPath = p.join(root, "agents.config.json");
-  // Existence checks must use host-native separators. Simulated path.win32 strings
-  // break existsSync on Linux/macOS CI hosts.
-  const legacyPathNative = path.join(root, "agents.config.json");
-  const legacyConfig = !env.AGENTS_CONFIG && exists(legacyPathNative);
+  const legacyConfig = !env.AGENTS_CONFIG && pathPresent(legacyPath);
   const stateRoot = env.AGENT_STATE_DIR || (legacyConfig ? root : defaultStateRoot);
   const managedStateRoot = env.AGENT_STATE_DIR || defaultStateRoot;
   const legacyVault = p.join(root, "Obsidian Vault");
-  const legacyVaultNative = path.join(root, "Obsidian Vault");
+  const hasLegacyVault = pathPresent(legacyVault);
 
   return {
     stateRoot,
     legacyConfig,
-    // Prefer host-native path when the file was detected on this host so readers can open it.
-    configPath: env.AGENTS_CONFIG || (legacyConfig
-      ? (platform === process.platform ? legacyPathNative : legacyPath)
-      : p.join(stateRoot, "agents.config.json")),
-    vaultPath: env.VAULT_PATH || (legacyConfig && exists(legacyVaultNative)
-      ? (platform === process.platform ? legacyVaultNative : legacyVault)
-      : p.join(stateRoot, "Vault")),
+    configPath: env.AGENTS_CONFIG || (legacyConfig ? legacyPath : p.join(stateRoot, "agents.config.json")),
+    vaultPath: env.VAULT_PATH || (legacyConfig && hasLegacyVault ? legacyVault : p.join(stateRoot, "Vault")),
     telemetryDir: legacyConfig ? p.join(root, "telemetry") : p.join(stateRoot, "telemetry"),
     avatarDir: legacyConfig ? p.join(root, "runtime", "avatars") : p.join(stateRoot, "avatars"),
     receiptDir: p.join(managedStateRoot, "receipts"),
