@@ -471,8 +471,10 @@ test("agent registration failure is contained and replayable after installer suc
     const configPath = path.join(root, "agents.config.json");
     const config = fs.readFileSync(configPath, "utf8");
     fs.writeFileSync(configPath, "{ invalid json", "utf8");
+    if (fs.existsSync(configPath + ".bak")) fs.writeFileSync(configPath + ".bak", "{ invalid json", "utf8");
     children[0].emit("exit", 0);
     fs.writeFileSync(configPath, config, "utf8");
+    if (fs.existsSync(configPath + ".bak")) fs.writeFileSync(configPath + ".bak", config, "utf8");
     await new Promise(resolve => setImmediate(resolve));
 
     const replayApproval = await approve(base, "agent.install", "opencode");

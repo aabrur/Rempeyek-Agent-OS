@@ -104,11 +104,45 @@ export function createDesktopSettingsStore(filePath, deps = fs) {
       write(initial);
       return initial;
     }
-    const stored = JSON.parse(deps.readFileSync(filePath, "utf8"));
-    return {
-      ...DESKTOP_SETTINGS_DEFAULTS,
-      ...validatedPatch(stored),
-    };
+    let raw;
+    try {
+      raw = deps.readFileSync(filePath, "utf8");
+      const cleaned = String(raw || "").replace(/^\uFEFF/, "");
+      const stored = JSON.parse(cleaned);
+      return {
+        ...DESKTOP_SETTINGS_DEFAULTS,
+        ...validatedPatch(stored),
+      };
+    } catch (err) {
+      // Preserve corrupt file in Quarantine
+      try {
+        const quarantineDir = path.join(directory, "Quarantine");
+        deps.mkdirSync(quarantineDir, { recursive: true });
+        const time = new Date().toISOString().replace(/[:.]/g, "-");
+        deps.copyFileSync(filePath, path.join(quarantineDir, `desktop-settings.corrupt.${time}.json`));
+      } catch {}
+
+      // Try backup (.bak)
+      const bakPath = `${filePath}.bak`;
+      if (deps.existsSync(bakPath)) {
+        try {
+          const rawBak = deps.readFileSync(bakPath, "utf8");
+          const cleanedBak = String(rawBak || "").replace(/^\uFEFF/, "");
+          const storedBak = JSON.parse(cleanedBak);
+          const restored = {
+            ...DESKTOP_SETTINGS_DEFAULTS,
+            ...validatedPatch(storedBak),
+          };
+          write(restored);
+          return restored;
+        } catch {}
+      }
+
+      // Safe default fallback
+      const initial = { ...DESKTOP_SETTINGS_DEFAULTS };
+      write(initial);
+      return initial;
+    }
   }
 
   function update(patch) {

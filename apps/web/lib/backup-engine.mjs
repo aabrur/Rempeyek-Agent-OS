@@ -74,6 +74,7 @@ export function createBackupEngine({ configDir, vaultPath, backupsDir }) {
       }
 
       const manifest = {
+        metadataVersion: 1,
         backupId,
         createdAt: new Date().toISOString(),
         label,
@@ -119,9 +120,16 @@ export function createBackupEngine({ configDir, vaultPath, backupsDir }) {
 
       try {
         const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
+        if (!manifest || typeof manifest !== 'object' || !Array.isArray(manifest.files)) {
+          return { valid: false, error: 'Invalid manifest structure' };
+        }
+
         const backupDir = getBackupPath(backupId);
 
         for (const file of manifest.files) {
+          if (!file.checksum) {
+            return { valid: false, error: `Missing checksum for file: ${file.relativePath}` };
+          }
           const backupFilePath = path.join(backupDir, file.relativePath);
           if (!fs.existsSync(backupFilePath)) {
             return { valid: false, error: `Missing file: ${file.relativePath}` };
@@ -178,15 +186,37 @@ export function createBackupEngine({ configDir, vaultPath, backupsDir }) {
       const manifest = JSON.parse(fs.readFileSync(getManifestPath(backupId), 'utf-8'));
       const backupDir = getBackupPath(backupId);
 
-      for (const file of manifest.files) {
-        const backupFilePath = path.join(backupDir, file.relativePath);
-        // Use atomic-like copy for restoration
-        const tmpTarget = file.originalPath + '.tmp';
-        copyFileSafe(backupFilePath, tmpTarget);
-        fs.renameSync(tmpTarget, file.originalPath);
-      }
+      const stagedFiles = [];
+      try {
+        // Stage 1: Copy to temporary restoration targets and verify checksums
+        for (const file of manifest.files) {
+          const backupFilePath = path.join(backupDir, file.relativePath);
+          const tmpTarget = file.originalPath + '.restore.tmp';
+          copyFileSafe(backupFilePath, tmpTarget);
 
-      return { success: true, restoredFiles: manifest.files.length };
+          const stagedChecksum = computeChecksum(tmpTarget);
+          if (stagedChecksum !== file.checksum) {
+            throw new Error(`Checksum verification failed during staging for ${file.relativePath}`);
+          }
+          stagedFiles.push({ tmpTarget, originalPath: file.originalPath });
+        }
+
+        // Stage 2: Commit staged files atomically
+        for (const item of stagedFiles) {
+          fs.mkdirSync(path.dirname(item.originalPath), { recursive: true });
+          fs.renameSync(item.tmpTarget, item.originalPath);
+        }
+
+        return { success: true, restoredFiles: manifest.files.length };
+      } catch (err) {
+        // Rollback staged temp files on error
+        for (const item of stagedFiles) {
+          if (fs.existsSync(item.tmpTarget)) {
+            try { fs.unlinkSync(item.tmpTarget); } catch {}
+          }
+        }
+        throw new Error(`Atomic restore failed: ${err.message}`);
+      }
     },
 
     getBackupSize(backupId) {

@@ -86,7 +86,23 @@ export function createMigrationEngine({ configDir, vaultPath, backupsDir }) {
 
     async run(customMigrationsDir) {
       if (fs.existsSync(lockPath)) {
-        throw new Error('Migration is locked. Another process may be running.');
+        let isStale = false;
+        try {
+          const st = fs.statSync(lockPath);
+          let lockTime = st.mtimeMs;
+          const content = fs.readFileSync(lockPath, 'utf8').trim();
+          const parsed = parseInt(content, 10);
+          if (!isNaN(parsed) && parsed > 0) lockTime = Math.min(lockTime, parsed);
+          if (Date.now() - lockTime > 60000) isStale = true;
+        } catch {
+          isStale = true;
+        }
+
+        if (isStale) {
+          try { fs.unlinkSync(lockPath); } catch {}
+        } else {
+          throw new Error('Migration is locked. Another process may be running.');
+        }
       }
 
       const journal = getMigrationJournal();
@@ -133,7 +149,7 @@ export function createMigrationEngine({ configDir, vaultPath, backupsDir }) {
             if (migration.validate) {
               const valResult = await migration.validate({ configDir, vaultPath });
               if (!valResult.valid) {
-                throw new Error(`Validation failed for migration ${migration.version}: ${valResult.errors.join(', ')}`);
+                throw new Error(`Validation failed for migration ${migration.version}: ${(valResult.errors || []).join(', ')}`);
               }
             }
 
@@ -155,10 +171,26 @@ export function createMigrationEngine({ configDir, vaultPath, backupsDir }) {
 
             results.push(entry);
           } catch (e) {
+            let rollbackStatus = 'none';
+            if (migration.reversible && migration.down) {
+              try {
+                await migration.down({ configDir, vaultPath });
+                if (migration.validate) {
+                  const valRes = await migration.validate({ configDir, vaultPath });
+                  rollbackStatus = valRes.valid ? 'verified' : 'failed';
+                } else {
+                  rollbackStatus = 'executed';
+                }
+              } catch {
+                rollbackStatus = 'failed';
+              }
+            }
+
             const entry = {
               version: migration.version,
               description: migration.description,
               status: 'failed',
+              rollbackStatus,
               executedAt: new Date().toISOString(),
               durationMs: Date.now() - startTime,
               error: e.message
@@ -171,7 +203,7 @@ export function createMigrationEngine({ configDir, vaultPath, backupsDir }) {
         }
       } finally {
         if (fs.existsSync(lockPath)) {
-          fs.unlinkSync(lockPath);
+          try { fs.unlinkSync(lockPath); } catch {}
         }
       }
 

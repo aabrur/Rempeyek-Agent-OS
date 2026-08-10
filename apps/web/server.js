@@ -12,6 +12,7 @@ const crypto = require("crypto");
 const { buildAgentEnv } = require("./lib/child-env.cjs");
 const { createAccessPolicy } = require("./lib/access-policy.cjs");
 const { createConfigStore } = require("./lib/config-store.cjs");
+const { stripBom, writeJsonAtomic, loadDurableJson } = require("./lib/durable-config.cjs");
 const { ensureEmptyConfig, resolveRuntimePaths } = require("./lib/runtime-paths.cjs");
 const { resolveSummonProfile } = require("./lib/summon-profile.cjs");
 const {
@@ -149,9 +150,6 @@ ensureEmptyConfig(CONFIG_PATH, { home: os.homedir() });
    R#11: keep the last error so the dashboard can show a banner (not silently serve last-good). */
 let _cfgCache = { mtime: 0, data: null };
 let configError = null;   // { msg, at } when parsing fails but a last-good copy exists
-function stripBom(text) {
-  return String(text || "").replace(/^\uFEFF/, "");
-}
 function emptyConfigFallback() {
   return { agency: "REMPEYEK AGENT OS", workdir: os.homedir(), agents: [] };
 }
@@ -159,40 +157,26 @@ function loadConfig() {
   try {
     const st = fs.statSync(CONFIG_PATH);
     if (_cfgCache.data && st.mtimeMs === _cfgCache.mtime) return _cfgCache.data;
-    const data = JSON.parse(stripBom(fs.readFileSync(CONFIG_PATH, "utf8")));
-    if (!data || !Array.isArray(data.agents)) throw new Error("agents.config.json must contain an agents array");
-    _cfgCache = { mtime: st.mtimeMs, data };
-    configError = null;                       // recovered → clear the banner
-    return data;
-  } catch (e) {
-    if (_cfgCache.data) {
-      console.error("[config] parse failed, using last-good:", e.message);
-      configError = { msg: e.message, at: new Date().toISOString() };
-      return _cfgCache.data;
-    }
-    // Fresh / public install must never hard-crash /api/state on a BOM-corrupted file.
-    console.error("[config] parse failed, bootstrapping empty registry:", e.message);
-    configError = { msg: e.message, at: new Date().toISOString() };
-    const fallback = emptyConfigFallback();
-    try {
-      fs.mkdirSync(path.dirname(CONFIG_PATH), { recursive: true });
-      fs.writeFileSync(CONFIG_PATH, JSON.stringify(fallback, null, 2) + "\n", "utf8");
-      const st = fs.statSync(CONFIG_PATH);
-      _cfgCache = { mtime: st.mtimeMs, data: fallback };
-    } catch {
-      _cfgCache = { mtime: Date.now(), data: fallback };
-    }
-    return fallback;
-  }
+  } catch {}
+
+  const validator = cfg => {
+    if (!cfg || !Array.isArray(cfg.agents)) throw new Error("agents.config.json must contain an agents array");
+  };
+
+  const result = loadDurableJson(CONFIG_PATH, {
+    validator,
+    fallback: emptyConfigFallback,
+  });
+  let st;
+  try { st = fs.statSync(CONFIG_PATH); } catch { st = { mtimeMs: Date.now() }; }
+  _cfgCache = { mtime: st.mtimeMs, data: result.data };
+  return result.data;
 }
 
-/* saveConfig: the ONLY write path for agents.config.json - backs up the current file
-   to <config>.bak first, writes pretty JSON, and invalidates the mtime cache. */
+/* saveConfig: atomic write path for agents.config.json with backup and cache invalidation. */
 function saveConfig(cfg) {
-  try { fs.copyFileSync(CONFIG_PATH, CONFIG_PATH + ".bak"); } catch {}
-  fs.mkdirSync(path.dirname(CONFIG_PATH), { recursive: true });
-  fs.writeFileSync(CONFIG_PATH, JSON.stringify(cfg, null, 2) + "\n", "utf8");
-  _cfgCache = { mtime: 0, data: null };   // force reload on next loadConfig()
+  writeJsonAtomic(CONFIG_PATH, cfg, { backup: true });
+  _cfgCache = { mtime: 0, data: null };
 }
 
 function createRuntimeServices(runtime = {}) {
@@ -209,11 +193,15 @@ function createRuntimeServices(runtime = {}) {
   const ownedMutations = new Map();
 
   const readConfig = () => {
-    const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
-    if (!Array.isArray(config.agents)) {
-      throw new Error("agents.config.json must contain an agents array");
-    }
-    return config;
+    const validator = config => {
+      if (!config || !Array.isArray(config.agents)) {
+        throw new Error("agents.config.json must contain an agents array");
+      }
+    };
+    const res = loadDurableJson(configPath, {
+      validator,
+    });
+    return res.data;
   };
   const store = createConfigStore({
     configPath,
