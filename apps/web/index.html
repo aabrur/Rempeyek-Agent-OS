@@ -7,11 +7,152 @@
 <!-- pre-paint theme: avoids a flash of the default theme before React mounts -->
 <script>(()=>{try{const k="aos-theme",v=(localStorage.getItem(k)||"").toLowerCase(),ok=["minimalist","brutalist","glassmorph","cyberpunk"],m={rempeyek:"cyberpunk",cosmos:"cyberpunk",ember:"brutalist","ghost-protocol":"minimalist","quantum-glass":"glassmorph","dark-matter":"minimalist",nebula:"cyberpunk",aurora:"glassmorph",midnight:"minimalist",solaris:"brutalist","crimson-rift":"cyberpunk",monochrome:"minimalist","nothing-os":"brutalist"},t=ok.includes(v)?v:(m[v]||"cyberpunk");document.documentElement.dataset.theme=t;localStorage.setItem(k,t)}catch{document.documentElement.dataset.theme="cyberpunk"}})();</script>
 <link rel="icon" type="image/webp" href="/brand/logo.webp">
-<style>html,body{background-color:#0b0f17;color:#e2e8f0;margin:0;padding:0;min-height:100vh;}</style>
+<style>
+  html, body { background-color: #0b0f17; color: #e2e8f0; margin: 0; padding: 0; min-height: 100vh; font-family: system-ui, -apple-system, sans-serif; }
+  .recovery-shell { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; box-sizing: border-box; background: radial-gradient(circle at center, #111827 0%, #0b0f17 100%); }
+  .recovery-card { max-width: 620px; width: 100%; background: rgba(17, 24, 39, 0.95); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 12px; padding: 32px; box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6); backdrop-filter: blur(16px); }
+  .recovery-header { display: flex; align-items: center; gap: 16px; margin-bottom: 24px; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 16px; }
+  .recovery-icon { font-size: 32px; }
+  .recovery-title { margin: 0; font-size: 22px; font-weight: 700; color: #f8fafc; letter-spacing: 0.5px; }
+  .recovery-subtitle { margin: 4px 0 0; font-size: 14px; color: #94a3b8; }
+  .recovery-status-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin-bottom: 20px; }
+  .status-item { background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 8px; padding: 10px 14px; display: flex; align-items: center; justify-content: space-between; font-size: 13px; color: #cbd5e1; }
+  .recovery-badge { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 4px; text-transform: uppercase; }
+  .badge-ok { background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3); }
+  .badge-error { background: rgba(244, 63, 94, 0.15); color: #fb7185; border: 1px solid rgba(244, 63, 94, 0.3); }
+  .badge-pending { background: rgba(148, 163, 184, 0.15); color: #94a3b8; border: 1px solid rgba(148, 163, 184, 0.3); }
+  .recovery-log-box { background: #06090e; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; padding: 14px 16px; margin: 16px 0 24px; font-size: 13px; font-family: monospace; color: #f43f5e; overflow-x: auto; white-space: pre-wrap; max-height: 140px; }
+  .recovery-actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+  .recovery-btn { background: rgba(255, 255, 255, 0.08); color: #f1f5f9; border: 1px solid rgba(255, 255, 255, 0.15); padding: 8px 16px; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.15s ease; }
+  .recovery-btn:hover { background: rgba(255, 255, 255, 0.16); }
+  .recovery-btn-primary { background: #3b82f6; color: #ffffff; border: 1px solid #60a5fa; }
+  .recovery-btn-primary:hover { background: #2563eb; }
+</style>
+<script>
+window.rempeyekBoot = (function() {
+  var currentPhase = "did-finish-load";
+  var isReady = false;
+
+  function scrub(text) {
+    if (typeof text !== "string") text = String(text || "");
+    return text
+      .replace(/x-desktop-session=[^\s&]+/gi, "x-desktop-session=[REDACTED_TOKEN]")
+      .replace(/dashToken=[^\s&]+/gi, "dashToken=[REDACTED_TOKEN]")
+      .replace(/\b(sk-proj-[a-zA-Z0-9_-]+)\b/g, "[REDACTED_API_KEY]")
+      .replace(/\b(sk-[a-zA-Z0-9_-]{20,})\b/g, "[REDACTED_API_KEY]")
+      .replace(/\b([0-9a-fA-F]{32}|[0-9a-fA-F]{64})\b/g, "[REDACTED_TOKEN]");
+  }
+
+  function showRecovery(error, phase) {
+    if (isReady) return;
+    phase = phase || currentPhase;
+    var el = document.getElementById("boot-recovery");
+    var rootEl = document.getElementById("root");
+    if (!el) return;
+    if (rootEl) rootEl.style.display = "none";
+    el.style.display = "flex";
+
+    var msg = scrub(error && (error.message || String(error)) || "The workspace process encountered an unexpected failure during bootstrap.");
+    var logEl = document.getElementById("recovery-log");
+    if (logEl) logEl.textContent = msg;
+
+    var setBadge = function(id, text, isError, isPending) {
+      var badge = document.getElementById(id);
+      if (!badge) return;
+      badge.textContent = text;
+      badge.className = "recovery-badge " + (isPending ? "badge-pending" : isError ? "badge-error" : "badge-ok");
+    };
+
+    setBadge("badge-shell", "Connected", false, false);
+    setBadge("badge-service", phase === "server-failed" ? "Failed" : "Connected", phase === "server-failed", false);
+    setBadge("badge-renderer", phase === "did-fail-load" ? "Failed" : "Active", phase === "did-fail-load", false);
+    setBadge("badge-bundle", phase === "bundle-evaluation-failed" ? "Failed" : phase === "did-finish-load" ? "Evaluating" : "Ready", phase === "bundle-evaluation-failed", false);
+    setBadge("badge-api", phase === "api-failed" ? "Unreachable" : "Pending", phase === "api-failed", phase !== "api-failed" && phase !== "app-ready");
+  }
+
+  window.addEventListener("error", function(event) {
+    if (!isReady) {
+      showRecovery(event.error || event.message || "Script evaluation error", "bundle-evaluation-failed");
+    }
+  });
+
+  window.addEventListener("unhandledrejection", function(event) {
+    if (!isReady) {
+      showRecovery(event.reason || "Unhandled Promise Rejection during startup", "bundle-evaluation-failed");
+    }
+  });
+
+  return {
+    setPhase: function(p) { currentPhase = p; },
+    notifyReady: function() {
+      isReady = true;
+      var el = document.getElementById("boot-recovery");
+      if (el) el.style.display = "none";
+      var rootEl = document.getElementById("root");
+      if (rootEl) rootEl.style.display = "block";
+    },
+    showRecovery: showRecovery,
+    retryRenderer: function() {
+      var attempts = parseInt(sessionStorage.getItem("aos_boot_retries") || "0", 10);
+      if (attempts >= 3) {
+        alert("Maximum reload attempts reached. Please use 'Restart Application' or check system logs.");
+        return;
+      }
+      sessionStorage.setItem("aos_boot_retries", String(attempts + 1));
+      window.location.reload();
+    },
+    restartApp: function() {
+      if (window.rempeyekDesktop && window.rempeyekDesktop.restartToUpdate) {
+        window.rempeyekDesktop.restartToUpdate().catch(function() { window.location.reload(); });
+      } else {
+        window.location.reload();
+      }
+    },
+    openLogs: function() {
+      if (window.rempeyekDesktop && window.rempeyekDesktop.openPath) {
+        window.rempeyekDesktop.openPath("logs").catch(function(err) { alert("Logs path: " + err.message); });
+      } else {
+        alert("Logs directory: %LOCALAPPDATA%\\Rempeyek-Agent-OS\\Logs");
+      }
+    },
+    runDiagnostics: function() {
+      alert("System Status:\n• Desktop Shell: Running\n• Phase: " + currentPhase + "\n• Path: %LOCALAPPDATA%\\Rempeyek-Agent-OS\n• Build Version: 2.4.0");
+    }
+  };
+})();
+</script>
 </head>
 <body>
 <div class="bg-grid" aria-hidden="true"></div>
 <div class="bg-glow" aria-hidden="true"></div>
+
+<!-- Layer 1: Static Pre-React Recovery Shell -->
+<div id="boot-recovery" class="recovery-shell" style="display: none;">
+  <div class="recovery-card">
+    <div class="recovery-header">
+      <span class="recovery-icon">⚠️</span>
+      <div>
+        <h1 class="recovery-title">REMPEYEK RECOVERY</h1>
+        <p class="recovery-subtitle">The workspace could not start correctly.</p>
+      </div>
+    </div>
+    <div class="recovery-status-list">
+      <div class="status-item"><span>Desktop shell</span><span class="recovery-badge badge-ok" id="badge-shell">Connected</span></div>
+      <div class="status-item"><span>Local service</span><span class="recovery-badge badge-ok" id="badge-service">Connected</span></div>
+      <div class="status-item"><span>Renderer</span><span class="recovery-badge badge-ok" id="badge-renderer">Active</span></div>
+      <div class="status-item"><span>UI bundle</span><span class="recovery-badge badge-pending" id="badge-bundle">Evaluating</span></div>
+      <div class="status-item"><span>API</span><span class="recovery-badge badge-pending" id="badge-api">Pending</span></div>
+    </div>
+    <div class="recovery-log-box" id="recovery-log">Evaluating workspace bundle and initial state…</div>
+    <div class="recovery-actions">
+      <button class="recovery-btn" onclick="window.rempeyekBoot?.retryRenderer()">Retry Renderer</button>
+      <button class="recovery-btn" onclick="window.rempeyekBoot?.restartApp()">Restart Application</button>
+      <button class="recovery-btn" onclick="window.rempeyekBoot?.openLogs()">Open Logs</button>
+      <button class="recovery-btn recovery-btn-primary" onclick="window.rempeyekBoot?.runDiagnostics()">Run Diagnostics</button>
+    </div>
+  </div>
+</div>
+
 <div id="root"></div>
 <script type="module" src="/src/main.jsx"></script>
 </body>

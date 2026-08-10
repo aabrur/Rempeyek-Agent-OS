@@ -27,6 +27,11 @@ import {
 import { startServerProcess } from "./server-process.mjs";
 import { createDesktopNotifier } from "./notification-service.mjs";
 import { createUpdateService } from "./update-service.mjs";
+import {
+  createBootWatchdog,
+  createIncidentRecord,
+  scrubSensitiveData,
+} from "./boot-recovery.mjs";
 
 const { autoUpdater } = electronUpdater;
 
@@ -50,6 +55,7 @@ let startMinimized = false;
 let settingsStore = null;
 let updateService = null;
 let notifyDesktop = null;
+let bootWatchdog = null;
 
 const iconPath = path.join(import.meta.dirname, "assets", "icon.ico");
 
@@ -71,6 +77,44 @@ function sendUpdateState(state) {
   if (!mainWindow || mainWindow.isDestroyed()) return;
   mainWindow.webContents.send("desktop:update-state", { ...state });
   notifyDesktop?.(state);
+}
+
+function appendIncidentLog(incident) {
+  try {
+    const logsDir = app.getPath("logs");
+    fs.mkdirSync(logsDir, { recursive: true });
+    const logPath = path.join(logsDir, "boot-incidents.log");
+    fs.appendFileSync(logPath, JSON.stringify(incident) + "\n");
+  } catch {}
+}
+
+function handleBootFailure(incident) {
+  appendIncidentLog(incident);
+  if (isQuitting || !mainWindow || mainWindow.isDestroyed()) return;
+
+  dialog.showMessageBox(mainWindow, {
+    type: "error",
+    title: "REMPEYEK RECOVERY - Startup Error",
+    message: "The workspace could not start correctly.",
+    detail: incident.userSafeMessage,
+    buttons: ["Retry Renderer", "Restart Application", "Open Logs", "Exit"],
+    defaultId: 0,
+    cancelId: 3,
+    noLink: true,
+  }).then(async ({ response }) => {
+    if (response === 0) {
+      mainWindow?.webContents?.reload();
+    } else if (response === 1) {
+      isQuitting = true;
+      app.relaunch();
+      app.quit();
+    } else if (response === 2) {
+      await shell.openPath(app.getPath("logs"));
+    } else {
+      isQuitting = true;
+      app.quit();
+    }
+  }).catch(() => {});
 }
 
 function createTray() {
@@ -131,12 +175,50 @@ function createMainWindow(origin) {
     }
     return { action: "deny" };
   });
+
   window.webContents.on("will-navigate", (event, url) => {
     if (!isAllowedLocalNavigation(url, origin)) {
       event.preventDefault();
       if (isAllowedExternalUrl(url)) void shell.openExternal(url);
     }
   });
+
+  // Layer 3: Failure Event Handlers
+  window.webContents.on("did-fail-load", (_event, errorCode, errorDescription, validatedURL) => {
+    if (isAllowedLocalNavigation(validatedURL, origin) && !bootWatchdog?.isReady()) {
+      const incident = createIncidentRecord({
+        phase: "did-fail-load",
+        error: new Error(`Local page load failed (${errorCode}): ${errorDescription}`),
+        userHome: app.getPath("home"),
+        packaged: app.isPackaged,
+        appVersion: app.getVersion(),
+      });
+      handleBootFailure(incident);
+    }
+  });
+
+  window.webContents.on("render-process-gone", (_event, details) => {
+    if (isQuitting) return;
+    const incident = createIncidentRecord({
+      phase: "render-process-gone",
+      error: new Error(`Renderer process exited: ${details.reason} (exit code: ${details.exitCode})`),
+      userHome: app.getPath("home"),
+      packaged: app.isPackaged,
+      appVersion: app.getVersion(),
+    });
+    handleBootFailure(incident);
+  });
+
+  window.webContents.on("unresponsive", () => {
+    appendIncidentLog(createIncidentRecord({
+      phase: "unresponsive",
+      error: new Error("Renderer process became unresponsive"),
+      userHome: app.getPath("home"),
+      packaged: app.isPackaged,
+      appVersion: app.getVersion(),
+    }));
+  });
+
   window.on("close", event => {
     if (isQuitting) return;
     if (closeBehavior === "exit") {
@@ -148,9 +230,11 @@ function createMainWindow(origin) {
     event.preventDefault();
     window.hide();
   });
+
   window.once("ready-to-show", () => {
     if (!startMinimized && !process.argv.includes("--hidden")) window.show();
   });
+
   window.on("closed", () => {
     if (mainWindow === window) mainWindow = null;
   });
@@ -229,6 +313,21 @@ function registerIpcHandlers() {
     });
     return next;
   });
+  ipcMain.handle("desktop:notify-app-ready", () => {
+    bootWatchdog?.notifyReady();
+    return true;
+  });
+  ipcMain.handle("desktop:send-boot-incident", (_event, payload) => {
+    const incident = createIncidentRecord({
+      phase: payload?.phase || "renderer",
+      error: new Error(payload?.userSafeMessage || payload?.error || "Renderer incident reported"),
+      userHome: app.getPath("home"),
+      packaged: app.isPackaged,
+      appVersion: app.getVersion(),
+    });
+    appendIncidentLog(incident);
+    return true;
+  });
   ipcMain.handle("desktop:open-path", async (_event, kind) => {
     const targets = {
       state: paths.stateRoot,
@@ -249,33 +348,33 @@ function registerIpcHandlers() {
     return true;
   });
   ipcMain.handle("desktop:check-for-updates", () => {
-      if (!app.isPackaged) {
-        return { phase: "idle", development: true };
-      }
-      if (!updateService) {
-        return { phase: "idle", initializing: true };
-      }
-      return updateService.checkNow();
-    });
-    ipcMain.handle("desktop:download-update", () => {
-      if (!app.isPackaged) {
-        throw new Error("desktop updates are disabled in development");
-      }
-      if (!updateService) {
-        throw new Error("desktop updater is not ready");
-      }
-      return updateService.downloadNow();
-    });
-    ipcMain.handle("desktop:restart-to-update", () => {
-      if (!app.isPackaged) {
-        throw new Error("desktop updates are disabled in development");
-      }
-      if (!updateService) {
-        throw new Error("desktop updater is not ready");
-      }
-      return updateService.restartToUpdate();
-    });
-  }
+    if (!app.isPackaged) {
+      return { phase: "idle", development: true };
+    }
+    if (!updateService) {
+      return { phase: "idle", initializing: true };
+    }
+    return updateService.checkNow();
+  });
+  ipcMain.handle("desktop:download-update", () => {
+    if (!app.isPackaged) {
+      throw new Error("desktop updates are disabled in development");
+    }
+    if (!updateService) {
+      throw new Error("desktop updater is not ready");
+    }
+    return updateService.downloadNow();
+  });
+  ipcMain.handle("desktop:restart-to-update", () => {
+    if (!app.isPackaged) {
+      throw new Error("desktop updates are disabled in development");
+    }
+    if (!updateService) {
+      throw new Error("desktop updater is not ready");
+    }
+    return updateService.restartToUpdate();
+  });
+}
 
 async function lifecycleMutationBusy(origin, desktopToken) {
   try {
@@ -295,8 +394,6 @@ function startUpdateLifecycle(server, desktopToken) {
     sendUpdateState({ phase: "idle", development: true });
     return;
   }
-  // Public builds are intentionally unsigned until Authenticode is provisioned.
-  // Without this, electron-updater rejects the GitHub NSIS artifact on Windows.
   try {
     autoUpdater.verifyUpdateCodeSignature = false;
   } catch {}
@@ -331,13 +428,23 @@ async function startOwnedServer() {
 
 async function startApplication() {
   createTray();
+  bootWatchdog = createBootWatchdog({
+    timeoutMs: 15000,
+    userHome: app.getPath("home"),
+    onBootFailure: (incident) => handleBootFailure(incident),
+  });
+  bootWatchdog.start();
+
   for (;;) {
     try {
       const { server, desktopToken } = await startOwnedServer();
       mainWindow = createMainWindow(server.origin);
       mainWindow.webContents.once(
         "did-finish-load",
-        () => startUpdateLifecycle(server, desktopToken),
+        () => {
+          bootWatchdog?.markPhase("did-finish-load");
+          startUpdateLifecycle(server, desktopToken);
+        },
       );
       await mainWindow.loadURL(server.origin);
       return;
@@ -349,7 +456,10 @@ async function startApplication() {
         type: "error",
         title: "Rempeyek Agent OS could not start",
         message: "The local Agent OS service could not start.",
-        detail: error instanceof Error ? error.message : String(error),
+        detail: scrubSensitiveData(
+          error instanceof Error ? error.message : String(error),
+          app.getPath("home"),
+        ),
         buttons: ["Retry", "Open Logs", "Exit"],
         defaultId: 0,
         cancelId: 2,
@@ -370,6 +480,7 @@ if (hasSingleInstanceLock) {
   app.on("second-instance", focusMainWindow);
   app.on("before-quit", () => {
     isQuitting = true;
+    bootWatchdog?.stop();
     updateService?.stop();
     stopOwnedServer();
   });
@@ -380,7 +491,10 @@ if (hasSingleInstanceLock) {
   }).catch(error => {
     dialog.showErrorBox(
       "Rempeyek Agent OS could not start",
-      error instanceof Error ? error.message : String(error),
+      scrubSensitiveData(
+        error instanceof Error ? error.message : String(error),
+        app.getPath("home"),
+      ),
     );
     app.quit();
   });

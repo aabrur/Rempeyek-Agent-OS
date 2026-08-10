@@ -11,8 +11,10 @@ contextBridge.exposeInMainWorld("rempeyekDesktop", Object.freeze({
   getSettings: () => invoke("desktop:get-settings"),
   updateSettings: patch => invoke("desktop:update-settings", patch),
   checkForUpdates: () => invoke("desktop:check-for-updates"),
-    downloadUpdate: () => invoke("desktop:download-update"),
-    restartToUpdate: () => invoke("desktop:restart-to-update"),
+  downloadUpdate: () => invoke("desktop:download-update"),
+  restartToUpdate: () => invoke("desktop:restart-to-update"),
+  notifyAppReady: () => invoke("desktop:notify-app-ready"),
+  sendBootIncident: incident => invoke("desktop:send-boot-incident", incident),
   openPath: kind => invoke("desktop:open-path", kind),
   openExternal: url => invoke("desktop:open-external", url),
   onUpdateState: listener => {
