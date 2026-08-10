@@ -4,6 +4,7 @@ import { THEMES } from "@rempeyek/theme-engine";
 import { api } from "../api";
 import { AgentManagementPanel } from "../components/AgentManagementPanel";
 import { RuntimeSettingsPanel } from "../components/RuntimeSettingsPanel";
+import { SystemDoctorPanel } from "../components/SystemDoctorPanel";
 import { ThemePicker } from "../components/ThemePicker";
 import { desktopRuntime } from "../lib/desktop-runtime.mjs";
 
@@ -347,6 +348,8 @@ export function SettingsView({ theme, onTheme, state }) {
             </p>
           )}
         </Panel>
+
+        <SystemDoctorPanel />
 
         <Panel title="WORKSPACE" chip="read-only">
           <div className="settings-facts">

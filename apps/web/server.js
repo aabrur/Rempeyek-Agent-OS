@@ -80,6 +80,9 @@ const UNIFIED_MEMORY_MOD = import("./lib/unified-memory-graph.mjs");
 let unifiedMemoryLib = null;
 UNIFIED_MEMORY_MOD.then(m => { unifiedMemoryLib = m; }).catch(e => console.error("[unified-memory]", e.message));
 
+const SYSTEM_DOCTOR_MOD = import("./lib/system-doctor.mjs");
+let systemDoctorLib = null;
+SYSTEM_DOCTOR_MOD.then(m => { systemDoctorLib = m; }).catch(e => console.error("[system-doctor]", e.message));
 const TODAY_PROJECTION = import("./lib/today-projection.mjs");
 const APPROVAL_QUEUE = import("./lib/approval-queue.mjs").then(({ createApprovalQueue }) => createApprovalQueue());
 const VAULT_GRAPH = import("./lib/vault-graph.mjs");
@@ -3556,6 +3559,62 @@ function requestHandler(req, res, services = DEFAULT_RUNTIME_SERVICES) {
           const r = saveAvatar(id, data);
           json(res, r.error ? 400 : 200, r);
         });
+      }
+      if (url === "/api/doctor/scan" && req.method === "GET") {
+        SYSTEM_DOCTOR_MOD.then(({ createSystemDoctor }) => {
+          const doctor = createSystemDoctor({
+            services: DEFAULT_RUNTIME_SERVICES,
+            loadConfig,
+            saveConfig,
+            backupEngine: backupEngineInstance,
+            migrationEngine: migrationEngineInstance,
+            processManager,
+          });
+          doctor.scan().then(report => json(res, 200, report)).catch(e => json(res, 500, { error: e.message }));
+        }).catch(e => json(res, 500, { error: e.message }));
+        return;
+      }
+      if (url === "/api/doctor/repair" && req.method === "POST") {
+        return readBody(req, res, body => {
+          let data; try { data = JSON.parse(body); } catch { return json(res, 400, { error: "body must be JSON {checkId, actionName}" }); }
+          SYSTEM_DOCTOR_MOD.then(({ createSystemDoctor }) => {
+            const doctor = createSystemDoctor({
+              services: DEFAULT_RUNTIME_SERVICES,
+              loadConfig,
+              saveConfig,
+              backupEngine: backupEngineInstance,
+              migrationEngine: migrationEngineInstance,
+              processManager,
+            });
+            doctor.runRepair({ checkId: data.checkId, actionName: data.actionName })
+              .then(result => json(res, result.ok ? 200 : 400, result))
+              .catch(e => json(res, 500, { error: e.message }));
+          }).catch(e => json(res, 500, { error: e.message }));
+        });
+      }
+      if (url === "/api/doctor/export" && req.method === "GET") {
+        SYSTEM_DOCTOR_MOD.then(({ createSystemDoctor }) => {
+          const doctor = createSystemDoctor({
+            services: DEFAULT_RUNTIME_SERVICES,
+            loadConfig,
+            saveConfig,
+            backupEngine: backupEngineInstance,
+            migrationEngine: migrationEngineInstance,
+            processManager,
+          });
+          doctor.scan().then(report => json(res, 200, {
+            exportId: `diag_${Date.now()}`,
+            exportedAt: new Date().toISOString(),
+            system: {
+              appVersion: "2.4.0",
+              platform: process.platform,
+              arch: process.arch,
+              nodeVersion: process.version,
+            },
+            report,
+          })).catch(e => json(res, 500, { error: e.message }));
+        }).catch(e => json(res, 500, { error: e.message }));
+        return;
       }
       return json(res, 404, { error: "unknown api" });
     } catch (err) { console.error("[api]", (err && err.stack) || err); return json(res, 500, { error: "internal error" }); }  // S12: don't echo internal details
