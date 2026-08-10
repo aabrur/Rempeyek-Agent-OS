@@ -53,8 +53,23 @@ test('buildAgentRecord from a catalog entry persists a summonable gateway', () =
   assert.equal(agent.gateway.home, 'C:\\Users\\test\\.codex', 'relative catalog home expands under homedir');
   assert.equal(agent.gateway.marketplaceId, 'codex');
   assert.equal(agent.gateway.install, undefined);
-  assert.deepEqual(agent.gateway.actions, [], 'dashboard-added agents are observe-only');
+  assert.deepEqual(agent.gateway.actions, ['run'], 'trigger-backed agents expose gateway-run');
+  assert.equal(agent.gateway.workdir, 'C:\\Users\\test\\.codex', 'workdir matches install home so gateway run equals summon');
   assert.match(agent.note, /Summon with `codex`/);
+});
+
+test('buildAgentRecord seeds hermes/openclaw service gateway actions', () => {
+  const hermes = buildAgentRecord({
+    body: { catalogId: 'hermes' },
+    cat: catalogEntry('hermes'),
+    existingIds: [],
+    existingNodeNums: [],
+    date: '2026-08-10',
+    homedir: HOMEDIR,
+  });
+  assert.equal(hermes.error, undefined);
+  assert.deepEqual(hermes.agent.gateway.actions, ['run', 'start', 'stop', 'restart', 'status']);
+  assert.equal(hermes.agent.gateway.runtime?.type, 'service');
 });
 
 test('buildAgentRecord persists custom trigger+home - the exact fields the shipped bug dropped', () => {
