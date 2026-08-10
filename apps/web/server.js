@@ -146,17 +146,40 @@ ensureEmptyConfig(CONFIG_PATH, { home: os.homedir() });
    R#11: keep the last error so the dashboard can show a banner (not silently serve last-good). */
 let _cfgCache = { mtime: 0, data: null };
 let configError = null;   // { msg, at } when parsing fails but a last-good copy exists
+function stripBom(text) {
+  return String(text || "").replace(/^\uFEFF/, "");
+}
+function emptyConfigFallback() {
+  return { agency: "REMPEYEK AGENT OS", workdir: os.homedir(), agents: [] };
+}
 function loadConfig() {
   try {
     const st = fs.statSync(CONFIG_PATH);
     if (_cfgCache.data && st.mtimeMs === _cfgCache.mtime) return _cfgCache.data;
-    const data = JSON.parse(fs.readFileSync(CONFIG_PATH, "utf8"));
+    const data = JSON.parse(stripBom(fs.readFileSync(CONFIG_PATH, "utf8")));
+    if (!data || !Array.isArray(data.agents)) throw new Error("agents.config.json must contain an agents array");
     _cfgCache = { mtime: st.mtimeMs, data };
     configError = null;                       // recovered → clear the banner
     return data;
   } catch (e) {
-    if (_cfgCache.data) { console.error("[config] parse failed, using last-good:", e.message); configError = { msg: e.message, at: new Date().toISOString() }; return _cfgCache.data; }
-    throw e;
+    if (_cfgCache.data) {
+      console.error("[config] parse failed, using last-good:", e.message);
+      configError = { msg: e.message, at: new Date().toISOString() };
+      return _cfgCache.data;
+    }
+    // Fresh / public install must never hard-crash /api/state on a BOM-corrupted file.
+    console.error("[config] parse failed, bootstrapping empty registry:", e.message);
+    configError = { msg: e.message, at: new Date().toISOString() };
+    const fallback = emptyConfigFallback();
+    try {
+      fs.mkdirSync(path.dirname(CONFIG_PATH), { recursive: true });
+      fs.writeFileSync(CONFIG_PATH, JSON.stringify(fallback, null, 2) + "\n", "utf8");
+      const st = fs.statSync(CONFIG_PATH);
+      _cfgCache = { mtime: st.mtimeMs, data: fallback };
+    } catch {
+      _cfgCache = { mtime: Date.now(), data: fallback };
+    }
+    return fallback;
   }
 }
 
@@ -3192,26 +3215,34 @@ function requestHandler(req, res, services = DEFAULT_RUNTIME_SERVICES) {
           );
         });
       if (url === "/api/state") {
-        if (services === DEFAULT_RUNTIME_SERVICES) {
-          const state = buildState();
-          state.activeAgentId = loadConfig().activeAgentId || null;
-          return json(res, 200, state);
+        try {
+          if (services === DEFAULT_RUNTIME_SERVICES) {
+            const state = buildState();
+            state.activeAgentId = loadConfig().activeAgentId || null;
+            return json(res, 200, state);
+          }
+          const config = services.loadConfig();
+          return json(res, 200, {
+            vault: services.vaultPath,
+            agency: config.agency || "AGENTIC//OS",
+            activeAgentId: config.activeAgentId || null,
+            generatedAt: new Date().toISOString(),
+            agents: config.agents
+              .filter(agent => agent.kind !== "subagent")
+              .map(agent => ({ ...agent, gateway: undefined })),
+            stats: {},
+            events: [],
+            review: [],
+            projects: [],
+            knowledge: [],
+          });
+        } catch (error) {
+          console.error("[api/state]", error?.message || error);
+          return json(res, 500, {
+            error: "failed to build dashboard state",
+            detail: String(error?.message || error).slice(0, 200),
+          });
         }
-        const config = services.loadConfig();
-        return json(res, 200, {
-          vault: services.vaultPath,
-          agency: config.agency || "AGENTIC//OS",
-          activeAgentId: config.activeAgentId || null,
-          generatedAt: new Date().toISOString(),
-          agents: config.agents
-            .filter(agent => agent.kind !== "subagent")
-            .map(agent => ({ ...agent, gateway: undefined })),
-          stats: {},
-          events: [],
-          review: [],
-          projects: [],
-          knowledge: [],
-        });
       }
       if (url === "/api/procs") {
         const cfg = services.loadConfig();

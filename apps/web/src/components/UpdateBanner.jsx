@@ -136,24 +136,27 @@ export function UpdateBanner() {
   };
 
   const desktopAction = async () => {
-    setDesktopBusy(true);
-    try {
-      if (desktopUpdate?.phase === "ready") {
-        await runtime.restartToUpdate();
-      } else {
-        const next = await runtime.checkForUpdates();
-        if (next) setDesktopUpdate(next);
+      setDesktopBusy(true);
+      try {
+        if (desktopUpdate?.phase === "ready") {
+          await runtime.restartToUpdate();
+        } else if (desktopUpdate?.phase === "available") {
+          const next = await runtime.downloadUpdate();
+          if (next) setDesktopUpdate(next);
+        } else {
+          const next = await runtime.checkForUpdates();
+          if (next) setDesktopUpdate(next);
+        }
+      } catch (error) {
+        setDesktopUpdate({
+          ...desktopUpdate,
+          phase: "error",
+          error: DESKTOP_UPDATE_ERROR,
+        });
+      } finally {
+        setDesktopBusy(false);
       }
-    } catch (error) {
-      setDesktopUpdate({
-        ...desktopUpdate,
-        phase: "error",
-        error: DESKTOP_UPDATE_ERROR,
-      });
-    } finally {
-      setDesktopBusy(false);
-    }
-  };
+    };
 
   if (runtime.desktop) {
     if (!desktopInfo?.packaged) return null;
@@ -192,19 +195,21 @@ export function UpdateBanner() {
               </b>
             </span>
           )}
-          {(updatePhase === "ready" || updatePhase === "error") && (
-            <Btn
-              variant="primary"
-              disabled={desktopBusy}
-              onClick={desktopAction}
-            >
-              {desktopBusy
-                ? "Working…"
-                : updatePhase === "ready"
-                  ? "Restart to update"
-                  : "Check again"}
-            </Btn>
-          )}
+          {(updatePhase === "ready" || updatePhase === "error" || updatePhase === "available") && (
+                      <Btn
+                        variant="primary"
+                        disabled={desktopBusy}
+                        onClick={desktopAction}
+                      >
+                        {desktopBusy
+                          ? "Working…"
+                          : updatePhase === "ready"
+                            ? "Restart to update"
+                            : updatePhase === "available"
+                              ? "Download update"
+                              : "Check again"}
+                      </Btn>
+                    )}
           {(updatePhase === "checking" || updatePhase === "downloading") && (
             <span className="update-banner-spin">
               {updatePhase === "checking" ? "checking…" : "downloading…"}

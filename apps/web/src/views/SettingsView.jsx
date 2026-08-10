@@ -71,28 +71,41 @@ export function SettingsView({ theme, onTheme, state }) {
   };
 
   const checkDesktopUpdate = async () => {
-    setNativeBusy("check");
-    setNativeHint("");
-    try {
-      const next = await runtime.checkForUpdates();
-      if (next) setUpdateState(next);
-    } catch (error) {
-      setNativeHint(error.message);
-    } finally {
-      setNativeBusy("");
-    }
-  };
+      setNativeBusy("check");
+      setNativeHint("");
+      try {
+        const next = await runtime.checkForUpdates();
+        if (next) setUpdateState(next);
+      } catch (error) {
+        setNativeHint(error.message);
+      } finally {
+        setNativeBusy("");
+      }
+    };
 
-  const restartToUpdate = async () => {
-    setNativeBusy("restart");
-    setNativeHint("");
-    try {
-      await runtime.restartToUpdate();
-    } catch (error) {
-      setNativeHint(error.message);
-      setNativeBusy("");
-    }
-  };
+    const downloadDesktopUpdate = async () => {
+      setNativeBusy("download");
+      setNativeHint("");
+      try {
+        const next = await runtime.downloadUpdate();
+        if (next) setUpdateState(next);
+      } catch (error) {
+        setNativeHint(error.message);
+      } finally {
+        setNativeBusy("");
+      }
+    };
+
+    const restartToUpdate = async () => {
+      setNativeBusy("restart");
+      setNativeHint("");
+      try {
+        await runtime.restartToUpdate();
+      } catch (error) {
+        setNativeHint(error.message);
+        setNativeBusy("");
+      }
+    };
 
   const active = THEMES.find(item => item.id === theme);
   const shownVersion = nativeRuntime?.version || version?.version;
@@ -287,33 +300,44 @@ export function SettingsView({ theme, onTheme, state }) {
           {runtime.desktop ? (
             <>
               <div className="aa-actions">
-                <Btn
-                  variant="dim"
-                  disabled={
-                    Boolean(nativeBusy) ||
-                    ["checking", "downloading"].includes(updateState?.phase)
-                  }
-                  onClick={checkDesktopUpdate}
-                >
-                  {nativeBusy === "check" ? "Checking…" : "Check for Updates"}
-                </Btn>
-                <Btn
-                  variant="primary"
-                  disabled={
-                    Boolean(nativeBusy) ||
-                    updateState?.phase !== "ready"
-                  }
-                  onClick={restartToUpdate}
-                >
-                  {nativeBusy === "restart"
-                    ? "Restarting…"
-                    : "Restart to Update"}
-                </Btn>
-              </div>
-              <p className="settings-note">
-                Packaged updates verify release metadata before the separate
-                restart action. Development mode never contacts a release feed.
-              </p>
+                              <Btn
+                                variant="dim"
+                                disabled={
+                                  Boolean(nativeBusy) ||
+                                  ["checking", "downloading"].includes(updateState?.phase)
+                                }
+                                onClick={checkDesktopUpdate}
+                              >
+                                {nativeBusy === "check" ? "Checking…" : "Check for Updates"}
+                              </Btn>
+                              <Btn
+                                variant="dim"
+                                disabled={
+                                  Boolean(nativeBusy) ||
+                                  !["available", "error"].includes(updateState?.phase)
+                                }
+                                onClick={downloadDesktopUpdate}
+                              >
+                                {nativeBusy === "download" ? "Downloading…" : "Download Update"}
+                              </Btn>
+                              <Btn
+                                variant="primary"
+                                disabled={
+                                  Boolean(nativeBusy) ||
+                                  updateState?.phase !== "ready"
+                                }
+                                onClick={restartToUpdate}
+                              >
+                                {nativeBusy === "restart"
+                                  ? "Restarting…"
+                                  : "Restart to Update"}
+                              </Btn>
+                            </div>
+                            <p className="settings-note">
+                              Packaged updates verify release metadata, then download, then
+                              require a separate restart. Development mode never contacts a release feed.
+                              Unsigned public builds are allowed to install from GitHub releases.
+                            </p>
             </>
           ) : (
             <p className="settings-note">

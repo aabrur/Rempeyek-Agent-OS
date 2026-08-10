@@ -248,24 +248,33 @@ function registerIpcHandlers() {
     return true;
   });
   ipcMain.handle("desktop:check-for-updates", () => {
-    if (!app.isPackaged) {
-      return { phase: "idle", development: true };
-    }
-    if (!updateService) {
-      return { phase: "idle", initializing: true };
-    }
-    return updateService.checkNow();
-  });
-  ipcMain.handle("desktop:restart-to-update", () => {
-    if (!app.isPackaged) {
-      throw new Error("desktop updates are disabled in development");
-    }
-    if (!updateService) {
-      throw new Error("desktop updater is not ready");
-    }
-    return updateService.restartToUpdate();
-  });
-}
+      if (!app.isPackaged) {
+        return { phase: "idle", development: true };
+      }
+      if (!updateService) {
+        return { phase: "idle", initializing: true };
+      }
+      return updateService.checkNow();
+    });
+    ipcMain.handle("desktop:download-update", () => {
+      if (!app.isPackaged) {
+        throw new Error("desktop updates are disabled in development");
+      }
+      if (!updateService) {
+        throw new Error("desktop updater is not ready");
+      }
+      return updateService.downloadNow();
+    });
+    ipcMain.handle("desktop:restart-to-update", () => {
+      if (!app.isPackaged) {
+        throw new Error("desktop updates are disabled in development");
+      }
+      if (!updateService) {
+        throw new Error("desktop updater is not ready");
+      }
+      return updateService.restartToUpdate();
+    });
+  }
 
 async function lifecycleMutationBusy(origin, desktopToken) {
   try {
@@ -285,6 +294,12 @@ function startUpdateLifecycle(server, desktopToken) {
     sendUpdateState({ phase: "idle", development: true });
     return;
   }
+  // Public builds are intentionally unsigned until Authenticode is provisioned.
+  // Without this, electron-updater rejects the GitHub NSIS artifact on Windows.
+  try {
+    autoUpdater.verifyUpdateCodeSignature = false;
+  } catch {}
+  autoUpdater.autoDownload = false;
   updateService = createUpdateService({
     autoUpdater,
     settingsStore,

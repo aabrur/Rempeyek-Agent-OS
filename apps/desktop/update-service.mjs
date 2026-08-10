@@ -124,38 +124,52 @@ export function createUpdateService({
   autoUpdater.on("error", onError);
 
   return {
-    start() {
-      if (started) return { ...state };
-      started = true;
-      const settings = settingsStore.read();
-      autoUpdater.autoDownload = false;
-      autoUpdater.allowPrerelease = settings.updateChannel === "preview";
-      if (settings.autoCheck) void checkNow();
-      timer = setIntervalImpl(() => {
-        if (settingsStore.read().autoCheck) void checkNow();
-      }, SIX_HOURS);
-      return { ...state };
-    },
-    checkNow,
-    async restartToUpdate() {
-      if (state.phase !== "ready") {
-        throw new Error("no downloaded update is ready");
-      }
-      if (await lifecycleBusy()) {
-        throw new Error(
-          "finish the active lifecycle operation before restarting",
-        );
-      }
-      autoUpdater.quitAndInstall(false, true);
-    },
-    stop() {
-      if (timer !== null) {
-        clearIntervalImpl(timer);
-        timer = null;
-      }
-    },
-    snapshot() {
-      return { ...state };
-    },
-  };
+      start() {
+        if (started) return { ...state };
+        started = true;
+        const settings = settingsStore.read();
+        autoUpdater.autoDownload = false;
+        autoUpdater.allowPrerelease = settings.updateChannel === "preview";
+        if (settings.autoCheck) void checkNow();
+        timer = setIntervalImpl(() => {
+          if (settingsStore.read().autoCheck) void checkNow();
+        }, SIX_HOURS);
+        return { ...state };
+      },
+      checkNow,
+      downloadNow() {
+        if (state.phase !== "available" && state.phase !== "error") {
+          return Promise.resolve({ ...state });
+        }
+        publish({ phase: "downloading", percent: 0, error: null });
+        try {
+          return Promise.resolve(autoUpdater.downloadUpdate())
+            .catch(error => { publishFailure(error); })
+            .then(() => ({ ...state }));
+        } catch (error) {
+          publishFailure(error);
+          return Promise.resolve({ ...state });
+        }
+      },
+      async restartToUpdate() {
+        if (state.phase !== "ready") {
+          throw new Error("no downloaded update is ready");
+        }
+        if (await lifecycleBusy()) {
+          throw new Error(
+            "finish the active lifecycle operation before restarting",
+          );
+        }
+        autoUpdater.quitAndInstall(false, true);
+      },
+      stop() {
+        if (timer !== null) {
+          clearIntervalImpl(timer);
+          timer = null;
+        }
+      },
+      snapshot() {
+        return { ...state };
+      },
+    };
 }

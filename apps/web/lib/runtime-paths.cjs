@@ -53,8 +53,22 @@ function ensureEmptyConfig(configPath, { home, agency = "REMPEYEK AGENT OS" } = 
     fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + "\n", "utf8");
     return config;
   }
-  const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
+  const raw = fs.readFileSync(configPath, "utf8").replace(/^\uFEFF/, "");
+  let config;
+  try {
+    config = JSON.parse(raw);
+  } catch (error) {
+    // Repair UTF-8 BOM / corrupted first-run configs so public installers boot.
+    const repaired = { agency, workdir: home, agents: [] };
+    try { fs.copyFileSync(configPath, configPath + ".bak"); } catch {}
+    fs.writeFileSync(configPath, JSON.stringify(repaired, null, 2) + "\n", "utf8");
+    return repaired;
+  }
   if (!Array.isArray(config.agents)) throw new Error("agents.config.json must contain an agents array");
+  // Rewrite without BOM if the on-disk file started with one.
+  if (/^\uFEFF/.test(fs.readFileSync(configPath, "utf8"))) {
+    fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + "\n", "utf8");
+  }
   return config;
 }
 

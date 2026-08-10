@@ -3,6 +3,29 @@
 All notable changes to Rempeyek Agent OS. The in-app update banner compares the local version
 against the latest GitHub Release of this repository - tag releases as `v<version>`.
 
+## [2.3.9] - 2026-08-10
+
+Public installer hotfix (requested as 2.3.8.1). Uses `2.3.9` because electron-updater
+stable channel requires valid semver (`2.3.8.1` is not comparable).
+
+### Fixed
+
+- **Public installer "Failed to load state / failed to fetch"**: `agents.config.json`
+  with a UTF-8 BOM or corrupt first-run JSON no longer crashes `/api/state`. The loader
+  strips BOM, repairs empty registries, and always returns JSON to the renderer.
+- **Unsigned auto-update on Windows**: packaged builds set
+  `verifyUpdateCodeSignature = false` so GitHub NSIS artifacts can install without
+  Authenticode (until signing is provisioned).
+- **Update UX**: Settings and banner expose **Download Update** when a version is
+  available, then **Restart to Update** when ready. Release assets must include
+  `latest.yml` + Setup `.exe` + `.exe.blockmap`.
+
+### Release note
+
+- Windows artifacts remain an unsigned manual-install prerelease. Verify with
+  `SHA256SUMS.txt`. Users on 2.3.8 should see 2.3.9 via Check for Updates after this
+  release is published.
+
 ## [2.3.8] - 2026-08-10
 
 ### Added
