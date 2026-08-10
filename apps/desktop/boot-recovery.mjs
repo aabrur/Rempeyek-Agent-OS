@@ -26,7 +26,7 @@ export function scrubSensitiveData(text, userHome = "") {
 export function createIncidentRecord({
   phase = "unknown",
   error = null,
-  appVersion = "2.4.0",
+  appVersion = "2.4.1",
   packaged = false,
   userHome = "",
   retryable = true,

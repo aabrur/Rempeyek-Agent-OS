@@ -3,6 +3,18 @@
 All notable changes to Rempeyek Agent OS. The in-app update banner compares the local version
 against the latest GitHub Release of this repository - tag releases as `v<version>`.
 
+## [2.4.1] - 2026-08-11
+
+### Added
+- **Boot recovery architecture**: multi-layer recovery path so a failed renderer or local service no longer leaves a permanent blank window.
+- **System Doctor**: real diagnostic probes with a safe self-repair workflow in Settings.
+- **Data durability**: atomic write pattern, config recovery hierarchy, and two-phase backup restore.
+- **Packaged app smoke suite**: 26-point desktop package verification.
+- **Agent end-to-end tests**: lifecycle and process-ownership coverage for the control plane.
+
+### Release note
+- Windows artifacts remain an unsigned manual-install prerelease. Verify downloads with `SHA256SUMS.txt`. Users on 2.4.0 should see 2.4.1 via Check for Updates after this release is published.
+
 ## [2.4.0] - 2026-08-10
 
 ### Added

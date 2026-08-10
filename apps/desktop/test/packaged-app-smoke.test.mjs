@@ -16,7 +16,7 @@ const desktopRoot = path.resolve(
 const root = path.join(desktopRoot, "dist", "win-unpacked");
 const resourcesRoot = path.join(root, "resources");
 const appExePath = path.join(root, "Rempeyek Agent OS.exe");
-const setupExePath = path.join(desktopRoot, "dist", "Rempeyek-Agent-OS-Setup-2.4.0.exe");
+const setupExePath = path.join(desktopRoot, "dist", "Rempeyek-Agent-OS-Setup-2.4.1.exe");
 
 function createIsolatedTestEnvironment() {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "rempeyek-smoke-test-"));

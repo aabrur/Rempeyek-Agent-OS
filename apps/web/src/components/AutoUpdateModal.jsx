@@ -16,7 +16,7 @@ export function AutoUpdateModal({
   if (!open) return null;
 
   const phase = desktopUpdate?.phase || "idle";
-  const version = desktopUpdate?.version || "2.4.0";
+  const version = desktopUpdate?.version || "2.4.1";
   const percent = desktopUpdate?.percent;
 
   const handleSelfRepair = async () => {
@@ -28,7 +28,7 @@ export function AutoUpdateModal({
         sessionStorage.clear();
       } catch {}
       await new Promise(r => setTimeout(r, 600));
-      setRepairHint("Checking for verified v2.4.0 update build…");
+      setRepairHint("Checking for verified v2.4.1 update build…");
       if (typeof onCheck === "function") {
         await onCheck();
       }
