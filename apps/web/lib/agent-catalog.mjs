@@ -64,13 +64,22 @@ export function buildAgentRecord({
   const workingDirectory = resolveHome(body.home || workdir, homedir);
 
   const gateway = { actions: [] };
-  if (home) gateway.home = home;
-  if (workingDirectory) gateway.workdir = workingDirectory;
-  if (trigger) gateway.trigger = trigger;
-  if (cat) gateway.marketplaceId = cat.id;
-  if (cat?.envAllow) gateway.envAllow = [...cat.envAllow];
-  const hasGateway =
-    gateway.home || gateway.workdir || gateway.trigger || gateway.marketplaceId || gateway.envAllow;
+    if (home) gateway.home = home;
+    // Prefer the agent install home as workdir so gateway-run matches summon.
+    if (home) gateway.workdir = home;
+    else if (workingDirectory) gateway.workdir = workingDirectory;
+    if (trigger) gateway.trigger = trigger;
+    if (cat) gateway.marketplaceId = cat.id;
+    if (cat?.envAllow) gateway.envAllow = [...cat.envAllow];
+    // Service gateways (Hermes/OpenClaw) get reviewed action hints; adapters still enforce argv.
+    if (id === "hermes" || id === "openclaw") {
+      gateway.actions = ["run", "start", "stop", "restart", "status"];
+      gateway.runtime = { type: "service" };
+    } else if (trigger) {
+      gateway.actions = ["run"];
+    }
+    const hasGateway =
+      gateway.home || gateway.workdir || gateway.trigger || gateway.marketplaceId || gateway.envAllow;
 
   const agent = {
     id,

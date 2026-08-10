@@ -447,7 +447,10 @@ test("agent install rejects executable input and can atomically register a revie
     const registered = state.agents.find(agent => agent.id === "opencode");
     assert.equal(registered.gateway, undefined);
     const config = JSON.parse(fs.readFileSync(path.join(root, "agents.config.json"), "utf8"));
-    assert.equal(config.agents.find(agent => agent.id === "opencode").gateway.workdir, root);
+    assert.equal(
+      config.agents.find(agent => agent.id === "opencode").gateway.workdir,
+      path.join(root, "home", ".config", "opencode"),
+    );
     assert.equal(fs.existsSync(path.join(root, "opencode.cmd")), true);
   });
 });

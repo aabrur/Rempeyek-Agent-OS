@@ -14,12 +14,41 @@ const COMMAND_ACTIONS = Object.freeze({
   "health-check": ["healthCheck"],
 });
 
-/* These profiles describe execution shape only. They deliberately do not invent
-   subcommands: a native action is available only when the registered gateway
-   supplies a reviewed, structured command with `verified: true`. */
+const verified = (program, args) =>
+  Object.freeze({ verified: true, program, args: Object.freeze([...args]) });
+
+/* Reviewed gateway service CLIs discovered from local --help (Hermes / OpenClaw).
+   These are the only built-ins that invent subcommands; everything else stays trigger-only. */
+export const BUILT_IN_SERVICE_COMMANDS = Object.freeze({
+  hermes: Object.freeze({
+    runtimeType: "service",
+    commands: Object.freeze({
+      gatewayRun: verified("hermes", ["gateway", "run"]),
+      nativeStart: verified("hermes", ["gateway", "start"]),
+      nativeStop: verified("hermes", ["gateway", "stop"]),
+      nativeRestart: verified("hermes", ["gateway", "restart"]),
+      nativeStatus: verified("hermes", ["gateway", "status"]),
+      healthCheck: verified("hermes", ["status"]),
+    }),
+  }),
+  openclaw: Object.freeze({
+    runtimeType: "service",
+    commands: Object.freeze({
+      gatewayRun: verified("openclaw", ["gateway", "run"]),
+      nativeStart: verified("openclaw", ["gateway", "start"]),
+      nativeStop: verified("openclaw", ["gateway", "stop"]),
+      nativeRestart: verified("openclaw", ["gateway", "restart"]),
+      nativeStatus: verified("openclaw", ["gateway", "status"]),
+      healthCheck: verified("openclaw", ["gateway", "health"]),
+    }),
+  }),
+});
+
+/* These profiles describe execution shape only. Native service actions come from
+   reviewed config OR BUILT_IN_SERVICE_COMMANDS. Task agents may gateway-run their trigger. */
 export const BUILT_IN_RUNTIME = Object.freeze({
-  hermes: { runtimeType: "task", binaryCandidates: ["hermes"] },
-  openclaw: { runtimeType: "task", binaryCandidates: ["openclaw"] },
+  hermes: { runtimeType: "service", binaryCandidates: ["hermes"] },
+  openclaw: { runtimeType: "service", binaryCandidates: ["openclaw"] },
   antigravity: { runtimeType: "task", binaryCandidates: ["agy"] },
   cline: { runtimeType: "task", binaryCandidates: ["cline"] },
   codex: { runtimeType: "task", binaryCandidates: ["codex"] },
@@ -73,13 +102,35 @@ function verifiedGatewayCommand(gateway, action) {
   return null;
 }
 
+function builtInServiceCommand(agentId, action) {
+  const service = BUILT_IN_SERVICE_COMMANDS[agentId];
+  if (!service) return null;
+  return verifiedGatewayCommand({ runtime: { commands: service.commands } }, action);
+}
+
+export function deriveGatewayActions(agent = {}) {
+  const id = String(agent?.id || "");
+  const gateway = agent?.gateway || {};
+  const configured = Array.isArray(gateway.actions) ? gateway.actions : [];
+  const actions = new Set(configured.filter(value => typeof value === "string" && value.trim()));
+  const trigger = gateway.trigger || BUILT_IN_RUNTIME[id]?.binaryCandidates?.[0];
+  if (trigger && BARE_PROGRAM.test(String(trigger))) actions.add("run");
+  for (const action of ["start", "stop", "restart", "status", "logs"]) {
+    if (verifiedGatewayCommand(gateway, action) || builtInServiceCommand(id, action)) {
+      actions.add(action);
+    }
+  }
+  return [...actions];
+}
+
 export function resolveRuntimeAdapter({ agent, action, platform = process.platform } = {}) {
   const id = String(agent?.id || "");
   const gateway = agent?.gateway || {};
   const builtIn = BUILT_IN_RUNTIME[id] || {};
+  const service = BUILT_IN_SERVICE_COMMANDS[id] || {};
   const runtimeType = RUNTIME_TYPES.has(gateway.runtime?.type)
     ? gateway.runtime.type
-    : builtIn.runtimeType || "task";
+    : service.runtimeType || builtIn.runtimeType || "task";
   const binaryCandidates = [...new Set([
     ...(builtIn.binaryCandidates || []),
     ...(gateway.trigger ? [gateway.trigger] : []),
@@ -93,6 +144,23 @@ export function resolveRuntimeAdapter({ agent, action, platform = process.platfo
     platform,
   };
 
+  if (action === "gateway-run") {
+    const custom = verifiedGatewayCommand(gateway, action) || builtInServiceCommand(id, action);
+    if (custom) {
+      return {
+        ...base,
+        available: true,
+        command: custom,
+        verification: verifiedGatewayCommand(gateway, action) ? "reviewed-config" : "built-in-service",
+      };
+    }
+    const trigger = gateway.trigger || builtIn.binaryCandidates?.[0];
+    const command = commandSpec({ program: trigger, args: [] });
+    return command
+      ? { ...base, available: true, command, verification: "configured-trigger" }
+      : { ...base, available: false, command: null, reason: `No safe gateway-run executable configured for ${id || "this agent"}` };
+  }
+
   if (action === "summon") {
     const command = commandSpec({ program: gateway.trigger || builtIn.binaryCandidates?.[0], args: [] });
     return command
@@ -100,9 +168,14 @@ export function resolveRuntimeAdapter({ agent, action, platform = process.platfo
       : { ...base, available: false, command: null, reason: "No safe summon executable is configured" };
   }
 
-  const command = verifiedGatewayCommand(gateway, action);
+  const command = verifiedGatewayCommand(gateway, action) || builtInServiceCommand(id, action);
   return command
-    ? { ...base, available: true, command, verification: "reviewed-config" }
+    ? {
+        ...base,
+        available: true,
+        command,
+        verification: verifiedGatewayCommand(gateway, action) ? "reviewed-config" : "built-in-service",
+      }
     : {
         ...base,
         available: false,
@@ -216,6 +289,14 @@ export function resolveAdapter({
     return {
       externalUrl: entry.officialUrl || entry.sourceUrl,
       note: adapter.note || entry.availabilityNote || "External setup required",
+      probe,
+    };
+  }
+  if (adapter.type === "plugin-copy" || adapter.type === "skill-copy") {
+    return {
+      type: adapter.type,
+      managed: true,
+      display: `${action} managed ${adapter.type}`,
       probe,
     };
   }

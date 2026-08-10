@@ -3,6 +3,43 @@
 All notable changes to Rempeyek Agent OS. The in-app update banner compares the local version
 against the latest GitHub Release of this repository - tag releases as `v<version>`.
 
+## [2.3.8] - 2026-08-10
+
+### Added
+
+- **Gateway service commands**: Hermes and OpenClaw now expose reviewed built-in
+  gateway actions (`gateway run|start|stop|restart|status`) discovered from their
+  local CLIs. Task agents keep safe bare-trigger gateway-run.
+- **Switchboard agent messaging**: `/api/switchboard/messages` (+ read) with a
+  SWITCHBOARD UI panel. Messages land in the agent Brains lane Inbox and Tasks;
+  online agents auto-ack unread mail.
+- **Plugin install modes for Hypertaks**: direct install + per-agent skill sync,
+  repository download, or copyable config snippet. `/api/skills/sync` mirrors the
+  Hypertaks skill into each selected agent skill root.
+- **Schedule panel enrichment**: shows `gateway.schtask` queries and
+  cadence/config schedule rows so SCHEDULED TASKS is not empty for config-only
+  agents.
+
+### Fixed
+
+- **Gateway run cwd** now matches summon: prefer each user's install/home folder
+  (same place the CLI expects), not only the shared OS workdir.
+- **Gateway control actions** are derived from reviewed adapters so Run/Status
+  buttons unlock when the agent truly has a safe command.
+- Missing switchboard helpers that broke message routes.
+- UTF-8 BOM accidentally introduced in version package files.
+
+### Changed
+
+- Marketplace filters/polish (All / Agents / Plugins / Skills) with clearer
+  Hypertaks/plugin guidance. Public registry still starts with **zero agents**;
+  users register what they install.
+
+### Release note
+
+- Windows artifacts are an unsigned manual-install prerelease. They are not a
+  stable auto-update feed and must be verified with the published checksum.
+
 ## [2.3.7] - 2026-08-06
 
 ### Fixed

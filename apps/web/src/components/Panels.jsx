@@ -138,16 +138,25 @@ export function VaultHealth({ health }) {
 
 export function ScheduleList({ schedule }) {
   return (
-    <Panel title="SCHEDULED TASKS" chip="schtasks">
+    <Panel title="SCHEDULED TASKS" chip="schtasks + config">
       <div className="sched-list">
         {!schedule ? <Skeleton />
-          : !schedule.length ? <Empty>No agents with a <code>schtask</code> in the config.</Empty>
+          : !schedule.length ? (
+            <Empty>
+              No scheduled work yet. Add <code>gateway.schtask</code> or <code>cadence</code> on an agent,
+              or create Windows Scheduled Tasks that the dashboard can query.
+            </Empty>
+          )
             : schedule.map(t => (
-              <div key={t.id} className="sched-row">
-                <span className={`dot ${t.error ? "error" : t.ok ? "running" : "exited"}`} />
+              <div key={`${t.id}-${t.name || t.source || "row"}`} className="sched-row">
+                <span className={`dot ${t.error ? "error" : t.ok === false ? "exited" : "running"}`} />
                 <span className="sched-a">{t.icon} {t.agent}</span>
                 <span className="sched-d">
-                  {t.error ? t.error : `last: ${t.lastRun || "-"} · result ${t.lastResult ?? "-"} · next ${t.nextRun || "-"}`}
+                  {t.error
+                    ? t.error
+                    : t.source === "config"
+                      ? `cadence/config: ${t.nextRun || t.name || "-"}`
+                      : `last: ${t.lastRun || "-"} · result ${t.lastResult ?? "-"} · next ${t.nextRun || "-"}`}
                 </span>
               </div>
             ))}

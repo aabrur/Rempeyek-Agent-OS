@@ -1,9 +1,16 @@
 export function filterMarketplace(entries = [], kind = "all") {
+  const rank = entry => {
+    let score = Number(Boolean(entry.featured)) * 100;
+    // Keep freshly curated / service gateways visible near the top.
+    if (entry.id === "hypertaks-agent") score += 50;
+    if (entry.id === "hermes" || entry.id === "openclaw") score += 20;
+    if (entry.kind === "plugin") score += 5;
+    if (entry.curatedAt) score += Math.min(10, String(entry.curatedAt).length);
+    return score;
+  };
   return entries
     .filter(entry => kind === "all" || entry.kind === kind)
-    .sort((a, b) =>
-      Number(Boolean(b.featured)) - Number(Boolean(a.featured)),
-    );
+    .sort((a, b) => rank(b) - rank(a) || String(a.name).localeCompare(String(b.name)));
 }
 
 export function marketplaceAction(entry, operationState = {}) {

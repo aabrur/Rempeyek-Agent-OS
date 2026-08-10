@@ -3,7 +3,8 @@ import { Btn, PageHead, Panel, SectionRow } from "@rempeyek/ui";
 import { CatalogGrid } from "../components/CatalogGrid";
 import { AddAgentModal } from "../components/AddAgentModal";
 
-/** Marketplace: reviewed agents, plugins, skills, and custom registration. */
+/** Marketplace: reviewed agents, plugins, skills, and custom registration.
+    Public builds never auto-register agents — users add what they install. */
 export function MarketplaceView({ refresh }) {
   const [adding, setAdding] = useState(false);
   const [kind, setKind] = useState("all");
@@ -11,10 +12,17 @@ export function MarketplaceView({ refresh }) {
   return (
     <section className="view active">
       <PageHead title="MARKETPLACE">
-        Known agents install with one approved click: adapters are reviewed server-side and never typed here.
+        Curated agents, plugins, and skills. Installers are reviewed server-side.
+        Registration is always user-driven — nothing is pre-added for you.
       </PageHead>
 
-      <SectionRow label="AGENT CATALOG">
+      <SectionRow label="CATALOG FILTERS">
+        <Btn
+          variant={kind === "all" ? "primary" : "dim"}
+          onClick={() => setKind("all")}
+        >
+          All
+        </Btn>
         <Btn
           variant={kind === "agent" ? "primary" : "dim"}
           onClick={() => setKind("agent")}
@@ -38,7 +46,14 @@ export function MarketplaceView({ refresh }) {
         </Btn>
       </SectionRow>
 
-      <Panel>
+      <Panel title={kind === "plugin" ? "PLUGINS" : kind === "skill" ? "SKILLS" : kind === "agent" ? "AGENTS" : "FULL CATALOG"}>
+        <div style={{ opacity: 0.75, fontSize: "0.85rem", marginBottom: 12 }}>
+          {kind === "plugin"
+            ? "Hypertaks installs with three modes: direct sync to a registered agent, repo download, or copyable config snippet. Skills ride along in the installer bundle."
+            : kind === "skill"
+              ? "Skills download through the managed installer and can sync into each agent skill folder the user owns."
+              : "Newest curated agents stay featured at the top. Install + register only what you choose."}
+        </div>
         <CatalogGrid kind={kind} onAdded={refresh} />
       </Panel>
 

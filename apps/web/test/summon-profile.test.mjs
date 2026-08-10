@@ -23,7 +23,7 @@ const expected = [
 
 test("built-in agents summon from their requested homes with their requested CLIs", () => {
   for (const [id, cwd, command] of expected) {
-    assert.deepEqual(resolveSummonProfile({ id, gateway: {} }), { cwd, command });
+    assert.deepEqual(resolveSummonProfile({ id, gateway: {} }), { cwd, command, home: cwd });
   }
 });
 
@@ -31,19 +31,23 @@ test("legacy Copilot slot summons Codex instead of Copilot", () => {
   assert.deepEqual(resolveSummonProfile({
     id: "copilot",
     gateway: { home: path.join(home, ".copilot"), trigger: "copilot" },
-  }), { cwd: path.join(home, ".codex"), command: "codex" });
+  }), { cwd: path.join(home, ".codex"), command: "codex", home: path.join(home, ".codex") });
 });
 
 test("custom agents retain their trusted configured summon profile", () => {
   assert.deepEqual(resolveSummonProfile({
     id: "custom-agent",
     gateway: { home: "C:\\Agents\\Custom", trigger: "custom-cli --interactive" },
-  }), { cwd: "C:\\Agents\\Custom", command: "custom-cli --interactive" });
+  }), { cwd: "C:\\Agents\\Custom", command: "custom-cli --interactive", home: "C:\\Agents\\Custom" });
 });
 
-test("registered launchers prefer their explicit app-state workdir", () => {
+test("install home wins over shared app-state workdir so gateway matches summon", () => {
   assert.deepEqual(resolveSummonProfile({
     id: "custom-agent",
-    gateway: { home: "C:\\Agents\\Custom", workdir: "C:\\Users\\test\\AppData\\Local\\Rempeyek-Agent-OS", trigger: "custom-cli" },
-  }), { cwd: "C:\\Users\\test\\AppData\\Local\\Rempeyek-Agent-OS", command: "custom-cli" });
+    gateway: {
+      home: "C:\\Agents\\Custom",
+      workdir: "C:\\Users\\test\\AppData\\Local\\Rempeyek-Agent-OS",
+      trigger: "custom-cli",
+    },
+  }), { cwd: "C:\\Agents\\Custom", command: "custom-cli", home: "C:\\Agents\\Custom" });
 });

@@ -108,6 +108,9 @@ AGENT_LIFECYCLE_MOD.then(m => { lifecycleLib = m; }).catch(e => console.error("[
 const MANAGED_BUNDLE_MOD = import("./lib/managed-bundle.mjs");
 let managedBundleLib = null;
 MANAGED_BUNDLE_MOD.then(m => { managedBundleLib = m; }).catch(e => console.error("[managed-bundle]", e.message));
+const SWITCHBOARD_MOD = import("./lib/switchboard.mjs");
+let switchboardLib = null;
+SWITCHBOARD_MOD.then(m => { switchboardLib = m; }).catch(e => console.error("[switchboard]", e.message));
 const RUNTIME_SETTINGS_MOD = import("./lib/runtime-settings.mjs");
 let runtimeSettingsLib = null;
 RUNTIME_SETTINGS_MOD.then(m => { runtimeSettingsLib = m; }).catch(e => console.error("[runtime-settings]", e.message));
@@ -747,7 +750,12 @@ function sysEvent(id, level, msg) {
 }
 
 function agentById(id) { return loadConfig().agents.find(a => a.id === id); }
-function gwActions(agent) { return (agent && agent.gateway && agent.gateway.actions) || []; }
+function gwActions(agent) {
+  if (processAdaptersLib?.deriveGatewayActions) {
+    try { return processAdaptersLib.deriveGatewayActions(agent); } catch {}
+  }
+  return (agent && agent.gateway && agent.gateway.actions) || [];
+}
 
 function detectRunning(text) {
   const t = (text || "").toLowerCase();
@@ -760,7 +768,7 @@ function detectRunning(text) {
 function procInfo(id) {
   const p = procs.get(id);
   const c = gwCache.get(id);
-  const managed = managedProcessManager?.status(id);
+  const managed = processManager()?.status(id);
   if (managed) {
     return {
       status: managed.runtimeState,
@@ -960,7 +968,9 @@ function gwCtl(id, action, cb) {
   }
   if (!resolved.available) return cb({ error: resolved.reason, runtimeState: "unavailable" });
 
-  const cwd = agent.gateway?.workdir || agent.gateway?.cwd || loadConfig().workdir;
+  const profile = resolveSummonProfile(agent, { stateRoot: RUNTIME_PATHS.stateRoot });
+  const cwd = profile.cwd || agent.gateway?.home || agent.gateway?.workdir || agent.gateway?.cwd || loadConfig().workdir;
+  if (cwd && !fs.existsSync(cwd)) { try { fs.mkdirSync(cwd, { recursive: true }); } catch (_) {} }
   if (!cwd || !fs.existsSync(cwd)) return cb({ error: `cwd does not exist: ${cwd || "(unset)"}` });
   const manager = processManager();
   if (!manager) return cb({ error: "process manager is still loading" });
@@ -1021,7 +1031,9 @@ function gwRun(id) {
   const resolved = runtimeAdapter(agent, "gateway-run");
   if (!resolved) return { error: "runtime adapters are still loading" };
   if (!resolved.available) return { error: resolved.reason, runtimeState: "unavailable" };
-  const cwd = agent.gateway?.workdir || agent.gateway?.cwd || loadConfig().workdir;
+  const profile = resolveSummonProfile(agent, { stateRoot: RUNTIME_PATHS.stateRoot });
+  const cwd = profile.cwd || agent.gateway?.home || agent.gateway?.workdir || agent.gateway?.cwd || loadConfig().workdir;
+  if (cwd && !fs.existsSync(cwd)) { try { fs.mkdirSync(cwd, { recursive: true }); } catch (_) {} }
   if (!cwd || !fs.existsSync(cwd)) return { error: `cwd does not exist: ${cwd || "(unset)"}` };
   const manager = processManager();
   if (!manager) return { error: "process manager is still loading" };
@@ -1117,7 +1129,7 @@ function gwTerminal(id, mode, cb) {
   const g = agent.gateway;
   if (!agent.enabled || !g) return cb({ error: agent.note || `gateway '${id}' not ready (enabled:false)` });
   if (mode !== "summon") return cb({ error: "terminal supports Summon only; use Gateway Run for managed execution" });
-  const profile = resolveSummonProfile(agent);
+  const profile = resolveSummonProfile(agent, { stateRoot: RUNTIME_PATHS.stateRoot });
   const resolved = runtimeAdapter(agent, "summon");
   if (!profile.command || !resolved?.available) {
     return cb({ error: resolved?.reason || `${agent.name} has no safe summon command` });
@@ -1933,6 +1945,52 @@ function saveReport() {
   } catch (e) { return { error: `failed to save report: ${e.message}` }; }
 }
 
+
+function readSwitchboardMessages() {
+  if (!switchboardLib) return [];
+  return switchboardLib.readSwitchboardMessages(TELEMETRY_DIR);
+}
+function saveSwitchboardMessages(list) {
+  if (!switchboardLib) throw new Error("switchboard module is still loading");
+  return switchboardLib.saveSwitchboardMessages(TELEMETRY_DIR, list);
+}
+function writeAgentTask(agentId, message) {
+  const agent = agentById(agentId);
+  const who = agent?.name || agentId || "agent";
+  const lane = agent?.lane || agentId || "General";
+  const stamp = localISO();
+  const body = String(message || "").trim();
+  if (!body) return { error: "empty message" };
+  try {
+    const inboxDir = path.join(VAULT, "Brains", lane, "Inbox");
+    fs.mkdirSync(inboxDir, { recursive: true });
+    const fname = `Switchboard ${stamp.slice(0, 10)} ${stamp.slice(11, 19).replace(/:/g, ".")}.md`;
+    fs.writeFileSync(path.join(inboxDir, fname),
+      `---\ntype: switchboard\nagent: ${agentId}\nfrom: dashboard\ncreated: ${stamp}\n---\n\n` +
+      `# Switchboard message for ${who}\n\n${body}\n`, "utf8");
+    const tasksDir = path.join(VAULT, "Tasks");
+    fs.mkdirSync(tasksDir, { recursive: true });
+    const taskFile = path.join(tasksDir, "Inbox Tasks.md");
+    const line = `- [ ] ${body.slice(0, 180)} - ${who} - ${stamp.slice(0, 10)}  ·  switchboard\n`;
+    if (!fs.existsSync(taskFile)) {
+      fs.writeFileSync(taskFile, `# Inbox Tasks\n\n${line}`, "utf8");
+    } else {
+      fs.appendFileSync(taskFile, line, "utf8");
+    }
+    const teleFile = path.join(TELEMETRY_DIR, `${agentId || "general"}.jsonl`);
+    fs.appendFileSync(teleFile, JSON.stringify({
+      ts: new Date().toISOString(),
+      type: "task_start",
+      name: body.slice(0, 120),
+      detail: "Delivered from Switchboard",
+      status: "running",
+    }) + "\n", "utf8");
+    return { ok: true, rel: `Brains/${lane}/Inbox/${fname}` };
+  } catch (e) {
+    return { error: e.message };
+  }
+}
+
 function processPendingAgentTasks(agentId) {
   if (!agentId) return;
   const cfg = loadConfig();
@@ -1943,6 +2001,20 @@ function processPendingAgentTasks(agentId) {
   const isOnline = (pInfo && pInfo.status === "running") || (tInfo && tInfo.alive);
 
   if (!isOnline) return;
+
+  try {
+    if (switchboardLib) {
+      const all = readSwitchboardMessages();
+      const unread = switchboardLib.unreadForAgent(all, agentId);
+      if (unread.length) {
+        for (const msg of unread) {
+          writeAgentTask(agentId, `[Switchboard] ${msg.fromAgentId || "user"}: ${msg.message}`);
+        }
+        const marked = switchboardLib.markSwitchboardRead(all, { agentId });
+        if (marked.updated) saveSwitchboardMessages(marked.messages);
+      }
+    }
+  } catch {}
 
   try {
     const file = path.join(VAULT, "Tasks", "Inbox Tasks.md");
@@ -2061,10 +2133,33 @@ function querySchtask(name, cb) {
   });
 }
 function buildSchedule(cb) {
-  let agents; try { agents = loadConfig().agents.filter(a => a.gateway && a.gateway.schtask); } catch { return cb([]); }
-  if (!agents.length) return cb([]);
-  const out = []; let pending = agents.length;
-  agents.forEach(a => querySchtask(a.gateway.schtask, r => { out.push({ id: a.id, agent: a.name, icon: a.icon, ...r }); if (--pending === 0) cb(out); }));
+  let agents;
+  try { agents = loadConfig().agents.filter(a => a.kind !== "subagent"); } catch { return cb([]); }
+  const configRows = agents
+    .filter(a => a.cadence || a.gateway?.schedule || a.gateway?.schtask)
+    .map(a => ({
+      id: a.id,
+      agent: a.name,
+      icon: a.icon,
+      name: a.gateway?.schtask || a.cadence || a.gateway?.schedule || a.id,
+      taskState: a.gateway?.schtask ? "querying" : "configured",
+      nextRun: a.cadence || a.gateway?.schedule || null,
+      lastRun: null,
+      lastResult: null,
+      ok: true,
+      source: a.gateway?.schtask ? "schtask" : "config",
+    }));
+  const withSch = agents.filter(a => a.gateway && a.gateway.schtask);
+  if (!withSch.length) return cb(configRows);
+  const out = [];
+  let pending = withSch.length;
+  withSch.forEach(a => querySchtask(a.gateway.schtask, r => {
+    out.push({ id: a.id, agent: a.name, icon: a.icon, source: "schtask", ...r });
+    if (--pending === 0) {
+      const ids = new Set(out.map(row => row.id));
+      cb([...out, ...configRows.filter(row => !ids.has(row.id) && row.source !== "schtask")]);
+    }
+  }));
 }
 
 /* R#9: vault health - age of the last git commit + age of the last backup (prevent losing the brain).
@@ -3326,7 +3421,89 @@ function requestHandler(req, res, services = DEFAULT_RUNTIME_SERVICES) {
           const r = startUpdate();
           json(res, r.error ? 409 : 200, r);
         });
-      if (url === "/api/schedule") return buildSchedule(r => json(res, 200, r));      // R#8
+      if (url === "/api/schedule") return buildSchedule(r => json(res, 200, r));
+      if (url.startsWith("/api/switchboard/messages") && req.method === "GET") {
+        if (!switchboardLib) return json(res, 503, { error: "switchboard module is still loading" });
+        const u = new URL(url, "http://localhost");
+        const agentId = u.searchParams.get("agentId") || u.searchParams.get("to");
+        let list = readSwitchboardMessages();
+        if (agentId) list = list.filter(m => m.toAgentId === agentId || m.fromAgentId === agentId);
+        return json(res, 200, { messages: list });
+      }
+      if (url === "/api/switchboard/messages" && req.method === "POST") return parseBody(req, body => {
+        if (!switchboardLib) return json(res, 503, { error: "switchboard module is still loading" });
+        const created = switchboardLib.createSwitchboardMessage(body || {});
+        if (created.error) return json(res, 400, { error: created.error });
+        const list = readSwitchboardMessages();
+        list.push(created);
+        saveSwitchboardMessages(list);
+        try { writeAgentTask(created.toAgentId, `[Switchboard] ${created.fromAgentId}: ${created.message}`); } catch (_) {}
+        // If target is online, deliver immediately and mark read
+        try { processPendingAgentTasks(created.toAgentId); } catch (_) {}
+        return json(res, 200, { ok: true, message: created });
+      });
+      if (url === "/api/switchboard/read" && req.method === "POST") return parseBody(req, body => {
+        if (!switchboardLib) return json(res, 503, { error: "switchboard module is still loading" });
+        const list = readSwitchboardMessages();
+        const marked = switchboardLib.markSwitchboardRead(list, body || {});
+        if (marked.updated) saveSwitchboardMessages(marked.messages);
+        return json(res, 200, { ok: true, count: marked.messages.length, updated: marked.updated });
+      });
+      if (url === "/api/skills/sync" && req.method === "POST") return parseBody(req, body => {
+        try {
+          if (!managedBundleLib || !marketplaceLib) return json(res, 503, { error: "modules still loading" });
+          const pluginId = String(body?.pluginId || "hypertaks-agent");
+          const agentId = String(body?.agentId || "").trim();
+          const entry = marketplaceLib.marketplaceEntry(pluginId);
+          if (!entry || (entry.kind !== "plugin" && entry.kind !== "skill")) {
+            return json(res, 404, { error: `unknown plugin/skill '${pluginId}'` });
+          }
+          const sourceRoot = path.join(DEFAULT_RUNTIME_SERVICES.bundleRoot || RUNTIME_PATHS.bundleRoot, "hypertaks-agent");
+          const userHome = os.homedir();
+          // Base install into ~/.agents
+          const plan = managedBundleLib.buildHypertaksCopyPlan({
+            sourceRoot,
+            userHome,
+            kind: entry.kind === "skill" ? "skill" : "plugin",
+          });
+          const receipt = receiptPath(DEFAULT_RUNTIME_SERVICES, entry.id);
+          let result;
+          try {
+            result = managedBundleLib.applyCopyPlan(plan, receipt);
+          } catch (error) {
+            // If already installed globally, continue to per-agent sync
+            result = { ok: false, error: error.message, collisions: true };
+          }
+          const synced = [];
+          if (agentId && switchboardLib) {
+            const agent = loadConfig().agents.find(a => a.id === agentId);
+            if (!agent) return json(res, 404, { error: `unknown agent '${agentId}'` });
+            const skillSrc = path.join(sourceRoot, "skills", "hypertaks");
+            if (fs.existsSync(skillSrc)) {
+              for (const targetRoot of switchboardLib.agentSkillTargets(agent, userHome)) {
+                const dest = path.join(targetRoot, "hypertaks");
+                try {
+                  fs.mkdirSync(targetRoot, { recursive: true });
+                  fs.cpSync(skillSrc, dest, { recursive: true, force: true });
+                  synced.push(dest);
+                } catch (error) {
+                  synced.push(`${dest} (failed: ${error.message})`);
+                }
+              }
+            }
+          }
+          return json(res, 200, {
+            ok: true,
+            pluginId: entry.id,
+            agentId: agentId || null,
+            globalInstall: result?.ok === true,
+            collisions: result?.collisions || null,
+            synced,
+          });
+        } catch (error) {
+          return json(res, 500, { error: error.message });
+        }
+      });      // R#8
       if (url === "/api/vault-health") return buildVaultHealth(r => json(res, 200, r)); // R#9
       if (url === "/api/bootstrap/status" && req.method === "GET") {
         if (!bootstrapInstance) return json(res, 503, { error: "Bootstrap module not loaded" });

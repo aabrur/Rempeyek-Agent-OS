@@ -12,7 +12,7 @@ React + Vite, split into components across an npm-workspaces monorepo.
 
 ## Download for Windows
 
-[![Download v2.3.4](https://img.shields.io/badge/Download-v2.3.4-ff8a00?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/aabrur/Rempeyek-Agent-OS/releases/tag/v2.3.4)
+[![Download v2.3.8](https://img.shields.io/badge/Download-v2.3.8-ff8a00?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/aabrur/Rempeyek-Agent-OS/releases/tag/v2.3.8)
 
 **The installer and direct download are free.** Most users only need to click
 the button above. No GitHub account, Git, Node.js, npm, or repository clone is
@@ -23,15 +23,17 @@ required.
   vault stay under `%LOCALAPPDATA%\Rempeyek-Agent-OS`
 - **User data survives uninstall** - removing the application does not delete
   the user's agent or vault data
+- **Empty by default** - a clean install starts with zero registered agents;
+  you add only the agents you install
 
 ### Install
 
-1. Open the public **v2.3.4** release above.
+1. Open the public **v2.3.8** release above.
 2. Download the NSIS installer and the published `SHA256SUMS.txt` from that same release.
 3. Verify the downloaded installer against `SHA256SUMS.txt` in PowerShell:
 
    ```powershell
-   Get-FileHash "$HOME\Downloads\Rempeyek-Agent-OS-Setup-<version>.exe" -Algorithm SHA256
+   Get-FileHash "$HOME\Downloads\Rempeyek-Agent-OS-Setup-2.3.8.exe" -Algorithm SHA256
    ```
 
 4. Open the installer only when the hash and release publisher match.
@@ -43,7 +45,7 @@ Official releases include published `SHA256SUMS.txt` checksum files for release 
 
 ### Updates
 
-The desktop updater supports automated background checks, release manifest verification via `latest.yml`, and a one-click update flow. When the in-app updater finds v2.3.4, click the update control and let the desktop app restart after the download is ready. This public release is unsigned, so manual downloads must be verified against `SHA256SUMS.txt`. User settings, installed-agent records, telemetry, avatars, and Vault data remain in place across application upgrades.
+The desktop updater supports automated background checks, release manifest verification via `latest.yml`, and a one-click update flow. When the in-app updater finds v2.3.8, click the update control and let the desktop app restart after the download is ready. This public release is unsigned, so manual downloads must be verified against `SHA256SUMS.txt`. User settings, installed-agent records, telemetry, avatars, and Vault data remain in place across application upgrades.
 
 ## Features
 
@@ -52,7 +54,7 @@ The desktop updater supports automated background checks, release manifest verif
   particles, live status, and a right-hand inspector (connections, measured signals,
   metadata). Fully keyboard-navigable, honest by design - no synthetic edges
 - **8-destination command deck** - Agent Map · Agents · Projects (project workspaces) ·
-  Memory (vault graph) · Switchboard (approvals, workflows, schedule) · Marketplace
+  Memory (vault graph) · Switchboard (approvals, agent messages, workflows, schedule) · Marketplace
   (vetted agent catalog) · Observatory (telemetry + reports) · Settings
 - **Project memory capture** - agents' `task_done` telemetry is auto-captured into the
   matching project's `decisions.md` (⚡auto entries, watermarked - never duplicated), and
@@ -61,13 +63,14 @@ The desktop updater supports automated background checks, release manifest verif
   cosmos default), switched from Settings and persisted per browser; the flat themes
   turn off glow and particles entirely, and the system reduce-motion preference is
   always respected
-- **Public Marketplace** - browse separate **Agents**, **Plugins**, and
+- **Public Marketplace** - browse separate **All**, **Agents**, **Plugins**, and
   **Skills** filters. The current launch curation contains 21 agent
   projects for portable discovery; it is maintained product curation, not a
   ranking or performance claim
 - **Safe install boundary** - reviewed adapters execute fixed programs and
-  argument arrays without a shell. Hypertaks is the featured plugin and its
-  managed bundle targets `%USERPROFILE%\.agents`; Crimson Odyssey remains
+  argument arrays without a shell. Hypertaks is the featured plugin with three
+  install modes (direct sync to a registered agent, repository download, or
+  copyable config snippet) and optional per-agent skill sync; Crimson Odyssey remains
   discoverable through its official project link but has no guessed one-click
   installer
 - **Agent lifecycle** - installed software and registered profiles are shown
@@ -85,13 +88,17 @@ The desktop updater supports automated background checks, release manifest verif
   profile's trusted home folder and runs its persisted CLI trigger; a missing
   CLI is reported honestly and routes back to the reviewed Marketplace or
   official project page
-- **Gateway control** - start / stop / restart / status / run agents from the dashboard
+- **Gateway control** - start / stop / restart / status / run agents from the dashboard.
+  Hermes and OpenClaw use reviewed `gateway` subcommands; other agents use a safe
+  bare-trigger run. Gateway run and summon share the same per-user install folder
+- **Switchboard messaging** - send messages to any registered agent; online agents
+  pick them up into their Brains lane Inbox and Tasks automatically
 - **Health monitoring** - TCP probes, 24h uptime history, watchdog auto-restart (opt-in), desktop alerts when an agent goes down
 - **Task board** - send tasks to agents (written to the vault), mark them done
 - **Telemetry** - per-agent JSONL event streams: sessions, subagents, progress
 - **Neural Vault graph** - interactive force-directed graph of your vault's `[[wikilinks]]`
 - **Reports** - auto-generated vault + agent activity reports, saved back to the vault
-- **Scheduled-task panel** - see what Windows Task Scheduler will run and when
+- **Scheduled-task panel** - Windows Task Scheduler rows plus agent cadence/config schedules
 - **Vault health** - last git commit age + last backup age, so you never lose the brain
 
 ## Requirements

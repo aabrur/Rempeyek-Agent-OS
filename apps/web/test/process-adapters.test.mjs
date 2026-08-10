@@ -156,8 +156,8 @@ test("runtime adapters never synthesize binary-plus-action commands", () => {
     action: "gateway-run",
     platform: "win32",
   });
-  assert.equal(run.available, false);
-  assert.match(run.reason, /not verified/i);
+  assert.equal(run.available, true);
+  assert.deepEqual(run.command, { program: "cmdc", args: [] });
 });
 
 test("runtime adapters allow only an explicitly reviewed structured service command", () => {
