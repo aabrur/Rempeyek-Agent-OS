@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "records": [
+    {
+      "recordKey": "hermes:native-status",
+      "agentId": "hermes",
+      "pid": null,
+      "childPids": [],
+      "command": "hermes",
+      "args": [
+        "gateway",
+        "status"
+      ],
+      "workingDirectory": "C:\\Users\\abrur\\AppData\\Local\\hermes",
+      "actionType": "native-status",
+      "startTime": "2026-08-10T13:32:13.253Z",
+      "exitCode": null,
+      "runtimeState": "unavailable",
+      "stdoutPath": "C:\\Users\\abrur\\Documents\\Rempeyek-Agent-Os\\telemetry\\logs\\managed\\hermes-native-status-31a50fb6-b624-4469-b94b-72c9e9946f0c.stdout.log",
+      "stderrPath": "C:\\Users\\abrur\\Documents\\Rempeyek-Agent-Os\\telemetry\\logs\\managed\\hermes-native-status-31a50fb6-b624-4469-b94b-72c9e9946f0c.stderr.log",
+      "runId": "hermes-native-status-31a50fb6-b624-4469-b94b-72c9e9946f0c",
+      "reason": "Process ownership cannot be verified after manager restart",
+      "stopRequested": true,
+      "stalePid": 8888
+    },
+    {
+      "recordKey": "openclaw:native-status",
+      "agentId": "openclaw",
+      "pid": null,
+      "childPids": [],
+      "command": "openclaw",
+      "args": [
+        "gateway",
+        "status"
+      ],
+      "workingDirectory": "C:\\Users\\abrur\\.openclaw",
+      "actionType": "native-status",
+      "startTime": "2026-08-10T13:32:13.317Z",
+      "exitCode": -1,
+      "runtimeState": "failed",
+      "stdoutPath": "C:\\Users\\abrur\\Documents\\Rempeyek-Agent-Os\\telemetry\\logs\\managed\\openclaw-native-status-f68ffafc-577a-46af-a60c-19dd3425243a.stdout.log",
+      "stderrPath": "C:\\Users\\abrur\\Documents\\Rempeyek-Agent-Os\\telemetry\\logs\\managed\\openclaw-native-status-f68ffafc-577a-46af-a60c-19dd3425243a.stderr.log",
+      "runId": "openclaw-native-status-f68ffafc-577a-46af-a60c-19dd3425243a",
+      "reason": "spawn returned no PID",
+      "stopRequested": false
+    }
+  ]
+}
