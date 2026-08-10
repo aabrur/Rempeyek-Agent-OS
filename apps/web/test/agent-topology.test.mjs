@@ -9,11 +9,18 @@ const agents = [
   { id: 'pi', name: 'Pi', status: 'offline' },
 ];
 
-test('renders an honest unconnected fleet when no relationship evidence exists', () => {
-  const topology = buildAgentTopology({ agents: agents.map(({ dependencies, ...agent }) => agent) });
+test('renders an honest unconnected fleet when no relationship evidence exists and fallbacks are disabled', () => {
+  const topology = buildAgentTopology({ agents: agents.map(({ dependencies, ...agent }) => agent), inferFallbacks: false });
   assert.equal(topology.nodes.length, 3);
   assert.deepEqual(topology.edges, []);
   assert.deepEqual(topology.metadata, { nodeCount: 3, edgeCount: 0, droppedRelations: 0, hasRelationships: false });
+});
+
+test('connects fleet with primary workflow relationships when inferFallbacks is enabled', () => {
+  const topology = buildAgentTopology({ agents: agents.map(({ dependencies, ...agent }) => agent), inferFallbacks: true });
+  assert.equal(topology.nodes.length, 3);
+  assert.ok(topology.edges.length > 0);
+  assert.equal(topology.metadata.hasRelationships, true);
 });
 
 test('keeps spawned subagents inside their parent profile instead of top-level topology', () => {

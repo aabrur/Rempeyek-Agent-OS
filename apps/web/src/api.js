@@ -12,7 +12,7 @@ export function setToken(t) {
 }
 
 async function request(path, opts = {}, attempt = 0) {
-  const { timeoutMs = 8000, ...init } = opts;
+  const { timeoutMs = 8000, maxRetries = 2, ...init } = opts;
   try {
     const res = await fetch(path, {
       ...init,
@@ -26,6 +26,10 @@ async function request(path, opts = {}, attempt = 0) {
     }
     return { status: res.status, body: await res.json() };
   } catch (e) {
+    if (attempt < maxRetries && e?.name !== "TimeoutError") {
+      await new Promise(resolve => setTimeout(resolve, 300 * (attempt + 1)));
+      return request(path, opts, attempt + 1);
+    }
     return {
       status: 0,
       body: {

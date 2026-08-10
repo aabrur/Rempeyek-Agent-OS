@@ -106,21 +106,32 @@ export function AgentMapView({ state, load, onOpenAgent, onView }) {
 
   useEffect(() => {
     let alive = true;
+    let timer = null;
     setTopologyReady(false);
     setTopology(current => beginTopologyRefresh(current, agents));
-    api("/api/agent-topology").then(data => {
-      if (!alive) return;
-      if (data?.error || !Array.isArray(data?.nodes) || !Array.isArray(data?.edges)) {
-        setLoadError(data?.error || "Topology response was incomplete.");
-        setTopology(current => beginTopologyRefresh(current, agents));
+    const loadTopology = (attempt = 0) => {
+      api("/api/agent-topology").then(data => {
+        if (!alive) return;
+        if (data?.error || !Array.isArray(data?.nodes) || !Array.isArray(data?.edges)) {
+          if (attempt < 2 && (data?.error?.includes("fetch") || data?.error?.includes("network"))) {
+            timer = setTimeout(() => loadTopology(attempt + 1), 800);
+            return;
+          }
+          setLoadError(data?.error || "Topology response was incomplete.");
+          setTopology(current => beginTopologyRefresh(current, agents));
+          setTopologyReady(true);
+          return;
+        }
+        setLoadError("");
+        setTopology(data);
         setTopologyReady(true);
-        return;
-      }
-      setLoadError("");
-      setTopology(data);
-      setTopologyReady(true);
-    });
-    return () => { alive = false; };
+      });
+    };
+    loadTopology(0);
+    return () => {
+      alive = false;
+      if (timer) clearTimeout(timer);
+    };
   }, [agentKey, refreshNonce]);
 
   const map = useMemo(() => buildCosmosMap(topology, agents, { reducedMotion }), [topology, agents, reducedMotion]);
