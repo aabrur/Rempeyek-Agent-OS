@@ -40,7 +40,13 @@ test("legacy repo-dir run resolves config but never injects catalog agents", () 
       JSON.stringify({ agency: "REMPEYEK AGENT OS", workdir: dir, agents: [] }),
       "utf8",
     );
-    const paths = resolveRuntimePaths({ root: dir, home: "C:\\Users\\public-test", platform: "win32" });
+    // Use the host platform so existence checks and path equality work on Linux CI
+    // and Windows alike. Forcing win32 path.win32 separators breaks existsSync on Ubuntu.
+    const paths = resolveRuntimePaths({
+      root: dir,
+      home: path.join(dir, "home"),
+      platform: process.platform,
+    });
     assert.equal(paths.legacyConfig, true);
     assert.equal(paths.configPath, cfgPath);
     const cfg = JSON.parse(fs.readFileSync(paths.configPath, "utf8"));
