@@ -36,6 +36,7 @@ Desktop.ini
 
 # Secrets / dumps - NEVER commit
 repomix-output.xml
+Rempeyek-Agent-OS.xml
 
 # Personal config & tooling
 agents.config.json
@@ -57,3 +58,4 @@ subagents.json
 system_prompt.txt
 *.canvas
 telemetry/memory-capture.json
+telemetry/*.json
