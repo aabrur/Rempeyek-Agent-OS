@@ -3599,7 +3599,7 @@ function requestHandler(req, res, services = DEFAULT_RUNTIME_SERVICES) {
               exportId: `diag_${Date.now()}`,
               exportedAt: new Date().toISOString(),
               system: {
-                appVersion: "2.4.1",
+                appVersion: "2.4.2",
                 platform: process.platform,
                 arch: process.arch,
                 nodeVersion: process.version,

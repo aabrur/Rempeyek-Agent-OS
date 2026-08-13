@@ -57,7 +57,7 @@ function createTestDoctorEnvironment() {
     backupsPath,
     tempPath,
     isPackaged: false,
-    appVersion: "2.4.1",
+    appVersion: "2.4.2",
     serverAlive: true,
   };
 

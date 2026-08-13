@@ -21,14 +21,14 @@ test("createIncidentRecord generates structured user-safe boot incident", () => 
   const incident = createIncidentRecord({
     phase: "bundle-evaluation",
     error: new Error("Failed to fetch /dist/assets/index-main.js"),
-    appVersion: "2.4.1",
+    appVersion: "2.4.2",
     packaged: true,
     userHome: "C:\\Users\\testuser",
   });
 
   assert.ok(incident.incidentId.startsWith("inc_"));
   assert.equal(incident.phase, "bundle-evaluation");
-  assert.equal(incident.appVersion, "2.4.1");
+  assert.equal(incident.appVersion, "2.4.2");
   assert.equal(incident.packaged, true);
   assert.equal(incident.retryable, true);
   assert.equal(typeof incident.timestamp, "string");

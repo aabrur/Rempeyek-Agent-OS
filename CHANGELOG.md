@@ -3,6 +3,14 @@
 All notable changes to Rempeyek Agent OS. The in-app update banner compares the local version
 against the latest GitHub Release of this repository - tag releases as `v<version>`.
 
+## [2.4.2] - 2026-08-14
+
+### Fixed
+- **Installer launch crash**: packaged `app.asar` now includes `boot-recovery.mjs`. 2.4.1 died on startup with `ERR_MODULE_NOT_FOUND` because `main.mjs` imported that module but electron-builder's files allowlist omitted it.
+
+### Release note
+- Windows artifacts remain an unsigned manual-install prerelease. Users on 2.4.1 cannot auto-update through the crash; install `Rempeyek-Agent-OS-Setup-2.4.2.exe` from this release.
+
 ## [2.4.1] - 2026-08-11
 
 ### Added

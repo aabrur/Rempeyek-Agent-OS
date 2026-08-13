@@ -34,7 +34,7 @@ export function createSystemDoctor({
       category: "DESKTOP",
       status: "healthy",
       summary: "Electron desktop runtime environment active",
-      details: `Electron: ${process.versions?.electron || "Node.js runtime"}, Packaged: ${services.isPackaged ?? false}, Version: ${services.appVersion || "2.4.1"}`,
+      details: `Electron: ${process.versions?.electron || "Node.js runtime"}, Packaged: ${services.isPackaged ?? false}, Version: ${services.appVersion || "2.4.2"}`,
       repairable: false,
       repairAction: null,
       risk: "none",

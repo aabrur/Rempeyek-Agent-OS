@@ -55,6 +55,24 @@ test("desktop package pins the reviewed runtime and packages only required app f
   assert.equal(JSON.stringify(pkg.build).includes("telemetry"), false);
 });
 
+test("desktop fileset includes every local module imported by main.mjs", () => {
+  const pkg = JSON.parse(
+    fs.readFileSync(path.join(DESKTOP, "package.json"), "utf8"),
+  );
+  const mainSource = fs.readFileSync(path.join(DESKTOP, "main.mjs"), "utf8");
+  const localImports = [
+    ...mainSource.matchAll(/from\s+["']\.\/([^"']+)["']/g),
+  ].map(match => match[1]);
+  assert.ok(localImports.length > 0, "main.mjs must import local modules");
+  for (const specifier of localImports) {
+    assert.equal(
+      pkg.build.files.includes(specifier),
+      true,
+      `${specifier} is imported by main.mjs but missing from build.files`,
+    );
+  }
+});
+
 test("root workspace exposes desktop scripts", () => {
   const pkg = JSON.parse(
     fs.readFileSync(path.join(ROOT, "package.json"), "utf8"),

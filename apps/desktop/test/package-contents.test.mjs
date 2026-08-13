@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
@@ -76,6 +77,29 @@ test("packaged app contains required runtime and excludes user data", {
     ),
     true,
   );
+});
+
+test("packaged app.asar includes every local module imported by main.mjs", {
+  skip: fs.existsSync(path.join(root, "app.asar"))
+    ? false
+    : "desktop package has not been built in this checkout",
+}, () => {
+  const asarCli = path.resolve(desktopRoot, "..", "..", "node_modules", "@electron", "asar", "bin", "asar.js");
+  const listing = execFileSync(process.execPath, [asarCli, "list", path.join(root, "app.asar")], {
+    encoding: "utf8",
+  });
+  const mainSource = fs.readFileSync(path.join(desktopRoot, "main.mjs"), "utf8");
+  const localImports = [
+    ...mainSource.matchAll(/from\s+["']\.\/([^"']+)["']/g),
+  ].map(match => match[1]);
+  assert.ok(localImports.includes("boot-recovery.mjs"));
+  for (const specifier of localImports) {
+    assert.match(
+      listing.replaceAll("\\", "/"),
+      new RegExp(`(?:^|/)${specifier.replaceAll(".", "\\.")}(?:\\r?\\n|$)`),
+      `${specifier} must exist inside app.asar`,
+    );
+  }
 });
 
 const sourceWebDist = path.resolve(desktopRoot, "..", "web", "dist");
