@@ -3,6 +3,15 @@
 All notable changes to Rempeyek Agent OS. The in-app update banner compares the local version
 against the latest GitHub Release of this repository - tag releases as `v<version>`.
 
+## [2.4.3] - 2026-08-17
+
+### Added
+- **Work Continuity Lifecycle**: Full deterministic lifecycle (`Mission`, `WorkContract`, `Run`, `WorkUnit`, `Evidence`, `Verification`, `Handoff`) in `apps/web/lib/work-lifecycle.mjs` ensuring tasks and memory survive agent replacement or cold restart.
+- **Multi-Platform Publishing Expansion**: Platform-native adaptation engine (`Campaign`, `PlatformVariant`, `PublicationJob`, `PublicationReceipt`, `AnalyticsSnapshot`, `ConnectorProfile`) with adapters for Twitter/X, LinkedIn, YouTube, TikTok, and Meta.
+- **Retry Isolation & Reconciled Scheduling**: Failed platforms can be retried without duplicate publishing to platforms that already succeeded.
+- **Dynamic Rempeyek CWD**: Terminal summon and gateway executions now operate directly inside the user's Rempeyek Agent OS installation root.
+- **Zero Auto-Register Consent**: Fresh public installations start with zero agents, requiring explicit user authorization.
+
 ## [2.4.2] - 2026-08-14
 
 ### Fixed

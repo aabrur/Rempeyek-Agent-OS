@@ -41,18 +41,26 @@ export function MarketplaceView({ refresh }) {
         >
           Skills
         </Btn>
+        <Btn
+          variant={kind === "connector" ? "primary" : "dim"}
+          onClick={() => setKind("connector")}
+        >
+          Connectors
+        </Btn>
         <Btn variant="primary" onClick={() => setAdding(true)}>
           ＋ REGISTER CUSTOM AGENT
         </Btn>
       </SectionRow>
 
-      <Panel title={kind === "plugin" ? "PLUGINS" : kind === "skill" ? "SKILLS" : kind === "agent" ? "AGENTS" : "FULL CATALOG"}>
+      <Panel title={kind === "plugin" ? "PLUGINS" : kind === "skill" ? "SKILLS" : kind === "connector" ? "CONNECTORS" : kind === "agent" ? "AGENTS" : "FULL CATALOG"}>
         <div style={{ opacity: 0.75, fontSize: "0.85rem", marginBottom: 12 }}>
           {kind === "plugin"
             ? "Hypertaks installs with three modes: direct sync to a registered agent, repo download, or copyable config snippet. Skills ride along in the installer bundle."
             : kind === "skill"
               ? "Skills download through the managed installer and can sync into each agent skill folder the user owns."
-              : "Newest curated agents stay featured at the top. Install + register only what you choose."}
+              : kind === "connector"
+                ? "Social and external multi-platform publishing connectors (Twitter/X, LinkedIn, YouTube, TikTok, Meta). Credential handles stay local; manual setup gates guide live onboarding."
+                : "Newest curated agents stay featured at the top. Install + register only what you choose."}
         </div>
         <CatalogGrid kind={kind} onAdded={refresh} />
       </Panel>

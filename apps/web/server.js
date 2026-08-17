@@ -129,6 +129,55 @@ RELEASE_MOD.then(m => { releaseLib = m; }).catch(e => console.error("[release-ch
 const SOURCE_UPDATE_MOD = import("./lib/source-update.mjs");
 let sourceUpdateLib = null;
 SOURCE_UPDATE_MOD.then(m => { sourceUpdateLib = m; }).catch(e => console.error("[source-update]", e.message));
+
+const WORK_LIFECYCLE_MOD = import("./lib/work-lifecycle.mjs");
+let workLifecycleLib = null;
+WORK_LIFECYCLE_MOD.then(m => { workLifecycleLib = m; }).catch(e => console.error("[work-lifecycle]", e.message));
+
+const PUBLISHING_DOMAIN_MOD = import("./lib/publishing-domain.mjs");
+let publishingDomainLib = null;
+PUBLISHING_DOMAIN_MOD.then(m => { publishingDomainLib = m; }).catch(e => console.error("[publishing-domain]", e.message));
+
+const PUBLISHING_GATEWAY_MOD = import("./lib/publishing-gateway.mjs");
+let publishingGatewayLib = null;
+PUBLISHING_GATEWAY_MOD.then(m => { publishingGatewayLib = m; }).catch(e => console.error("[publishing-gateway]", e.message));
+
+const PUBLISHING_SCHEDULER_MOD = import("./lib/publishing-scheduler.mjs");
+let publishingSchedulerLib = null;
+PUBLISHING_SCHEDULER_MOD.then(m => { publishingSchedulerLib = m; }).catch(e => console.error("[publishing-scheduler]", e.message));
+
+function getWorkStore(services = DEFAULT_RUNTIME_SERVICES) {
+  if (!workLifecycleLib) return null;
+  if (!services._workStore) {
+    services._workStore = workLifecycleLib.createWorkLifecycleStore({ vaultRoot: services.vaultPath, stateRoot: services.stateRoot });
+  }
+  return services._workStore;
+}
+
+function getPublishingStore(services = DEFAULT_RUNTIME_SERVICES) {
+  if (!publishingDomainLib) return null;
+  if (!services._publishingStore) {
+    services._publishingStore = publishingDomainLib.createPublishingStore({ vaultRoot: services.vaultPath, stateRoot: services.stateRoot });
+  }
+  return services._publishingStore;
+}
+
+function getPublishingGateway(services = DEFAULT_RUNTIME_SERVICES) {
+  if (!publishingGatewayLib) return null;
+  if (!services._publishingGateway) {
+    const store = getPublishingStore(services);
+    services._publishingGateway = publishingGatewayLib.createPublishingGateway({ store });
+  }
+  return services._publishingGateway;
+}
+
+function getPublishingScheduler(services = DEFAULT_RUNTIME_SERVICES, approvalQueue = null) {
+  if (!publishingSchedulerLib) return null;
+  const store = getPublishingStore(services);
+  const gateway = getPublishingGateway(services);
+  return publishingSchedulerLib.createPublishingScheduler({ gateway, store, approvalQueue });
+}
+
 /* PUBLIC = tracked static source. Runtime avatars live in the ignored state root so
    Vite cannot copy a user's uploads into dist during a production build.
    DIST = the built React app (`npm run build`). Requests resolve DIST first, then
@@ -3432,13 +3481,180 @@ function requestHandler(req, res, services = DEFAULT_RUNTIME_SERVICES) {
             json(res, r.error ? 400 : 200, r);
           });
         });
-      if (url === "/api/catalog") {
-        return json(res, 405, { error: "GET only" });
+      // === WORK LIFECYCLE API ===
+      if (url === "/api/work/missions" && req.method === "GET") {
+        const store = getWorkStore(services);
+        if (!store) return json(res, 503, { error: "work lifecycle store loading" });
+        const u = new URL(req.url, "http://localhost");
+        const projectId = u.searchParams.get("projectId");
+        return json(res, 200, { missions: store.listMissions(projectId) });
       }
-      if (url === "/api/agents/install" && req.method === "POST")
-        return json(res, 410, {
-          error: "use POST /api/marketplace/:id/install with an operationId",
+      if (url === "/api/work/missions" && req.method === "POST") {
+        return readBody(req, res, body => {
+          let d; try { d = JSON.parse(body); } catch { return json(res, 400, { error: "body must be JSON" }); }
+          const store = getWorkStore(services);
+          if (!store) return json(res, 503, { error: "work lifecycle store loading" });
+          try {
+            const m = store.saveMission(workLifecycleLib.createMission(d));
+            json(res, 201, m);
+          } catch (e) {
+            json(res, 400, { error: e.message });
+          }
         });
+      }
+      m = url.match(/^\/api\/work\/missions\/([\w-]+)$/);
+      if (m && req.method === "GET") {
+        const store = getWorkStore(services);
+        if (!store) return json(res, 503, { error: "work lifecycle store loading" });
+        const mission = store.getMission(m[1]);
+        return json(res, mission ? 200 : 404, mission || { error: "mission not found" });
+      }
+      if (m && req.method === "PATCH") {
+        const missionId = m[1];
+        return readBody(req, res, body => {
+          let d; try { d = JSON.parse(body); } catch { return json(res, 400, { error: "body must be JSON" }); }
+          const store = getWorkStore(services);
+          if (!store) return json(res, 503, { error: "work lifecycle store loading" });
+          const mission = store.getMission(missionId);
+          if (!mission) return json(res, 404, { error: "mission not found" });
+          try {
+            const updated = store.saveMission(workLifecycleLib.transitionMission(mission, d.status, { reason: d.reason, actor: d.actor }));
+            json(res, 200, updated);
+          } catch (e) {
+            json(res, 400, { error: e.message });
+          }
+        });
+      }
+      if (url === "/api/work/contracts" && req.method === "POST") {
+        return readBody(req, res, body => {
+          let d; try { d = JSON.parse(body); } catch { return json(res, 400, { error: "body must be JSON" }); }
+          const store = getWorkStore(services);
+          if (!store) return json(res, 503, { error: "work lifecycle store loading" });
+          try {
+            const contract = store.saveWorkContract(workLifecycleLib.createWorkContract(d));
+            json(res, 201, contract);
+          } catch (e) {
+            json(res, 400, { error: e.message });
+          }
+        });
+      }
+      if (url === "/api/work/runs" && req.method === "POST") {
+        return readBody(req, res, body => {
+          let d; try { d = JSON.parse(body); } catch { return json(res, 400, { error: "body must be JSON" }); }
+          const store = getWorkStore(services);
+          if (!store) return json(res, 503, { error: "work lifecycle store loading" });
+          try {
+            const run = store.saveRun(workLifecycleLib.createRun(d));
+            json(res, 201, run);
+          } catch (e) {
+            json(res, 400, { error: e.message });
+          }
+        });
+      }
+
+      // === SOCIAL PUBLISHING API ===
+      if (url === "/api/social/campaigns" && req.method === "GET") {
+        const store = getPublishingStore(services);
+        if (!store) return json(res, 503, { error: "publishing store loading" });
+        const u = new URL(req.url, "http://localhost");
+        const projectId = u.searchParams.get("projectId");
+        return json(res, 200, { campaigns: store.listCampaigns(projectId) });
+      }
+      if (url === "/api/social/campaigns" && req.method === "POST") {
+        return readBody(req, res, body => {
+          let d; try { d = JSON.parse(body); } catch { return json(res, 400, { error: "body must be JSON" }); }
+          const store = getPublishingStore(services);
+          const gateway = getPublishingGateway(services);
+          if (!store || !gateway) return json(res, 503, { error: "publishing modules loading" });
+          try {
+            const campaign = store.saveCampaign(publishingDomainLib.createCampaign(d));
+            const variants = gateway.generateVariants(campaign);
+            json(res, 201, { campaign, variants });
+          } catch (e) {
+            json(res, 400, { error: e.message });
+          }
+        });
+      }
+      m = url.match(/^\/api\/social\/campaigns\/([\w-]+)$/);
+      if (m && req.method === "GET") {
+        const store = getPublishingStore(services);
+        if (!store) return json(res, 503, { error: "publishing store loading" });
+        const campaign = store.getCampaign(m[1]);
+        if (!campaign) return json(res, 404, { error: "campaign not found" });
+        const variants = store.listVariantsForCampaign(m[1]);
+        const jobs = store.listJobsForCampaign(m[1]);
+        const receipts = jobs.map(j => store.getReceiptForJob(j.jobId)).filter(Boolean);
+        return json(res, 200, { campaign, variants, jobs, receipts });
+      }
+      m = url.match(/^\/api\/social\/campaigns\/([\w-]+)\/schedule$/);
+      if (m && req.method === "POST") {
+        const campaignId = m[1];
+        return readBody(req, res, async body => {
+          let d = {}; try { if (body) d = JSON.parse(body); } catch {}
+          const store = getPublishingStore(services);
+          const scheduler = getPublishingScheduler(services);
+          if (!store || !scheduler) return json(res, 503, { error: "publishing scheduler loading" });
+          const campaign = store.getCampaign(campaignId);
+          if (!campaign) return json(res, 404, { error: "campaign not found" });
+          try {
+            const result = await scheduler.scheduleCampaign(campaign, { approvalRef: d.approvalRef, scheduledFor: d.scheduledFor });
+            json(res, 200, result);
+          } catch (e) {
+            json(res, 400, { error: e.message });
+          }
+        });
+      }
+      m = url.match(/^\/api\/social\/campaigns\/([\w-]+)\/publish$/);
+      if (m && req.method === "POST") {
+        const campaignId = m[1];
+        return readBody(req, res, async body => {
+          let d = {}; try { if (body) d = JSON.parse(body); } catch {}
+          const store = getPublishingStore(services);
+          const queue = await APPROVAL_QUEUE;
+          const scheduler = getPublishingScheduler(services, queue);
+          if (!store || !scheduler) return json(res, 503, { error: "publishing scheduler loading" });
+          try {
+            const result = await scheduler.processCampaign(campaignId, { connectorConfigs: d.connectorConfigs || {}, approvalId: d.approvalId });
+            json(res, 200, result);
+          } catch (e) {
+            json(res, 400, { error: e.message });
+          }
+        });
+      }
+      m = url.match(/^\/api\/social\/campaigns\/([\w-]+)\/retry$/);
+      if (m && req.method === "POST") {
+        const campaignId = m[1];
+        return readBody(req, res, async body => {
+          let d = {}; try { if (body) d = JSON.parse(body); } catch {}
+          const scheduler = getPublishingScheduler(services);
+          if (!scheduler) return json(res, 503, { error: "publishing scheduler loading" });
+          try {
+            const result = await scheduler.retryFailedJobs(campaignId, { connectorConfigs: d.connectorConfigs || {} });
+            json(res, 200, result);
+          } catch (e) {
+            json(res, 400, { error: e.message });
+          }
+        });
+      }
+      if (url === "/api/social/connectors" && req.method === "GET") {
+        const store = getPublishingStore(services);
+        if (!store) return json(res, 503, { error: "publishing store loading" });
+        return json(res, 200, { connectors: store.listConnectors() });
+      }
+      if (url === "/api/social/connectors" && req.method === "POST") {
+        return readBody(req, res, body => {
+          let d; try { d = JSON.parse(body); } catch { return json(res, 400, { error: "body must be JSON" }); }
+          const store = getPublishingStore(services);
+          if (!store) return json(res, 503, { error: "publishing store loading" });
+          try {
+            const conn = store.saveConnectorProfile(publishingDomainLib.createConnectorProfile(d));
+            json(res, 201, conn);
+          } catch (e) {
+            json(res, 400, { error: e.message });
+          }
+        });
+      }
+
       if (url === "/api/version") return json(res, 200, versionInfo());
       if (url === "/api/update" && req.method === "POST")
         return withApproval(req, res, "system.update", "dashboard", () => {

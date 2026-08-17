@@ -187,5 +187,6 @@ export function redactSecrets(text) {
     .replace(/(ghp_[a-zA-Z0-9]{36})/g, '[REDACTED_GITHUB_TOKEN]')
     .replace(/(xox[baprs]-[a-zA-Z0-9-]+)/g, '[REDACTED_SLACK_TOKEN]')
     .replace(/(AIzaSy[a-zA-Z0-9_-]{33})/g, '[REDACTED_GOOGLE_KEY]')
-    .replace(/("?(?:password|secret|api_key|token)"?\s*:\s*)"[^"]+"/gi, '$1"[REDACTED]"');
+    .replace(/(Bearer\s+)[a-zA-Z0-9_\-\.]{20,}/gi, '$1[REDACTED_BEARER_TOKEN]')
+    .replace(/("?(?:password|secret|api_key|token|access_token|refresh_token|oauth_token|publish_secret|secret_key)"?\s*:\s*)"[^"]+"/gi, '$1"[REDACTED]"');
 }

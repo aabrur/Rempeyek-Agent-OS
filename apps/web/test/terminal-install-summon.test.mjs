@@ -6,7 +6,7 @@ import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
 const { resolveSummonProfile } = require("../lib/summon-profile.cjs");
 
-test("resolveSummonProfile prefers install home over shared OS workdir", () => {
+test("resolveSummonProfile sets cwd to Rempeyek Agent OS directory while preserving agent home", () => {
   const stateRoot = "C:\\AppData\\Local\\Rempeyek-Agent-OS";
   const agent = {
     id: "custom-cli",
@@ -19,12 +19,12 @@ test("resolveSummonProfile prefers install home over shared OS workdir", () => {
   };
 
   const profile = resolveSummonProfile(agent, { stateRoot });
-  assert.equal(profile.cwd, "C:\\Users\\user\\.custom");
+  assert.equal(profile.cwd, stateRoot);
   assert.equal(profile.home, "C:\\Users\\user\\.custom");
   assert.equal(profile.command, "custom");
 });
 
-test("resolveSummonProfile uses built-in kilo home when gateway has only workdir", () => {
+test("resolveSummonProfile uses stateRoot for built-in agents like kilo", () => {
   const stateRoot = "C:\\AppData\\Local\\Rempeyek-Agent-OS";
   const agent = {
     id: "kilo-code",
@@ -38,8 +38,8 @@ test("resolveSummonProfile uses built-in kilo home when gateway has only workdir
 
   const profile = resolveSummonProfile(agent, { stateRoot });
   assert.equal(profile.command, "kilo");
-  assert.match(profile.cwd.replace(/\\/g, "/"), /\.kilocode$/);
-  assert.notEqual(profile.cwd, stateRoot);
+  assert.equal(profile.cwd, stateRoot);
+  assert.match(profile.home.replace(/\\/g, "/"), /\.kilocode$/);
 });
 
 test("resolveSummonProfile falls back to state root when no home exists", () => {

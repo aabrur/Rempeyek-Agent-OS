@@ -36,16 +36,18 @@ function resolveSummonProfile(agent = {}, options = {}) {
   const canonical = builtIns[agent.id];
   const stateRoot = options.stateRoot
     || process.env.AGENT_STATE_DIR
+    || options.workdir
     || path.join(localAppData, "Rempeyek-Agent-OS");
-  // Built-in roster CLIs win over stale gateway.trigger so legacy slots stay correct.
   const command = String(canonical?.[1] || agent.gateway?.trigger || "").trim();
   const installHome = String(canonical?.[0] || agent.gateway?.home || "").trim();
-  // Prefer the per-user install/home folder (same as a manual terminal launch).
-  // Only fall back to configured workdir / shared OS root when no home exists.
-  const cwd = installHome
+  // All agents and gateways MUST be summoned and executed inside the Rempeyek Agent OS
+  // installation folder on the user's PC (stateRoot) so they immediately have full context
+  // of Vault, Projects, Memory, Tasks, and Agent OS tools.
+  const cwd = stateRoot
     || String(agent.gateway?.workdir || agent.gateway?.cwd || "").trim()
-    || stateRoot;
+    || installHome;
   return { cwd, command, home: installHome || null };
 }
 
 module.exports = { resolveSummonProfile, builtIns };
+

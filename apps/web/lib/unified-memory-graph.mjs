@@ -441,6 +441,113 @@ export function buildUnifiedMemoryGraph({ vaultPath, rootDir, configDir } = {}) 
     }
   }
 
+  // 9. Work Lifecycle (Missions, Contracts, Runs, Evidence)
+  if (vaultPath) {
+    const missionsDir = path.join(vaultPath, 'Work', 'Missions');
+    if (fs.existsSync(missionsDir)) {
+      let mFiles = [];
+      try { mFiles = fs.readdirSync(missionsDir); } catch {}
+      for (const f of mFiles) {
+        if (!f.endsWith('.json')) continue;
+        const mData = safeReadJson(path.join(missionsDir, f));
+        if (mData && mData.missionId) {
+          const mNodeId = `Mission:${mData.missionId}`;
+          addNode({
+            id: mNodeId,
+            type: 'mission',
+            label: mData.title || mData.missionId,
+            scope: 'project',
+            source: 'work-lifecycle',
+            sourcePath: `Work/Missions/${f}`,
+            updatedAt: mData.updatedAt || mData.createdAt || new Date().toISOString(),
+            status: mData.status || 'active',
+            confidence: 'verified',
+            metadata: { projectId: mData.projectId, goal: mData.goal }
+          });
+
+          if (mData.projectId) {
+            const pNodeId = `Project:${mData.projectId}`;
+            if (nodesMap.has(pNodeId)) {
+              addEdge({ source: pNodeId, target: mNodeId, type: 'HAS_MISSION', provenance: 'work-lifecycle' });
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // 10. Social Publishing (Campaigns, Variants, Jobs, Receipts, Analytics)
+  if (vaultPath) {
+    const campaignsDir = path.join(vaultPath, 'Social', 'Campaigns');
+    if (fs.existsSync(campaignsDir)) {
+      let cFiles = [];
+      try { cFiles = fs.readdirSync(campaignsDir); } catch {}
+      for (const f of cFiles) {
+        if (!f.endsWith('.json')) continue;
+        const cData = safeReadJson(path.join(campaignsDir, f));
+        if (cData && cData.campaignId) {
+          const cNodeId = `Campaign:${cData.campaignId}`;
+          addNode({
+            id: cNodeId,
+            type: 'campaign',
+            label: cData.objective?.slice(0, 40) || cData.campaignId,
+            scope: 'project',
+            source: 'social-publishing',
+            sourcePath: `Social/Campaigns/${f}`,
+            updatedAt: cData.updatedAt || cData.createdAt || new Date().toISOString(),
+            status: cData.status || 'active',
+            confidence: 'verified',
+            metadata: { targetPlatforms: cData.targetPlatforms, missionId: cData.missionId }
+          });
+
+          if (cData.missionId) {
+            const mNodeId = `Mission:${cData.missionId}`;
+            if (nodesMap.has(mNodeId)) {
+              addEdge({ source: mNodeId, target: cNodeId, type: 'PRODUCED', provenance: 'publishing-provenance' });
+            }
+          } else if (cData.projectId) {
+            const pNodeId = `Project:${cData.projectId}`;
+            if (nodesMap.has(pNodeId)) {
+              addEdge({ source: pNodeId, target: cNodeId, type: 'HAS_CAMPAIGN', provenance: 'publishing-provenance' });
+            }
+          }
+        }
+      }
+    }
+
+    const receiptsDir = path.join(vaultPath, 'Social', 'Receipts');
+    if (fs.existsSync(receiptsDir)) {
+      let rFiles = [];
+      try { rFiles = fs.readdirSync(receiptsDir); } catch {}
+      for (const f of rFiles) {
+        if (!f.endsWith('.json')) continue;
+        const rData = safeReadJson(path.join(receiptsDir, f));
+        if (rData && rData.receiptId) {
+          const rNodeId = `Receipt:${rData.receiptId}`;
+          addNode({
+            id: rNodeId,
+            type: 'receipt',
+            label: `${rData.platform}: ${rData.externalPostId || rData.receiptId}`,
+            scope: 'project',
+            source: 'social-publishing',
+            sourcePath: `Social/Receipts/${f}`,
+            updatedAt: rData.verifiedAt || rData.publishedAt || new Date().toISOString(),
+            status: rData.rawStatusClass?.toLowerCase() || 'published',
+            confidence: 'verified',
+            metadata: { platform: rData.platform, externalPostId: rData.externalPostId, externalUrl: rData.externalUrl }
+          });
+
+          if (rData.jobId) {
+            const jNodeId = `Job:${rData.jobId}`;
+            if (nodesMap.has(jNodeId)) {
+              addEdge({ source: jNodeId, target: rNodeId, type: 'PUBLISHED_AS', provenance: 'publishing-provenance' });
+            }
+          }
+        }
+      }
+    }
+  }
+
   const nodes = [...nodesMap.values()];
   const edges = [...edgesMap.values()];
 

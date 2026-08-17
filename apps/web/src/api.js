@@ -48,3 +48,40 @@ export async function api(path, opts = {}, attempt = 0) {
 export function apiResponse(path, opts = {}) {
   return request(path, opts);
 }
+
+export async function getMissions(projectId) {
+  return api(`/api/work/missions${projectId ? `?projectId=${encodeURIComponent(projectId)}` : ''}`);
+}
+
+export async function createMission(data) {
+  return api('/api/work/missions', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(data) });
+}
+
+export async function patchMission(missionId, data) {
+  return api(`/api/work/missions/${encodeURIComponent(missionId)}`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify(data) });
+}
+
+export async function getCampaigns(projectId) {
+  return api(`/api/social/campaigns${projectId ? `?projectId=${encodeURIComponent(projectId)}` : ''}`);
+}
+
+export async function createCampaign(data) {
+  return api('/api/social/campaigns', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(data) });
+}
+
+export async function scheduleCampaign(campaignId, data = {}) {
+  return api(`/api/social/campaigns/${encodeURIComponent(campaignId)}/schedule`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(data) });
+}
+
+export async function publishCampaign(campaignId, data = {}) {
+  return api(`/api/social/campaigns/${encodeURIComponent(campaignId)}/publish`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(data) });
+}
+
+export async function retryCampaign(campaignId, data = {}) {
+  return api(`/api/social/campaigns/${encodeURIComponent(campaignId)}/retry`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(data) });
+}
+
+export async function getConnectors() {
+  return api('/api/social/connectors');
+}
+

@@ -123,8 +123,12 @@ function TodayContext({ today }) {
   const tasks = today.unfinishedTasks || [];
   const decisions = today.project?.decisions || [];
   const artifacts = today.recentArtifacts || [];
+  const campaign = today.activeCampaign || today.publishingContinuity?.activeCampaign || null;
+  const publishing = today.publishingContinuity || null;
+
   return <section className="today-context" aria-labelledby="today-context-title"><h2 id="today-context-title" className="sr-only">Current project details</h2>
     <article className="today-panel"><h3>Unfinished tasks <span className="cnt">{tasks.length}</span></h3><ul className="today-list">{tasks.slice(0, 5).map((task, index) => <li key={task.id || index}><StatusChip status={task.status} /><span>{task.title}</span></li>)}{!tasks.length && <li className="muted">No unfinished tasks.</li>}</ul></article>
+    {campaign && <article className="today-panel"><h3>Active distribution <span className="cnt">{campaign.status}</span></h3><div className="campaign-continuity-card"><p><strong>{campaign.objective}</strong></p><div className="campaign-meta"><span><b>Platforms:</b> {(campaign.targetPlatforms || []).join(", ")}</span>{publishing?.failedPlatforms?.length > 0 && <span className="failed-tag"><b>Failed:</b> {publishing.failedPlatforms.join(", ")}</span>}</div></div></article>}
     <article className="today-panel"><h3>Decision context <span className="cnt">{decisions.length}</span></h3><ul className="today-list">{decisions.slice(0, 4).map((decision, index) => <li key={decision.id || index}><span>{decision.text || decision.label || String(decision)}</span></li>)}{!decisions.length && <li className="muted">No decision record is available.</li>}</ul></article>
     <article className="today-panel"><h3>Recent output <span className="cnt">{artifacts.length}</span></h3><ul className="today-list">{artifacts.slice(0, 5).map((artifact, index) => { const notePath = artifact.path || artifact.rel || artifact.target; return <li key={notePath || index}>{notePath ? <a href={obsUri(notePath)}>{artifact.label || notePath.split("/").pop()}</a> : <span>{artifact.label || "Project output"}</span>}</li>; })}{!artifacts.length && <li className="muted">No recent output.</li>}</ul></article>
   </section>;

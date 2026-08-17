@@ -8,6 +8,8 @@ const require = createRequire(import.meta.url);
 const { resolveSummonProfile } = require("../lib/summon-profile.cjs");
 
 const home = os.homedir();
+const stateRoot = path.join(process.env.LOCALAPPDATA || path.join(home, "AppData", "Local"), "Rempeyek-Agent-OS");
+
 const expected = [
   ["claude-code", path.join(home, ".claude"), "claude"],
   ["cline", path.join(home, ".cline"), "cline"],
@@ -21,33 +23,31 @@ const expected = [
   ["command-code", path.join(home, ".commandcode"), "cmdc"],
 ];
 
-test("built-in agents summon from their requested homes with their requested CLIs", () => {
-  for (const [id, cwd, command] of expected) {
-    assert.deepEqual(resolveSummonProfile({ id, gateway: {} }), { cwd, command, home: cwd });
+test("built-in agents summon inside Rempeyek Agent OS state directory with their requested CLIs", () => {
+  for (const [id, homeDir, command] of expected) {
+    const profile = resolveSummonProfile({ id, gateway: {} }, { stateRoot });
+    assert.equal(profile.cwd, stateRoot);
+    assert.equal(profile.command, command);
+    assert.equal(profile.home, homeDir);
   }
 });
 
-test("legacy Copilot slot summons Codex instead of Copilot", () => {
-  assert.deepEqual(resolveSummonProfile({
+test("legacy Copilot slot summons Codex inside Rempeyek Agent OS directory", () => {
+  const profile = resolveSummonProfile({
     id: "copilot",
     gateway: { home: path.join(home, ".copilot"), trigger: "copilot" },
-  }), { cwd: path.join(home, ".codex"), command: "codex", home: path.join(home, ".codex") });
+  }, { stateRoot });
+  assert.equal(profile.cwd, stateRoot);
+  assert.equal(profile.command, "codex");
+  assert.equal(profile.home, path.join(home, ".codex"));
 });
 
-test("custom agents retain their trusted configured summon profile", () => {
-  assert.deepEqual(resolveSummonProfile({
+test("custom agents summon inside Rempeyek Agent OS directory with their configured command", () => {
+  const profile = resolveSummonProfile({
     id: "custom-agent",
     gateway: { home: "C:\\Agents\\Custom", trigger: "custom-cli --interactive" },
-  }), { cwd: "C:\\Agents\\Custom", command: "custom-cli --interactive", home: "C:\\Agents\\Custom" });
-});
-
-test("install home wins over shared app-state workdir so gateway matches summon", () => {
-  assert.deepEqual(resolveSummonProfile({
-    id: "custom-agent",
-    gateway: {
-      home: "C:\\Agents\\Custom",
-      workdir: "C:\\Users\\test\\AppData\\Local\\Rempeyek-Agent-OS",
-      trigger: "custom-cli",
-    },
-  }), { cwd: "C:\\Agents\\Custom", command: "custom-cli", home: "C:\\Agents\\Custom" });
+  }, { stateRoot });
+  assert.equal(profile.cwd, stateRoot);
+  assert.equal(profile.command, "custom-cli --interactive");
+  assert.equal(profile.home, "C:\\Agents\\Custom");
 });
