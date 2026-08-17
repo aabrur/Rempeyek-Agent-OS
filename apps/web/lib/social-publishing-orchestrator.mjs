@@ -16,6 +16,20 @@ function adapterFor(adapters, platform) {
   return adapter;
 }
 
+function validateContractAuthority(campaign, authority) {
+  if (!authority || authority.allowed !== true) throw new Error("verified Work Contract authority is required");
+  if (authority.capability !== "social.publish") throw new Error("Work Contract authority capability mismatch");
+  if (authority.projectId !== campaign.projectId || authority.missionId !== campaign.missionId) {
+    throw new Error("Work Contract authority scope mismatch");
+  }
+  if (authority.campaignId && authority.campaignId !== campaign.id) throw new Error("Work Contract authority target mismatch");
+  if (Array.isArray(authority.platforms)) {
+    const allowed = new Set(authority.platforms);
+    if (campaign.platforms.some(platform => !allowed.has(platform))) throw new Error("Work Contract authority platform mismatch");
+  }
+  return true;
+}
+
 export function createSocialPublishingOrchestrator({
   store,
   approvalQueue,
@@ -44,9 +58,10 @@ export function createSocialPublishingOrchestrator({
     return { campaign: persist(next), approval };
   };
 
-  const authorize = campaign => {
+  const authorize = (campaign, { contractAuthority } = {}) => {
     if (campaign.status === "ready" && campaign.approvalPolicy.mode === "within-contract") {
-      const queued = transitionCampaign(campaign, "queued", { now, summary: "Queued under Work Contract authority" });
+      validateContractAuthority(campaign, contractAuthority);
+      const queued = transitionCampaign(campaign, "queued", { now, summary: "Queued under verified Work Contract authority" });
       queued.jobs = queued.jobs.map(job => transitionJob(job, "queued", { now }));
       return persist(queued);
     }
