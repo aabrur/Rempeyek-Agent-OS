@@ -19,13 +19,14 @@ async function withRuntime(run) {
   }
 }
 
-function campaign() {
+function campaign(overrides = {}) {
   return createSocialCampaign({
     projectId: "project-1",
     missionId: "mission-1",
     title: "Launch",
     platforms: ["instagram", "tiktok"],
     masterContent: { title: "Launch", message: "Platform-native campaign." },
+    ...overrides,
   });
 }
 
@@ -53,6 +54,32 @@ test("requires scoped approval before external publishing and consumes it once",
   assert.deepEqual(calls.sort(), ["instagram", "tiktok"]);
   assert.equal(queue.authorize(requested.approval.id, { type: "social.publish", target: current.id }).allowed, false);
   assert.equal(result.receipt.jobs.every(job => job.status === "live"), true);
+}));
+
+test("within-contract mode cannot self-authorize without verified matching authority", async () => withRuntime(async ({ store }) => {
+  const queue = createApprovalQueue();
+  const orchestrator = createSocialPublishingOrchestrator({ store, approvalQueue: queue });
+  let current = orchestrator.prepare(campaign({ approvalPolicy: { mode: "within-contract" } }));
+
+  assert.throws(() => orchestrator.authorize(current), /verified Work Contract authority is required/);
+  assert.throws(() => orchestrator.authorize(current, { contractAuthority: {
+    allowed: true,
+    capability: "social.publish",
+    projectId: "wrong-project",
+    missionId: current.missionId,
+    campaignId: current.id,
+    platforms: current.platforms,
+  } }), /scope mismatch/);
+
+  current = orchestrator.authorize(current, { contractAuthority: {
+    allowed: true,
+    capability: "social.publish",
+    projectId: current.projectId,
+    missionId: current.missionId,
+    campaignId: current.id,
+    platforms: current.platforms,
+  } });
+  assert.equal(current.status, "queued");
 }));
 
 test("partial failure preserves live posts and retries only failed jobs", async () => withRuntime(async ({ store }) => {
