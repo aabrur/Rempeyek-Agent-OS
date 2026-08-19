@@ -16,7 +16,7 @@ export function AutoUpdateModal({
   if (!open) return null;
 
   const phase = desktopUpdate?.phase || "idle";
-  const version = desktopUpdate?.version || "2.4.2";
+  const version = desktopUpdate?.version || "";
   const percent = desktopUpdate?.percent;
 
   const handleSelfRepair = async () => {
@@ -28,7 +28,7 @@ export function AutoUpdateModal({
         sessionStorage.clear();
       } catch {}
       await new Promise(r => setTimeout(r, 600));
-      setRepairHint("Checking for verified v2.4.2 update build…");
+      setRepairHint("Checking for verified update build…");
       if (typeof onCheck === "function") {
         await onCheck();
       }
@@ -95,7 +95,7 @@ export function AutoUpdateModal({
                 Auto Update Available
               </h2>
               <span style={{ fontSize: "12px", color: "#38bdf8", fontWeight: "600" }}>
-                Rempeyek Agent OS v{version}
+                Rempeyek Agent OS{version ? ` v${version}` : ""}
               </span>
             </div>
           </div>
@@ -168,7 +168,7 @@ export function AutoUpdateModal({
             <Btn variant="primary" onClick={onRestart} disabled={desktopBusy}>
               {desktopBusy ? "Restarting…" : "Restart & Apply Update"}
             </Btn>
-          ) : phase === "available" || phase === "error" || phase === "idle" ? (
+          ) : phase === "available" || phase === "error" ? (
             <Btn variant="primary" onClick={onDownload} disabled={desktopBusy}>
               {desktopBusy ? "Working…" : "Download & Install"}
             </Btn>

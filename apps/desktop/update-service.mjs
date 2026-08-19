@@ -138,7 +138,12 @@ export function createUpdateService({
       },
       checkNow,
       downloadNow() {
-        if (state.phase !== "available" && state.phase !== "error") {
+        if (state.phase === "error") {
+          // Re-check first: a direct downloadUpdate() after a network error would
+          // fail immediately again without a fresh update-available signal.
+          return checkNow();
+        }
+        if (state.phase !== "available") {
           return Promise.resolve({ ...state });
         }
         publish({ phase: "downloading", percent: 0, error: null });

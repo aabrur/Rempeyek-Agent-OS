@@ -178,3 +178,66 @@ test("unexpected updater errors expose only a bounded user-safe message", () => 
     checkedAt: null,
   });
 });
+test("downloadNow from error phase re-checks before downloading so users are not stuck", async () => {
+  // Regression: when phase==="error" the user clicks "Download & Install".
+  // The previous code called autoUpdater.downloadUpdate() directly, which would
+  // immediately fail again if the network was the problem.  The fix must call
+  // checkForUpdates() first so the update-available event can re-arm the download.
+  let checkCount = 0;
+  let downloadCount = 0;
+  const autoUpdater = new FakeUpdater();
+  const _origCheck = autoUpdater.checkForUpdates.bind(autoUpdater);
+  autoUpdater.checkForUpdates = () => {
+    checkCount += 1;
+    return _origCheck();
+  };
+  const _origDownload = autoUpdater.downloadUpdate.bind(autoUpdater);
+  autoUpdater.downloadUpdate = () => {
+    downloadCount += 1;
+    return _origDownload();
+  };
+
+  const service = createUpdateService({
+    autoUpdater,
+    settingsStore: stableSettings,
+    lifecycleBusy: () => false,
+    emit: () => {},
+    setIntervalImpl: () => 1,
+    clearIntervalImpl: () => {},
+  });
+
+  // Drive into error state
+  autoUpdater.emit("error", new Error("network timeout"));
+  assert.equal(service.snapshot().phase, "error");
+
+  // User clicks "Download & Install" from error state
+  await service.downloadNow();
+
+  // Must have re-checked (not just tried to download into the void)
+  assert.equal(checkCount >= 1, true, "downloadNow from error must call checkForUpdates first");
+  assert.equal(downloadCount, 0,
+    "downloadNow from error should NOT call downloadUpdate directly without a fresh available signal");
+});
+
+test("downloadNow from error phase transitions to checking phase, not straight to downloading", async () => {
+  const autoUpdater = new FakeUpdater();
+  const phases = [];
+  const service = createUpdateService({
+    autoUpdater,
+    settingsStore: stableSettings,
+    lifecycleBusy: () => false,
+    emit: state => phases.push(state.phase),
+    setIntervalImpl: () => 1,
+    clearIntervalImpl: () => {},
+  });
+
+  autoUpdater.emit("error", new Error("connection refused"));
+  assert.equal(service.snapshot().phase, "error");
+
+  const downloadPromise = service.downloadNow();
+  // The very first emitted phase after calling downloadNow must be "checking", not "downloading"
+  await downloadPromise;
+  const firstPhaseAfterCall = phases[phases.findIndex(p => p !== "error")];
+  assert.equal(firstPhaseAfterCall, "checking",
+    "downloadNow from error must emit 'checking' before any download phase");
+});
