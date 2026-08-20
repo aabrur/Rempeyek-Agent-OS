@@ -18,7 +18,7 @@ The bootstrap system (`apps/web/lib/bootstrap.mjs`) executes 10 sequential setup
    Scaffolds the directory structure for your local Neural Vault (`Vault/System`, `Vault/Memory`, `Vault/Graph`, `Vault/Agents`), populating initial README templates and metadata stores.
 
 4. **Initialize AI Family Registry**
-   Scans registered agents and writes `Vault/System/AI-Family/family-registry.json` and human-readable `family-registry.md`, indexing active node IDs, roles, and capability trees.
+   Writes `Vault/System/AI-Family/family-registry.json` from currently registered agents. When none are registered, the registry starts with zero agents and `nodeCount` is 0.
 
 5. **Initialize Shared Memory Engine**
    Creates `Vault/Memory/Shared/index.json` to enable cross-agent episodic memory, daily logs, and shared task tracking.
@@ -53,7 +53,7 @@ The report file is located at `<REMPEYEK_RUNTIME_ROOT>/Config/bootstrap-report.j
     "runtimeDirs": { "status": "created", "path": ".../Rempeyek-Agent-OS" },
     "manifest": { "status": "created" },
     "vault": { "status": "scaffolded" },
-    "familyRegistry": { "status": "initialized", "nodeCount": 4 },
+    "familyRegistry": { "status": "initialized", "nodeCount": 0 },
     "sharedMemory": { "status": "initialized" },
     "graphify": { "status": "initialized" },
     "skills": { "status": "initialized" },

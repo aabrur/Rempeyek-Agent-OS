@@ -5,6 +5,7 @@ import path from "node:path";
 import test from "node:test";
 
 import { createSystemDoctor } from "../lib/system-doctor.mjs";
+import { APP_VERSION } from "../lib/version.mjs";
 
 function createTestDoctorEnvironment() {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "doctor-test-"));
@@ -213,6 +214,28 @@ test("System Doctor aborts repair if pre-repair backup fails", async () => {
 
     assert.equal(repairResult.ok, false);
     assert.equal(repairResult.error.includes("backup failed"), true);
+  } finally {
+    env.cleanup();
+  }
+});
+
+test("desktop check falls back to APP_VERSION when services.appVersion is omitted", async () => {
+  const env = createTestDoctorEnvironment();
+  try {
+    delete env.services.appVersion;
+    const doctor = createSystemDoctor({
+      services: env.services,
+      loadConfig: () => env.mockConfig,
+      saveConfig: () => {},
+      backupEngine: env.mockBackupEngine,
+      migrationEngine: env.mockMigrationEngine,
+      processManager: env.mockProcessManager,
+    });
+    const report = await doctor.scan();
+    const desktop = report.checks.find(c => c.id === "desktop_runtime");
+    assert.ok(desktop);
+    assert.match(desktop.details, new RegExp(`Version: ${APP_VERSION.replace(/\./g, "\\.")}`));
+    assert.equal(desktop.details.includes("Version: 2.4.2"), false);
   } finally {
     env.cleanup();
   }

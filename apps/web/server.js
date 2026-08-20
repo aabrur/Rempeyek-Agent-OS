@@ -5,6 +5,7 @@
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
+const APP_VERSION = "2.4.3";
 const net = require("net");
 const os = require("os");
 const { spawn, execFile, spawnSync } = require("child_process");
@@ -3815,7 +3816,7 @@ function requestHandler(req, res, services = DEFAULT_RUNTIME_SERVICES) {
               exportId: `diag_${Date.now()}`,
               exportedAt: new Date().toISOString(),
               system: {
-                appVersion: "2.4.2",
+                appVersion: APP_VERSION,
                 platform: process.platform,
                 arch: process.arch,
                 nodeVersion: process.version,

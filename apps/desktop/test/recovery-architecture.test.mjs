@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { APP_VERSION } from "../../web/lib/version.mjs";
 import {
   createBootWatchdog,
   createIncidentRecord,
@@ -81,4 +82,9 @@ test("createBootWatchdog handles repeated crash loop prevention", () => {
   assert.deepEqual(watchdog.recordRetryAttempt(2), { retryAllowed: true, attempt: 2 });
   assert.deepEqual(watchdog.recordRetryAttempt(3), { retryAllowed: true, attempt: 3 });
   assert.deepEqual(watchdog.recordRetryAttempt(4), { retryAllowed: false, attempt: 4 });
+});
+
+test("createIncidentRecord default appVersion matches APP_VERSION", () => {
+  const incident = createIncidentRecord({ error: new Error("boot") });
+  assert.equal(incident.appVersion, APP_VERSION);
 });

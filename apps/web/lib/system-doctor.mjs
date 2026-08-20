@@ -2,6 +2,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
+import { APP_VERSION } from "./version.mjs";
+
 export function createSystemDoctor({
   services = {},
   loadConfig = () => ({ agents: [], projects: [] }),
@@ -34,7 +36,7 @@ export function createSystemDoctor({
       category: "DESKTOP",
       status: "healthy",
       summary: "Electron desktop runtime environment active",
-      details: `Electron: ${process.versions?.electron || "Node.js runtime"}, Packaged: ${services.isPackaged ?? false}, Version: ${services.appVersion || "2.4.2"}`,
+      details: `Electron: ${process.versions?.electron || "Node.js runtime"}, Packaged: ${services.isPackaged ?? false}, Version: ${services.appVersion || APP_VERSION}`,
       repairable: false,
       repairAction: null,
       risk: "none",

@@ -12,7 +12,7 @@ React + Vite, split into components across an npm-workspaces monorepo.
 
 ## Download for Windows
 
-[![Download v2.4.2](https://img.shields.io/badge/Download-v2.4.2-ff8a00?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/aabrur/Rempeyek-Agent-OS/releases/tag/v2.4.2)
+[![Download v2.4.3](https://img.shields.io/badge/Download-v2.4.3-ff8a00?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/aabrur/Rempeyek-Agent-OS/releases/tag/v2.4.3)
 
 **The installer and direct download are free.** Most users only need to click
 the button above. No GitHub account, Git, Node.js, npm, or repository clone is
@@ -29,12 +29,12 @@ required.
 
 ### Install
 
-1. Open the public **v2.4.2** release above.
+1. Open the public **v2.4.3** release above.
 2. Download the NSIS installer and the published `SHA256SUMS.txt` from that same release.
 3. Verify the downloaded installer against `SHA256SUMS.txt` in PowerShell:
 
    ```powershell
-   Get-FileHash "$HOME\Downloads\Rempeyek-Agent-OS-Setup-2.4.2.exe" -Algorithm SHA256
+   Get-FileHash "$HOME\Downloads\Rempeyek-Agent-OS-Setup-2.4.3.exe" -Algorithm SHA256
    ```
 
 4. Open the installer only when the hash and release publisher match.
@@ -46,7 +46,7 @@ Official releases include published `SHA256SUMS.txt` checksum files for release 
 
 ### Updates
 
-The desktop updater supports automated background checks, release manifest verification via `latest.yml`, and a one-click update flow. When the in-app updater finds v2.3.9, click the update control and let the desktop app restart after the download is ready. This public release is unsigned, so manual downloads must be verified against `SHA256SUMS.txt`. User settings, installed-agent records, telemetry, avatars, and Vault data remain in place across application upgrades.
+The desktop updater supports automated background checks, release manifest verification via `latest.yml`, and a one-click update flow. When the in-app updater finds a newer verified release, click the update control and let the desktop app restart after the download is ready. This public release is unsigned, so manual downloads must be verified against `SHA256SUMS.txt`. User settings, installed-agent records, telemetry, avatars, and Vault data remain in place across application upgrades.
 
 ## Features
 

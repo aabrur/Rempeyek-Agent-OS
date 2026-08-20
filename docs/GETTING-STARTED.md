@@ -9,7 +9,7 @@ Welcome to **Rempeyek Agent OS**, an autonomous multi-agent operating system des
 Before installing Rempeyek Agent OS, ensure your system meets the following requirements:
 
 * **Node.js**: Version **18.0.0** or higher (LTS recommended).
-* **Operating System**: Windows 10/11, macOS 12+ (Intel/Apple Silicon), or Linux (Ubuntu 20.04+, Debian 11+, Fedora 36+).
+* **Operating System**: Windows 10/11. The public desktop installer is Windows x64.
 * **Git**: Installed and accessible in your system terminal.
 
 ---
@@ -54,7 +54,7 @@ When you run Rempeyek Agent OS for the first time, the system automatically runs
 1. Creating runtime directories (`Config/`, `Vault/`, `Logs/`, `Cache/`, `Backups/`, `Quarantine/`, `Temp/`, `Runtime/`, `Updates/`, `Packages/`, `Agents/`).
 2. Creating a system manifest tracking application version and execution mode.
 3. Scaffolding your local **Neural Vault** structure for persistent note, memory, and graph storage.
-4. Initializing the **AI Family Registry** and registering system agents.
+4. Initializing the **AI Family Registry** with zero agents. You add agents yourself from Marketplace.
 5. Setting up **Shared Memory** indexes and **Graphify** knowledge links.
 6. Generating a deny-by-default security access policy (`Config/access-policy.json`).
 
