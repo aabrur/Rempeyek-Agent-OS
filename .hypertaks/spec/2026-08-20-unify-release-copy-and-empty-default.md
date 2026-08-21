@@ -10,7 +10,7 @@
 
 ## Global Constraints
 
-- Repo root: `C:/Users/abrur/Documents/Rempeyek-Agent-Os`
+- Repo root: this checkout (do not hardcode an owner-specific absolute path)
 - Slice A only. Do not persist WorkUnit/Verification (Plan B). Do not split `requestHandler`.
 - Do not git commit unless the Boss explicitly asks. Skip every Commit step until then.
 - Do not edit `CHANGELOG.md` historical `## [2.4.2]` / `## [2.3.9]` sections.
@@ -543,3 +543,12 @@ Skip unless the Boss says to commit.
 ## Plan B (not written)
 
 Persist `saveWorkUnit` / `saveVerification` to `Vault/Work/...` with a cold-restart test. Separate plan, after this slice ships.
+
+## Execution notes (2026-08-21)
+
+- Tasks 1-5 already landed in `dd1fdd8`.
+- Task 6 web: `npm test` → 419/419 pass, fail 0.
+- Task 6 desktop: `node --test test/recovery-architecture.test.mjs test/package-config.test.mjs` → 10/10 pass.
+- Extra this session: TDD lock for uncommitted P0 hardening (CANCELLED, credentialRef `$SECRET_`, maxHashtags, approval fail-closed). RED 4 fail without impl, GREEN 23/23 with impl.
+- Spec leaked an owner-specific absolute Windows path; stripped so `public-release.test.mjs` stays green.
+- No git commit (Boss did not ask).
