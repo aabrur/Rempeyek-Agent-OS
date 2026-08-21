@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { writeJsonAtomic, loadDurableJson } from './durable-config.mjs';
 
 export const MISSION_STATUSES = Object.freeze([
   'DRAFT',
@@ -60,6 +61,7 @@ export const WORK_UNIT_STATUSES = Object.freeze([
   'COMPLETED',
   'FAILED',
   'RETRYING',
+  'CANCELLED',
 ]);
 
 export const WORK_UNIT_TRANSITIONS = Object.freeze({
@@ -70,6 +72,7 @@ export const WORK_UNIT_TRANSITIONS = Object.freeze({
   BLOCKED: new Set(['READY', 'RUNNING', 'FAILED']),
   RETRYING: new Set(['READY', 'RUNNING', 'FAILED']),
   COMPLETED: new Set([]),
+  CANCELLED: new Set([]),
   FAILED: new Set(['RETRYING', 'READY', 'RUNNING']),
 });
 
@@ -230,6 +233,7 @@ export function createWorkUnit(input = {}) {
     failureReason: input.failureReason || null,
     createdAt: input.createdAt || now,
     updatedAt: input.updatedAt || now,
+    schemaVersion: 1,
   };
 }
 
@@ -343,7 +347,7 @@ export function createWorkLifecycleStore({ vaultRoot, stateRoot } = {}) {
 
   const workDir = vaultRoot ? path.join(vaultRoot, 'Work') : null;
   if (workDir) {
-    for (const sub of ['Missions', 'Contracts', 'Runs', 'Evidence', 'Verifications', 'Handoffs']) {
+    for (const sub of ['Missions', 'Contracts', 'Runs', 'WorkUnits', 'Evidence', 'Verifications', 'Handoffs']) {
       try { fs.mkdirSync(path.join(workDir, sub), { recursive: true }); } catch {}
     }
   }
@@ -440,10 +444,25 @@ export function createWorkLifecycleStore({ vaultRoot, stateRoot } = {}) {
     },
     saveWorkUnit(unit) {
       memory.units.set(unit.workUnitId, { ...unit });
+      if (workDir) {
+        const file = path.join(workDir, 'WorkUnits', `${unit.workUnitId}.json`);
+        try { writeJsonAtomic(file, unit, { backup: true }); } catch {}
+      }
       return { ...unit };
     },
     getWorkUnit(workUnitId) {
-      return memory.units.get(workUnitId) ? { ...memory.units.get(workUnitId) } : null;
+      if (memory.units.has(workUnitId)) return { ...memory.units.get(workUnitId) };
+      if (workDir) {
+        const file = path.join(workDir, 'WorkUnits', `${workUnitId}.json`);
+        const result = loadDurableJson(file, {
+          fallback: () => ({ workUnitId, runId: null, title: 'recovered-empty' }),
+        });
+        if (result.source !== 'fallback' || result.data.workUnitId === workUnitId) {
+          memory.units.set(workUnitId, result.data);
+          return { ...result.data };
+        }
+      }
+      return null;
     },
     saveEvidence(ev) {
       memory.evidence.set(ev.evidenceId, { ...ev });
@@ -490,10 +509,25 @@ export function createWorkLifecycleStore({ vaultRoot, stateRoot } = {}) {
     },
     saveVerification(verification) {
       memory.verifications.set(verification.verificationId, { ...verification });
+      if (workDir) {
+        const file = path.join(workDir, 'Verifications', `${verification.verificationId}.json`);
+        try { writeJsonAtomic(file, verification, { backup: true }); } catch {}
+      }
       return { ...verification };
     },
     getVerification(verificationId) {
-      return memory.verifications.get(verificationId) ? { ...memory.verifications.get(verificationId) } : null;
+      if (memory.verifications.has(verificationId)) return { ...memory.verifications.get(verificationId) };
+      if (workDir) {
+        const file = path.join(workDir, 'Verifications', `${verificationId}.json`);
+        const result = loadDurableJson(file, {
+          fallback: () => ({ verificationId, missionId: null, criteriaChecks: [] }),
+        });
+        if (result.source !== 'fallback' || result.data.verificationId === verificationId) {
+          memory.verifications.set(verificationId, result.data);
+          return { ...result.data };
+        }
+      }
+      return null;
     },
     saveHandoff(handoff) {
       memory.handoffs.set(handoff.handoffId, { ...handoff });

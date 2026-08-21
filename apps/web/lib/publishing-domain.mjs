@@ -298,7 +298,16 @@ export function createConnectorProfile(input = {}) {
     capabilities: Array.isArray(input.capabilities)
       ? input.capabilities.map(String)
       : ['social.content.generate', 'social.publish.execute', 'social.analytics.read'],
-    credentialRef: input.credentialRef ? String(input.credentialRef) : `$SECRET_${connectorId.toUpperCase().replace(/[^A-Z0-9]/g, '_')}`,
+    credentialRef: (() => {
+      if (input.credentialRef) {
+        const ref = String(input.credentialRef);
+        if (!/^\$SECRET_[A-Z0-9_]+$/.test(ref)) {
+          throw new Error('credentialRef must be a valid $SECRET_<HANDLE> reference');
+        }
+        return ref;
+      }
+      return `$SECRET_${connectorId.toUpperCase().replace(/[^A-Z0-9]/g, '_')}`;
+    })(),
     isManualSetupRequired: input.isManualSetupRequired !== undefined ? Boolean(input.isManualSetupRequired) : true,
     schemaVersion: 1,
   };

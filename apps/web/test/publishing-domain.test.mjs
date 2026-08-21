@@ -134,6 +134,15 @@ test('ConnectorProfile safeguards credentials with indirect handles', () => {
   assert.equal(connector.status, 'CONNECTED');
   assert.equal(connector.credentialRef, '$SECRET_TWITTER_OAUTH_TOKEN');
   assert.ok(!JSON.stringify(connector).includes('bearer'));
+
+  assert.throws(
+    () => createConnectorProfile({
+      platform: 'twitter',
+      accountName: 'official_rempeyek',
+      credentialRef: 'sk_live_not_a_handle',
+    }),
+    /credentialRef must be a valid \$SECRET_/,
+  );
 });
 
 test('PublishingStore provides atomic persistence for social entities', () => {

@@ -134,6 +134,24 @@ test('Approval Queue blocks unauthorized execution until explicitly authorized',
   assert.equal(store.getPublicationJob(job.jobId).status, 'LIVE');
 });
 
+test('Scheduler fail-closes when approvalRef exists but no approval queue is configured', async () => {
+  const store = createPublishingStore();
+  const gateway = createPublishingGateway({ store });
+  const scheduler = createPublishingScheduler({ gateway, store });
+
+  const campaign = store.saveCampaign(createCampaign({
+    projectId: 'p-1',
+    objective: 'Must not publish without an approval queue',
+    targetPlatforms: ['twitter'],
+  }));
+
+  const { jobs } = await scheduler.scheduleCampaign(campaign, { approvalRef: 'orphan-approval-ref' });
+  const pass = await scheduler.processCampaign(campaign.campaignId);
+  assert.equal(store.getPublicationJob(jobs[0].jobId).status, 'BLOCKED');
+  assert.equal(pass.results[0].status, 'BLOCKED');
+  assert.match(String(pass.results[0].error), /no approval queue configured/i);
+});
+
 test('Publishing context packet is bounded, clean, and records memory outcomes', () => {
   const campaign = createCampaign({
     projectId: 'p-apollo',

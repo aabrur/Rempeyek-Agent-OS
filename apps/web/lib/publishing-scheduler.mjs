@@ -83,8 +83,15 @@ export function createPublishingScheduler({
           continue;
         }
 
-        // Check approval if required
-        if (approvalQueue && job.approvalRef) {
+        // Check approval if required — fail-closed when approvalRef exists
+        if (job.approvalRef) {
+          if (!approvalQueue) {
+            const blockedJob = transitionPublicationJob(job, 'BLOCKED', { reason: 'Approval required but no approval queue configured' });
+            store.savePublicationJob(blockedJob);
+            results.push({ job: blockedJob, error: 'Approval required but no approval queue configured', status: 'BLOCKED' });
+            hasFailure = true;
+            continue;
+          }
           const auth = approvalQueue.authorize(job.approvalRef, {
             type: 'social.publish.execute',
             target: job.jobId,

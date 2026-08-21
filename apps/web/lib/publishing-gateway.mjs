@@ -125,6 +125,10 @@ export function validatePlatformVariant(variant) {
     errors.push(`Ratio '${variant.ratio}' is not allowed on ${platform} (supported: ${limits.allowedRatios.join(', ')})`);
   }
 
+  if (limits.maxHashtags && variant.metadata && Array.isArray(variant.metadata.hashtags) && variant.metadata.hashtags.length > limits.maxHashtags) {
+    errors.push(`Hashtag count (${variant.metadata.hashtags.length}) exceeds ${platform} limit (${limits.maxHashtags})`);
+  }
+
   const valid = errors.length === 0;
   return {
     ...variant,

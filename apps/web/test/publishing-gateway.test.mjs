@@ -77,6 +77,16 @@ test('Preflight validator flags character overflows, missing titles, and invalid
   const tiktokCheck = validatePlatformVariant(wideTikTok);
   assert.equal(tiktokCheck.validationState, 'INVALID');
   assert.ok(tiktokCheck.errors.some(e => e.includes('Ratio \'16:9\' is not allowed on tiktok')));
+
+  const tooManyTags = createPlatformVariant({
+    campaignId: 'c-1',
+    platform: 'twitter',
+    copy: 'Ship it',
+    metadata: { hashtags: ['#a', '#b', '#c', '#d', '#e', '#f'] },
+  });
+  const tagCheck = validatePlatformVariant(tooManyTags);
+  assert.equal(tagCheck.validationState, 'INVALID');
+  assert.ok(tagCheck.errors.some(e => e.includes('Hashtag count')));
 });
 
 test('Sandbox publishing provider simulates live publishing, verification, and analytics', async () => {
