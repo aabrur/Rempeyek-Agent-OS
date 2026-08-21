@@ -1,6 +1,6 @@
 {
   "name": "@rempeyek/desktop",
-  "version": "2.4.3",
+  "version": "2.4.4",
   "description": "Secure Windows desktop shell for Rempeyek Agent OS.",
   "author": "Rempeyek Agent OS Contributors",
   "private": true,
@@ -18,7 +18,7 @@
   },
   "devDependencies": {
     "electron": "43.2.0",
-    "electron-builder": "26.15.3",
+    "electron-builder": "^24.13.3",
     "png-to-ico": "3.0.2",
     "sharp": "0.35.3"
   },

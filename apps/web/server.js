@@ -5,7 +5,7 @@
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
-const APP_VERSION = "2.4.3";
+const APP_VERSION = "2.4.4";
 const net = require("net");
 const os = require("os");
 const { spawn, execFile, spawnSync } = require("child_process");

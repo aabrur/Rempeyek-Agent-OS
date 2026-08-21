@@ -3,6 +3,15 @@
 All notable changes to Rempeyek Agent OS. The in-app update banner compares the local version
 against the latest GitHub Release of this repository - tag releases as `v<version>`.
 
+## [2.4.4] - 2026-08-21
+
+### Added
+- **Versioned Release Copy**: README badges, installer download links, SHA256 verification path, and docs all locked to `2.4.4`.
+- **P0 Security Closure**: credentialRef validation, maxHashtags preflight, fail-closed approval queue.
+
+### Changed
+- Version bump `2.4.3` → `2.4.4` across `version.mjs`, all `package.json` files, `package-lock.json`, `server.js`, `index.html`, `boot-recovery.mjs`, and README.
+
 ## [2.4.3] - 2026-08-17
 
 ### Added
