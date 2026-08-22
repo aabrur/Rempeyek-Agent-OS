@@ -5,7 +5,7 @@
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
-const APP_VERSION = "2.4.4";
+const APP_VERSION = "2.4.5";
 const net = require("net");
 const os = require("os");
 const { spawn, execFile, spawnSync } = require("child_process");
@@ -3257,7 +3257,7 @@ function requestHandler(req, res, services = DEFAULT_RUNTIME_SERVICES) {
             }),
           );
         });
-      if (url === "/api/state") {
+      if (url === "/api/state" || url === "/api/config") {
         try {
           if (services === DEFAULT_RUNTIME_SERVICES) {
             const state = buildState();

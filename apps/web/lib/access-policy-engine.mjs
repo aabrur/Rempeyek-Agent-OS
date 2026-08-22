@@ -29,7 +29,7 @@ export function getDefaultSystemPaths(env = process.env, platform = process.plat
     localAppData,
     runtimeRoot,
     sharedVault: env.REMPEYEK_VAULT_PATH || pathModule.join(runtimeRoot, 'Vault'),
-    centralSkillsWarehouse: env.REMPEYEK_SKILLS_PATH || pathModule.join(home, '.skills'),
+    centralSkillsWarehouse: env.REMPEYEK_SKILLS_PATH || (env.AGENT_STATE_DIR || env.REMPEYEK_RUNTIME_ROOT ? pathModule.join(runtimeRoot, '.skills') : pathModule.join(home, '.skills')),
     agentsRuntimeState: pathModule.join(runtimeRoot, 'Agents'),
     sharedGraphifyData: pathModule.join(runtimeRoot, 'Vault', '.graphify'),
     systemConfig: pathModule.join(runtimeRoot, 'Config'),

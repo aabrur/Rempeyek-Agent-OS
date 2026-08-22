@@ -28,12 +28,22 @@ function useTime() {
   return `${pad(time.getHours())}:${pad(time.getMinutes())}:${pad(time.getSeconds())}`;
 }
 
-function TopBar({ map, agents, load }) {
+function TopBar({ map, agents, load, stateError, loadError }) {
   const clock = useTime();
   const errors = agents.filter(a => a.proc?.status === "error" || a.proc?.status === "exited").length;
-  const status = errors ? "DEGRADED" : "OPTIMAL";
+  const isWarn = Boolean(stateError || loadError || errors);
+  const status = stateError
+    ? "API UNAVAILABLE"
+    : loadError
+      ? "PARTIAL DATA"
+      : errors
+        ? "DEGRADED"
+        : !agents.length
+          ? "READY"
+          : "HEALTHY";
   const buf = load?.current || [];
-  const loadPct = buf.length ? Math.round(buf[buf.length - 1] * 100) : 0;
+  const hasLoad = Boolean(buf.length && !stateError);
+  const loadPct = hasLoad ? Math.round(buf[buf.length - 1] * 100) : null;
   return (
     <div className="cosmos-topbar">
       <div className="cosmos-topbar-left">
@@ -45,12 +55,12 @@ function TopBar({ map, agents, load }) {
       </div>
       <div className="cosmos-topbar-right">
         <div className="cosmos-stat">
-          <span className={`cosmos-stat-label ${errors ? "is-warn" : "is-ok"}`}><i aria-hidden="true" /> SYSTEM STATUS</span>
+          <span className={`cosmos-stat-label ${isWarn ? "is-warn" : "is-ok"}`}><i aria-hidden="true" /> SYSTEM STATUS</span>
           <b>{status}</b>
         </div>
         <div className="cosmos-stat">
           <span className="cosmos-stat-label">NETWORK LOAD</span>
-          <b className="is-amber">{loadPct}%</b>
+          <b className={hasLoad ? "is-amber" : "is-muted"}>{loadPct !== null ? `${loadPct}%` : "N/A"}</b>
         </div>
         <div className="cosmos-clock" aria-label={`Local time ${clock}`}>{clock}</div>
       </div>
@@ -91,7 +101,7 @@ function EvidenceTable({ map, onSelect }) {
 }
 
 /** The Agent Map: the cosmos constellation view. Default landing view. */
-export function AgentMapView({ state, load, onOpenAgent, onView }) {
+export function AgentMapView({ state, load, stateError, onOpenAgent, onView }) {
   const agents = state.agents || [];
   const reducedMotion = Boolean(useReducedMotion());
   const effectsOn = useEffectsEnabled();
@@ -182,7 +192,7 @@ export function AgentMapView({ state, load, onOpenAgent, onView }) {
 
   return <LazyMotion features={domAnimation}>
     <section className="view active cosmos-view" aria-label="Agent Map">
-      <TopBar map={map} agents={agents} load={load} />
+      <TopBar map={map} agents={agents} load={load} stateError={stateError} loadError={loadError} />
       {loadError && <div className="cosmos-alert" role="alert">Relationship evidence could not be refreshed: {loadError}. Showing the current agent records without inferred edges.</div>}
 
       <div className="cosmos-stage-row">

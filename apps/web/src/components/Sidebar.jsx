@@ -31,12 +31,23 @@ function NavButton({ item, view, onView }) {
   );
 }
 
-export function Sidebar({ view, onView, agents = [], agency, vault }) {
+export function Sidebar({ view, onView, agents = [], agency, vault, stateError }) {
   const clock = useClock();
   const [brandTop, ...brandRest] = String(agency || "REMPEYEK AGENT OS").split(" ");
   const upList = agents.map(a => a.uptime?.pct).filter(v => typeof v === "number");
-  const health = upList.length ? Math.round((upList.reduce((s, v) => s + v, 0) / upList.length) * 10) / 10 : null;
+  const baseHealth = upList.length ? Math.round((upList.reduce((s, v) => s + v, 0) / upList.length) * 10) / 10 : null;
+  const health = stateError ? null : baseHealth;
   const issues = agents.filter(a => a.proc?.status === "error" || a.proc?.status === "exited").length;
+
+  const healthNote = stateError
+    ? "API UNAVAILABLE"
+    : health === null
+      ? (agents.length ? "NO UPTIME DATA YET" : "NO AGENTS REGISTERED")
+      : issues
+        ? `${issues} GATEWAY ISSUE${issues > 1 ? "S" : ""}`
+        : "ALL SYSTEMS NOMINAL";
+
+  const isWarn = Boolean(stateError || issues);
 
   return (
     <aside className="sidebar" aria-label="Application sidebar">
@@ -68,10 +79,10 @@ export function Sidebar({ view, onView, agents = [], agency, vault }) {
           <span className="side-health-label">SYSTEM HEALTH</span>
           <div className="side-health-row">
             <div className="side-health-bar"><i style={{ width: `${health ?? 0}%` }} /></div>
-            <b>{health === null ? "-" : `${health}%`}</b>
+            <b>{stateError ? "OFFLINE" : health === null ? "-" : `${health}%`}</b>
           </div>
-          <span className={`side-health-note ${issues ? "is-warn" : ""}`.trim()}>
-            ● {health === null ? "NO UPTIME DATA YET" : issues ? `${issues} GATEWAY ISSUE${issues > 1 ? "S" : ""}` : "ALL SYSTEMS NOMINAL"}
+          <span className={`side-health-note ${isWarn ? "is-warn" : ""}`.trim()}>
+            ● {healthNote}
           </span>
         </div>
         <span>{clock}</span>

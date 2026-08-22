@@ -3,6 +3,18 @@
 All notable changes to Rempeyek Agent OS. The in-app update banner compares the local version
 against the latest GitHub Release of this repository - tag releases as `v<version>`.
 
+## [2.4.5] - 2026-08-23
+
+### Added
+- **Truthful Global System Health**: Real-time reachability (`HEALTHY`, `DEGRADED`, `PARTIAL DATA`, `API UNAVAILABLE`, `READY`) across Sidebar, Agent Map TopBar, and Observatory; eliminates false `OPTIMAL` / `ALL SYSTEMS NOMINAL` during API or backend disconnects.
+- **Structured API Error Classification**: Standardized typed error codes (`SERVER_UNAVAILABLE`, `TIMEOUT`, `AUTH_REQUIRED`, `AUTH_INVALID`, `FORBIDDEN`, `NOT_FOUND`, `SERVER_ERROR`, `MALFORMED_RESPONSE`) in `api.js`.
+- **Knowledge Graph Truthfulness**: Neural Graph canvas cleanly distinguishes loading state, offline/error status, and empty vaults.
+- **Skills Sync Test Isolation**: Isolated `centralSkillsWarehouse` path resolution during testing and custom runtime root execution.
+- **Dependency Audit & Desktop Security**: Pinned `electron-builder: 26.15.3` resolving dependency vulnerabilities.
+
+### Changed
+- Version bump `2.4.4` → `2.4.5` across all packages, README, version.mjs, server.js, index.html, and boot-recovery.mjs.
+
 ## [2.4.4] - 2026-08-21
 
 ### Added

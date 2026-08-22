@@ -98,7 +98,9 @@ export function NeuralGraphCanvas({ active, theme }) {
       <header className="graph-bar">
         <div className="graph-heading">
           <span className="graph-title">UNIFIED NEURAL MEMORY</span>
-          <span className="graph-counts" aria-live="polite">{projection.counts.nodes} nodes · {projection.counts.edges} edges</span>
+          <span className="graph-counts" aria-live="polite">
+            {error ? "Graph unavailable" : !data ? "Loading graph…" : `${projection.counts.nodes} nodes · ${projection.counts.edges} edges`}
+          </span>
         </div>
         <input aria-label="Search Vault graph nodes" className="graph-search" type="search" placeholder="Search knowledge, notes or modules…"
           value={query} onChange={event => setQuery(event.target.value)} onKeyDown={event => { if (event.key === "Enter") selectFirstMatch(); }} />

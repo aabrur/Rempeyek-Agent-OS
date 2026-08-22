@@ -10,12 +10,18 @@ const visible = () => document.visibilityState === "visible";
 export function useDashboard() {
   const [state, setState] = useState(null);
   const [error, setError] = useState(null);
+  const [errorCode, setErrorCode] = useState(null);
   const loadRef = useRef([]);   // rolling running/total ratio, max 40 samples
 
   const refresh = useCallback(async () => {
     const s = await api("/api/state");
-    if (!s || s.error) { setError(s?.error || "server not responding"); return; }
+    if (!s || s.error) {
+      setError(s?.error || "Server unreachable");
+      setErrorCode(s?.code || "SERVER_UNAVAILABLE");
+      return;
+    }
     setError(null);
+    setErrorCode(null);
     if (s.vault) setVaultAbs(s.vault);
     if (Array.isArray(s.agents)) {
       const running = s.agents.filter(a => a.proc?.status === "running").length;
@@ -34,7 +40,7 @@ export function useDashboard() {
     return () => { clearInterval(id); document.removeEventListener("visibilitychange", onVis); };
   }, [refresh]);
 
-  return { state, error, refresh, load: loadRef };
+  return { state, error, errorCode, refresh, load: loadRef };
 }
 
 /** Vault health + Windows schedule. Expensive (git/schtasks) → polled slowly. */

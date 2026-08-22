@@ -64,6 +64,7 @@ export default function App() {
           agents={state?.agents || []}
           agency={state?.agency}
           vault={state?.vault}
+          stateError={error}
         />
 
         <main className={`main${view === "map" && state ? " main-flush" : ""}`} id="main-content" tabIndex="-1">
@@ -74,12 +75,12 @@ export default function App() {
             <section className="app-state" role="status" aria-live="polite">
               <div className="skeleton-block" aria-hidden="true" />
               <h1>{error ? "Workspace unavailable" : "Opening your workspace"}</h1>
-              <p>{error ? "Rempeyek could not reach the local service. Your Vault remains untouched." : "Reading projects, recent activity, and the next useful action…"}</p>
+              <p>{error ? `Rempeyek could not reach the local service (${error}). Your Vault remains untouched.` : "Reading projects, recent activity, and the next useful action…"}</p>
               {error && <button className="btn btn-primary" onClick={refresh}>Try again</button>}
             </section>
           ) : view === "map" ? (
             <Suspense fallback={<div className="cosmos-view" role="status"><div className="skeleton-block" style={{ margin: 24, flex: 1 }} /><span className="sr-only">Loading Agent Map…</span></div>}>
-              <AgentMapView state={state} load={load} onOpenAgent={openAgentDetail} onView={setView} />
+              <AgentMapView state={state} load={load} stateError={error} onOpenAgent={openAgentDetail} onView={setView} />
             </Suspense>
           ) : view === "agents" ? (
             <AgentsView

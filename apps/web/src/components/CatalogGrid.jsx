@@ -22,10 +22,10 @@ export function CatalogGrid({ onAdded, kind = "all" }) {
     api("/api/marketplace").then(response => {
       if (alive.current && response.entries) setEntries(response.entries);
     });
-    api("/api/config").then(cfg => {
-      if (alive.current && cfg.agents) {
-        setUserAgents(cfg.agents);
-        if (cfg.agents.length && !targetAgent) setTargetAgent(cfg.agents[0].id);
+    api("/api/state").then(state => {
+      if (alive.current && state?.agents) {
+        setUserAgents(state.agents);
+        if (state.agents.length && !targetAgent) setTargetAgent(state.agents[0].id);
       }
     });
   };
