@@ -202,6 +202,7 @@ test("ManagedProcessManager handles stop and prevents killing unowned PIDs", asy
     const pm = createManagedProcessManager({
       logDir: env.logDir,
       recordsPath: env.recordsPath,
+      platform: "win32",
       spawnImpl: mockSpawn,
       execFileImpl: mockExecFile,
       listChildPidsImpl: () => Promise.resolve([98766]),

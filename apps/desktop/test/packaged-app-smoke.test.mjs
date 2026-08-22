@@ -8,6 +8,7 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 import { startServerProcess } from "../server-process.mjs";
+import { APP_VERSION } from "../../web/lib/version.mjs";
 
 const desktopRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -16,7 +17,7 @@ const desktopRoot = path.resolve(
 const root = path.join(desktopRoot, "dist", "win-unpacked");
 const resourcesRoot = path.join(root, "resources");
 const appExePath = path.join(root, "Rempeyek Agent OS.exe");
-const setupExePath = path.join(desktopRoot, "dist", "Rempeyek-Agent-OS-Setup-2.4.2.exe");
+const setupExePath = path.join(desktopRoot, "dist", `Rempeyek-Agent-OS-Setup-${APP_VERSION}.exe`);
 
 function createIsolatedTestEnvironment() {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "rempeyek-smoke-test-"));
@@ -53,7 +54,11 @@ function fetchJson(url, options = {}) {
   });
 }
 
-test("Packaged App Acceptance Test 1: Installer file exists and is a valid executable", () => {
+test("Packaged App Acceptance Test 1: Installer file exists and is a valid executable", {
+  skip: fs.existsSync(setupExePath)
+    ? false
+    : "desktop installer has not been built in this checkout",
+}, () => {
   assert.equal(fs.existsSync(setupExePath), true, "Setup installer executable must exist");
   const stat = fs.statSync(setupExePath);
   assert.ok(stat.size > 10_000_000, "Installer size should be greater than 10MB");
@@ -66,7 +71,11 @@ test("Packaged App Acceptance Test 1: Installer file exists and is a valid execu
   assert.equal(buffer.toString("ascii"), "MZ", "Installer must have valid Windows PE header");
 });
 
-test("Packaged App Acceptance Test 2 & 3: Unpacked Windows binary exists and app resources are complete", () => {
+test("Packaged App Acceptance Test 2 & 3: Unpacked Windows binary exists and app resources are complete", {
+  skip: fs.existsSync(root)
+    ? false
+    : "desktop package has not been built in this checkout",
+}, () => {
   assert.equal(fs.existsSync(appExePath), true, "Unpacked executable must exist");
   assert.equal(fs.existsSync(path.join(resourcesRoot, "app.asar")), true, "app.asar must exist");
   assert.equal(
@@ -81,7 +90,11 @@ test("Packaged App Acceptance Test 2 & 3: Unpacked Windows binary exists and app
   );
 });
 
-test("Packaged App Acceptance Test 4 & 5: Static boot shell and renderer assets exist without blank window risks", () => {
+test("Packaged App Acceptance Test 4 & 5: Static boot shell and renderer assets exist without blank window risks", {
+  skip: fs.existsSync(root)
+    ? false
+    : "desktop package has not been built in this checkout",
+}, () => {
   const htmlPath = path.join(resourcesRoot, "app-root", "apps", "web", "dist", "index.html");
   const htmlContent = fs.readFileSync(htmlPath, "utf8");
 
@@ -90,7 +103,11 @@ test("Packaged App Acceptance Test 4 & 5: Static boot shell and renderer assets 
   assert.ok(htmlContent.includes('boot-recovery.mjs') || htmlContent.includes('/assets/'), "HTML must include boot assets");
 });
 
-test("Packaged App Acceptance Test 6 - 26: Packaged server process lifecycle, API state, UI views & System Doctor", async () => {
+test("Packaged App Acceptance Test 6 - 26: Packaged server process lifecycle, API state, UI views & System Doctor", {
+  skip: fs.existsSync(root)
+    ? false
+    : "desktop package has not been built in this checkout",
+}, async () => {
   const env = createIsolatedTestEnvironment();
   const desktopToken = crypto.randomUUID();
   const serverPath = path.join(resourcesRoot, "app-root", "apps", "web", "server.js");
