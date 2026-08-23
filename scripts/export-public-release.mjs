@@ -54,4 +54,18 @@ try {
   process.exit(1);
 }
 
-console.log("\nExport complete. Public files are ready in dist-release/.\n");
+// Keep the latest installer in project root and clean up older versions
+try {
+  const rootFiles = fs.readdirSync(ROOT);
+  for (const file of rootFiles) {
+    if (file.startsWith("Rempeyek-Agent-OS-Setup-") && file.endsWith(".exe") && file !== `Rempeyek-Agent-OS-Setup-${version}.exe`) {
+      fs.rmSync(path.join(ROOT, file), { force: true });
+    }
+  }
+  fs.copyFileSync(installerPath, path.join(ROOT, `Rempeyek-Agent-OS-Setup-${version}.exe`));
+  console.log(`Root installer synced: Rempeyek-Agent-OS-Setup-${version}.exe`);
+} catch (e) {
+  console.warn("Could not sync root installer:", e.message);
+}
+
+console.log("\nExport complete. Public files are ready in dist-release/ and project root.\n");
