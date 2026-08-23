@@ -4,21 +4,21 @@ import { api } from "../api";
 import { desktopRuntime } from "../lib/desktop-runtime.mjs";
 import { approveAction } from "../hooks/useGateway";
 import { releaseState } from "../../lib/release-check.mjs";
-import { AutoUpdateModal } from "./AutoUpdateModal";
 
 const CHECK_KEY = "aos-release-check";
 const CHECK_TTL = 12 * 3600 * 1000;
 const DESKTOP_UPDATE_ERROR =
   "The desktop updater could not complete this request. Try again from Settings.";
 
-export function UpdateBanner() {
+export function UpdateBanner({ onView }) {
   const [runtime] = useState(() => desktopRuntime(
     globalThis.window?.rempeyekDesktop,
   ));
   const [desktopInfo, setDesktopInfo] = useState(null);
   const [desktopUpdate, setDesktopUpdate] = useState(null);
   const [desktopBusy, setDesktopBusy] = useState(false);
-  const [showModal, setShowModal] = useState(false);
+  const [dismissed, setDismissed] = useState(false);
+  const [lastVersion, setLastVersion] = useState("");
   const [rel, setRel] = useState(null);
   const [phase, setPhase] = useState("idle");
   const [tail, setTail] = useState([]);
@@ -30,7 +30,7 @@ export function UpdateBanner() {
     if (runtime.desktop) {
       runtime.getRuntime().then(value => {
         if (alive.current) setDesktopInfo(value);
-      }).catch(error => {
+      }).catch(() => {
         if (alive.current) {
           setDesktopUpdate({ phase: "error", error: DESKTOP_UPDATE_ERROR });
         }
@@ -38,8 +38,9 @@ export function UpdateBanner() {
       const unsubscribe = runtime.onUpdateState(value => {
         if (alive.current) {
           setDesktopUpdate(value);
-          if (value?.phase === "available" || value?.phase === "ready") {
-            setShowModal(true);
+          if (value?.version && value.version !== lastVersion) {
+            setLastVersion(value.version);
+            setDismissed(false);
           }
         }
       });
@@ -97,13 +98,13 @@ export function UpdateBanner() {
       });
       if (state.updateAvailable) {
         setRel(state);
-        setShowModal(true);
+        setDismissed(false);
       }
     })();
     return () => {
       alive.current = false;
     };
-  }, [runtime]);
+  }, [runtime, lastVersion]);
 
   const sourceUpdate = async () => {
     const approvalId = await approveAction(
@@ -145,45 +146,6 @@ export function UpdateBanner() {
     );
   };
 
-  const desktopAction = async () => {
-    setDesktopBusy(true);
-    try {
-      if (desktopUpdate?.phase === "ready") {
-        await runtime.restartToUpdate();
-      } else if (desktopUpdate?.phase === "available") {
-        const next = await runtime.downloadUpdate();
-        if (next) setDesktopUpdate(next);
-      } else {
-        const next = await runtime.checkForUpdates();
-        if (next) setDesktopUpdate(next);
-      }
-    } catch (error) {
-      setDesktopUpdate({
-        ...desktopUpdate,
-        phase: "error",
-        error: DESKTOP_UPDATE_ERROR,
-      });
-    } finally {
-      setDesktopBusy(false);
-    }
-  };
-
-  const desktopCheck = async () => {
-    setDesktopBusy(true);
-    try {
-      const next = await runtime.checkForUpdates();
-      if (next) setDesktopUpdate(next);
-    } catch (error) {
-      setDesktopUpdate({
-        ...desktopUpdate,
-        phase: "error",
-        error: DESKTOP_UPDATE_ERROR,
-      });
-    } finally {
-      setDesktopBusy(false);
-    }
-  };
-
   const desktopDownload = async () => {
     setDesktopBusy(true);
     try {
@@ -215,126 +177,186 @@ export function UpdateBanner() {
     }
   };
 
+  const handleOpenSettings = () => {
+    if (typeof onView === "function") {
+      onView("settings");
+    }
+  };
+
+  if (dismissed) return null;
+
   if (runtime.desktop) {
     if (!desktopInfo?.packaged) return null;
     const updatePhase = desktopUpdate?.phase || "idle";
     if (updatePhase === "idle" || updatePhase === "not-available") return null;
     const percent = desktopUpdate?.percent;
+    const version = desktopUpdate?.version || "";
+
     return (
-      <>
+      <div className="update-toast-container" role="region" aria-label="Update notification">
         <div
-          className={`update-banner phase-${updatePhase}`}
+          className={`update-toast phase-${updatePhase}`}
           role="status"
           aria-live="polite"
         >
-          <div className="update-banner-row">
-            <span className="update-banner-badge" aria-hidden="true">⬆</span>
+          <div className="update-toast-header">
+            <div className="update-toast-head-left">
+              <div className="update-toast-icon" aria-hidden="true">🚀</div>
+              <div className="update-toast-titles">
+                <span className="update-toast-title">
+                  {updatePhase === "ready"
+                    ? "Update Ready to Install"
+                    : updatePhase === "downloading"
+                    ? "Downloading Update"
+                    : updatePhase === "error"
+                    ? "Update Check Notice"
+                    : "New Update Available"}
+                </span>
+                <span className="update-toast-version">
+                  Rempeyek Agent OS{version ? ` v${version}` : ""}
+                </span>
+              </div>
+            </div>
+            <button
+              type="button"
+              className="update-toast-close"
+              onClick={() => setDismissed(true)}
+              aria-label="Dismiss update notification"
+            >
+              ✕
+            </button>
+          </div>
+
+          <div className="update-toast-body">
             {updatePhase === "ready" ? (
               <span>
-                <b>v{desktopUpdate.version} is verified and ready.</b>{" "}
-                Restart is a separate user action.
+                <b>v{version}</b> is downloaded and verified. Restart the app now to apply the update, or manage in Settings.
               </span>
             ) : updatePhase === "downloading" ? (
-              <span>
-                <b>Downloading v{desktopUpdate.version || "update"}.</b>{" "}
-                {Number.isFinite(percent) ? `${percent}%` : ""}
-              </span>
+              <div>
+                <span>Downloading update package v{version}… ({percent || 0}%)</span>
+                <div className="update-toast-progress-track">
+                  <div
+                    className="update-toast-progress-bar"
+                    style={{ width: `${percent || 0}%` }}
+                  />
+                </div>
+              </div>
             ) : updatePhase === "error" ? (
               <span>
-                <b>Desktop update check failed.</b>{" "}
-                {DESKTOP_UPDATE_ERROR}
+                Desktop update encountered an issue. You can manage or auto-fix update channels from Settings.
               </span>
             ) : (
               <span>
-                <b>
-                  {updatePhase === "checking"
-                    ? "Checking for a verified desktop update."
-                    : `v${desktopUpdate.version} is available.`}
-                </b>
-              </span>
-            )}
-            {(updatePhase === "ready" || updatePhase === "error" || updatePhase === "available") && (
-              <Btn
-                variant="primary"
-                disabled={desktopBusy}
-                onClick={() => setShowModal(true)}
-              >
-                {desktopBusy ? "Working…" : "Open Auto Update"}
-              </Btn>
-            )}
-            {(updatePhase === "checking" || updatePhase === "downloading") && (
-              <span className="update-banner-spin">
-                {updatePhase === "checking" ? "checking…" : "downloading…"}
+                A new version <b>v{version}</b> is available. You can download it directly or configure in Settings.
               </span>
             )}
           </div>
+
+          <div className="update-toast-actions">
+            {onView && (
+              <Btn variant="dim" onClick={handleOpenSettings}>
+                Settings
+              </Btn>
+            )}
+            {updatePhase === "ready" ? (
+              <Btn variant="primary" onClick={desktopRestart} disabled={desktopBusy}>
+                {desktopBusy ? "Restarting…" : "Restart & Apply"}
+              </Btn>
+            ) : updatePhase === "available" || updatePhase === "error" ? (
+              <Btn variant="primary" onClick={desktopDownload} disabled={desktopBusy}>
+                {desktopBusy ? "Working…" : "Download"}
+              </Btn>
+            ) : null}
+          </div>
         </div>
-        <AutoUpdateModal
-          open={showModal}
-          onClose={() => setShowModal(false)}
-          desktopUpdate={desktopUpdate}
-          desktopBusy={desktopBusy}
-          onCheck={desktopCheck}
-          onDownload={desktopDownload}
-          onRestart={desktopRestart}
-        />
-      </>
+      </div>
     );
   }
 
   if (!rel) return null;
+
   return (
-    <>
+    <div className="update-toast-container" role="region" aria-label="Update notification">
       <div
-        className={`update-banner phase-${phase}`}
+        className={`update-toast phase-${phase}`}
         role="status"
         aria-live="polite"
       >
-        <div className="update-banner-row">
-          <span className="update-banner-badge" aria-hidden="true">⬆</span>
+        <div className="update-toast-header">
+          <div className="update-toast-head-left">
+            <div className="update-toast-icon" aria-hidden="true">🚀</div>
+            <div className="update-toast-titles">
+              <span className="update-toast-title">
+                {phase === "done"
+                  ? "Update Complete"
+                  : phase === "failed"
+                  ? "Update Notice"
+                  : phase === "updating"
+                  ? "Updating System"
+                  : "New Version Available"}
+              </span>
+              <span className="update-toast-version">
+                Rempeyek Agent OS v{rel.latest}
+              </span>
+            </div>
+          </div>
+          <button
+            type="button"
+            className="update-toast-close"
+            onClick={() => setDismissed(true)}
+            aria-label="Dismiss update notification"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="update-toast-body">
           {phase === "done" ? (
             <span>
-              <b>Updated to v{rel.latest}.</b> UI assets are live; restart the
-              source server to load backend changes.
+              <b>Updated to v{rel.latest}.</b> UI assets are live; restart the source server to load backend changes.
             </span>
           ) : phase === "failed" ? (
             <span>
-              <b>Update did not complete.</b> Dirty or diverged checkouts stop
-              before changes are applied.
+              <b>Update did not complete.</b> Dirty or diverged checkouts stop safely. Manage in Settings.
             </span>
+          ) : phase === "updating" ? (
+            <span>Applying update v{rel.current} → v{rel.latest}…</span>
           ) : (
             <span>
-              <b>v{rel.latest} tersedia</b> (you run v{rel.current}).
+              <b>v{rel.latest}</b> is available (current: v{rel.current}). Update now or manage in Settings.
             </span>
           )}
-          {phase === "idle" && (
-            <>
-              {rel.notes && (
-                <button
-                  type="button"
-                  className="update-banner-link"
-                  onClick={() => setShowNotes(value => !value)}
-                >
-                  {showNotes ? "hide changelog" : "changelog"}
-                </button>
-              )}
-              {rel.url && (
-                <a
-                  className="update-banner-link"
-                  href={rel.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  release ↗
-                </a>
-              )}
-              <Btn variant="primary" onClick={() => setShowModal(true)}>Open Auto Update</Btn>
-            </>
+        </div>
+
+        <div className="update-toast-actions">
+          {rel.notes && phase === "idle" && (
+            <button
+              type="button"
+              className="update-banner-link"
+              onClick={() => setShowNotes(v => !v)}
+              style={{ marginRight: "auto" }}
+            >
+              {showNotes ? "hide notes" : "changelog"}
+            </button>
           )}
-          {phase === "updating" && (
-            <span className="update-banner-spin">updating…</span>
+          {onView && (
+            <Btn variant="dim" onClick={handleOpenSettings}>
+              Settings
+            </Btn>
+          )}
+          {phase === "idle" && (
+            <Btn variant="primary" onClick={sourceUpdate}>
+              Update Now
+            </Btn>
+          )}
+          {(phase === "done" || phase === "failed") && (
+            <Btn variant="dim" onClick={() => setDismissed(true)}>
+              Dismiss
+            </Btn>
           )}
         </div>
+
         {showNotes && phase === "idle" && (
           <pre className="update-banner-notes">{rel.notes}</pre>
         )}
@@ -346,15 +368,6 @@ export function UpdateBanner() {
           </pre>
         )}
       </div>
-      <AutoUpdateModal
-        open={showModal}
-        onClose={() => setShowModal(false)}
-        desktopUpdate={{ phase: "available", version: rel.latest }}
-        desktopBusy={phase === "updating"}
-        onDownload={sourceUpdate}
-        onRestart={sourceUpdate}
-        onCheck={() => {}}
-      />
-    </>
+    </div>
   );
 }

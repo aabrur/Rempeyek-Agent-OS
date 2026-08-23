@@ -69,7 +69,7 @@ export default function App() {
 
         <main className={`main${view === "map" && state ? " main-flush" : ""}`} id="main-content" tabIndex="-1">
           <ConfigBanner configError={state?.configError} stateError={error} />
-          <UpdateBanner />
+          <UpdateBanner onView={setView} />
 
           {!state ? (
             <section className="app-state" role="status" aria-live="polite">

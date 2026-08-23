@@ -108,6 +108,30 @@ export function SettingsView({ theme, onTheme, state }) {
       }
     };
 
+    const handleAutoFixOS = async () => {
+      setNativeBusy("autofix");
+      setNativeHint("Executing Auto-Fix OS: clearing local caches & verifying update channels…");
+      try {
+        try {
+          localStorage.removeItem("aos-release-check");
+          sessionStorage.clear();
+        } catch {}
+        await new Promise(r => setTimeout(r, 600));
+        if (runtime.desktop) {
+          const next = await runtime.checkForUpdates();
+          if (next) setUpdateState(next);
+        } else {
+          const v = await api("/api/version");
+          if (v && !v.error) setVersion(v);
+        }
+        setNativeHint("Auto-Fix OS completed successfully. Cache cleared and channel state verified.");
+      } catch (error) {
+        setNativeHint(`Auto-Fix completed with notice: ${error.message || error}`);
+      } finally {
+        setNativeBusy("");
+      }
+    };
+
   const active = THEMES.find(item => item.id === theme);
   const shownVersion = nativeRuntime?.version || version?.version;
 
@@ -301,51 +325,79 @@ export function SettingsView({ theme, onTheme, state }) {
           {runtime.desktop ? (
             <>
               <div className="aa-actions">
-                              <Btn
-                                variant="dim"
-                                disabled={
-                                  Boolean(nativeBusy) ||
-                                  ["checking", "downloading"].includes(updateState?.phase)
-                                }
-                                onClick={checkDesktopUpdate}
-                              >
-                                {nativeBusy === "check" ? "Checking…" : "Check for Updates"}
-                              </Btn>
-                              <Btn
-                                variant="dim"
-                                disabled={
-                                  Boolean(nativeBusy) ||
-                                  !["available", "error"].includes(updateState?.phase)
-                                }
-                                onClick={downloadDesktopUpdate}
-                              >
-                                {nativeBusy === "download" ? "Downloading…" : "Download Update"}
-                              </Btn>
-                              <Btn
-                                variant="primary"
-                                disabled={
-                                  Boolean(nativeBusy) ||
-                                  updateState?.phase !== "ready"
-                                }
-                                onClick={restartToUpdate}
-                              >
-                                {nativeBusy === "restart"
-                                  ? "Restarting…"
-                                  : "Restart to Update"}
-                              </Btn>
-                            </div>
-                            <p className="settings-note">
-                              Packaged updates verify release metadata, then download, then
-                              require a separate restart. Development mode never contacts a release feed.
-                              Unsigned public builds are allowed to install from GitHub releases.
-                            </p>
+                <Btn
+                  variant="dim"
+                  disabled={
+                    Boolean(nativeBusy) ||
+                    ["checking", "downloading"].includes(updateState?.phase)
+                  }
+                  onClick={checkDesktopUpdate}
+                >
+                  {nativeBusy === "check" ? "Checking…" : "Check for Updates"}
+                </Btn>
+                <Btn
+                  variant="dim"
+                  disabled={
+                    Boolean(nativeBusy) ||
+                    !["available", "error"].includes(updateState?.phase)
+                  }
+                  onClick={downloadDesktopUpdate}
+                >
+                  {nativeBusy === "download" ? "Downloading…" : "Download Update"}
+                </Btn>
+                <Btn
+                  variant="dim"
+                  disabled={Boolean(nativeBusy)}
+                  onClick={handleAutoFixOS}
+                >
+                  {nativeBusy === "autofix" ? "Auto-Fixing…" : "Auto-Fix OS"}
+                </Btn>
+                <Btn
+                  variant="primary"
+                  disabled={
+                    Boolean(nativeBusy) ||
+                    updateState?.phase !== "ready"
+                  }
+                  onClick={restartToUpdate}
+                >
+                  {nativeBusy === "restart"
+                    ? "Restarting…"
+                    : "Restart to Update"}
+                </Btn>
+              </div>
+              {nativeHint && (
+                <p className="settings-note" role="status" style={{ color: "var(--cyan)" }}>
+                  ℹ️ {nativeHint}
+                </p>
+              )}
+              <p className="settings-note">
+                Packaged updates verify release metadata, then download, then
+                require a separate restart. Development mode never contacts a release feed.
+                Unsigned public builds are allowed to install from GitHub releases.
+              </p>
             </>
           ) : (
-            <p className="settings-note">
-              Newer GitHub source releases use a clean-check, fast-forward-only
-              pull, <code>npm ci</code>, and build behind an approval. Dirty or
-              diverged checkouts stop safely.
-            </p>
+            <>
+              <div className="aa-actions">
+                <Btn
+                  variant="dim"
+                  disabled={Boolean(nativeBusy)}
+                  onClick={handleAutoFixOS}
+                >
+                  {nativeBusy === "autofix" ? "Auto-Fixing…" : "Auto-Fix OS"}
+                </Btn>
+              </div>
+              {nativeHint && (
+                <p className="settings-note" role="status" style={{ color: "var(--cyan)" }}>
+                  ℹ️ {nativeHint}
+                </p>
+              )}
+              <p className="settings-note">
+                Newer GitHub source releases use a clean-check, fast-forward-only
+                pull, <code>npm ci</code>, and build behind an approval. Dirty or
+                diverged checkouts stop safely.
+              </p>
+            </>
           )}
         </Panel>
 

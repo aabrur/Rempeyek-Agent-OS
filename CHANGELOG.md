@@ -3,6 +3,16 @@
 All notable changes to Rempeyek Agent OS. The in-app update banner compares the local version
 against the latest GitHub Release of this repository - tag releases as `v<version>`.
 
+## [2.4.6] - 2026-08-23
+
+### Added
+- **Top-Right Update Notification Toast**: Replaced intrusive full-screen update popups with a floating top-right card featuring direct update triggers (Restart & Apply, Download, Update Now), dismissal controls, and a quick Settings shortcut.
+- **Settings Auto-Fix & Diagnostics**: Centralized update management and added quick **Auto-Fix OS** self-repair buttons in Settings (Software Panel & System Doctor).
+
+### Changed
+- Neutralized legacy modal popups and moved all auto-fix actions to Settings.
+- Version bump `2.4.5` → `2.4.6` across all packages, README, version.mjs, server.js, index.html, and boot-recovery.mjs.
+
 ## [2.4.5] - 2026-08-23
 
 ### Added

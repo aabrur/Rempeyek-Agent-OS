@@ -5,7 +5,8 @@
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
-const APP_VERSION = "2.4.5";
+const APP_VERSION = "2.4.6";
+const APP_TITLE = "REMPEYEK AGENT OS";
 const net = require("net");
 const os = require("os");
 const { spawn, execFile, spawnSync } = require("child_process");

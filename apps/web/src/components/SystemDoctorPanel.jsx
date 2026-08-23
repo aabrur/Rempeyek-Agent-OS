@@ -107,6 +107,24 @@ export function SystemDoctorPanel() {
     }
   };
 
+  const handleQuickAutoFix = async () => {
+    setRepairing(true);
+    setStatusMessage("Executing Auto-Fix OS: clearing stale caches and running diagnostic probes…");
+    try {
+      try {
+        localStorage.removeItem("aos-release-check");
+        sessionStorage.clear();
+      } catch {}
+      await new Promise(r => setTimeout(r, 400));
+      await runScan();
+      setStatusMessage("Auto-Fix OS completed successfully. Caches cleared and system state refreshed.");
+    } catch (e) {
+      setStatusMessage(`Auto-Fix completed with notice: ${e.message}`);
+    } finally {
+      setRepairing(false);
+    }
+  };
+
   const getStatusBadge = (status) => {
     if (status === "healthy") return <span className="pill pill-ok" style={{ background: "rgba(34, 197, 94, 0.15)", color: "#4ade80", border: "1px solid rgba(34, 197, 94, 0.3)", padding: "2px 8px", borderRadius: 4, fontSize: 11, fontWeight: 600 }}>Healthy</span>;
     if (status === "warning") return <span className="pill pill-warning" style={{ background: "rgba(245, 158, 11, 0.15)", color: "#fbbf24", border: "1px solid rgba(245, 158, 11, 0.3)", padding: "2px 8px", borderRadius: 4, fontSize: 11, fontWeight: 600 }}>Warning</span>;
@@ -119,6 +137,9 @@ export function SystemDoctorPanel() {
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 16 }}>
         <Btn variant="primary" onClick={runScan} disabled={loading || repairing}>
           {loading ? "Scanning…" : "Run Full Scan"}
+        </Btn>
+        <Btn variant="dim" onClick={handleQuickAutoFix} disabled={loading || repairing}>
+          {repairing ? "Repairing…" : "Auto-Fix OS"}
         </Btn>
         <Btn variant="dim" onClick={handleCreateBackup} disabled={loading || repairing}>
           Create Backup

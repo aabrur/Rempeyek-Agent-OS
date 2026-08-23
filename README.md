@@ -12,13 +12,13 @@ React + Vite, split into components across an npm-workspaces monorepo.
 
 ## Download for Windows
 
-|[![Download v2.4.5](https://img.shields.io/badge/Download-v2.4.5-ff8a00?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/aabrur/Rempeyek-Agent-OS/releases/tag/v2.4.5)
+|[![Download v2.4.6](https://img.shields.io/badge/Download-v2.4.6-ff8a00?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/aabrur/Rempeyek-Agent-OS/releases/tag/v2.4.6)
 
 **The installer and direct download are free.** Most users only need to click
 the button above. No GitHub account, Git, Node.js, npm, or repository clone is
 required.
 
-- **Pop-Up Auto Update & Self-Repair** - automatic update dialog with one-click fix
+- **Non-Intrusive Top-Right Update Notifications & Settings Self-Repair** - sleek corner updates and dedicated settings controls
 - **Windows x64** desktop installer
 - **Private local state** - settings, agents, telemetry, avatars, and the starter
   vault stay under `%LOCALAPPDATA%\Rempeyek-Agent-OS`
@@ -29,12 +29,12 @@ required.
 
 ### Install
 
-1. Open the public **v2.4.5** release above.
+1. Open the public **v2.4.6** release above.
 2. Download the NSIS installer and the published `SHA256SUMS.txt` from that same release.
 3. Verify the downloaded installer against `SHA256SUMS.txt` in PowerShell:
 
    ```powershell
-   Get-FileHash "$HOME\Downloads\Rempeyek-Agent-OS-Setup-2.4.5.exe" -Algorithm SHA256
+   Get-FileHash "$HOME\Downloads\Rempeyek-Agent-OS-Setup-2.4.6.exe" -Algorithm SHA256
    ```
 
 4. Open the installer only when the hash and release publisher match.

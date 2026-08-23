@@ -1,6 +1,6 @@
 {
   "name": "@rempeyek/desktop",
-  "version": "2.4.5",
+  "version": "2.4.6",
   "description": "Secure Windows desktop shell for Rempeyek Agent OS.",
   "author": "Rempeyek Agent OS Contributors",
   "private": true,
