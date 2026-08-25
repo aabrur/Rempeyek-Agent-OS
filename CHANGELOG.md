@@ -13,6 +13,14 @@ against the latest GitHub Release of this repository - tag releases as `v<versio
 - Neutralized legacy modal popups and moved all auto-fix actions to Settings.
 - Version bump `2.4.5` → `2.4.6` across all packages, README, version.mjs, server.js, index.html, and boot-recovery.mjs.
 
+### Maintenance (2026-08-25)
+- HTTP startup readiness now waits for Work Lifecycle, Publishing, Switchboard, and process-manager before `server.listen()` / `rempeyek:ready`. Permanent import failures are `unavailable`, not infinite `loading`.
+- Real Playwright Chromium E2E is a required CI gate (desktop 1440x900 and mobile 390x844). Missing browser fails the release check.
+- `package-lock.json` workspace metadata synchronized to `2.4.6`. Independently versioned `packages/*` remain `2.1.0`.
+- Release export copies the canonical Setup installer only and fails if SHA-256 diverges. Tag republish deletes same-named GitHub assets before upload.
+- Windows pack/dist invoke `scripts/desktop-pack.mjs` so electron-builder is not broken by a shadowed user-level `cmd`/`npm` on PATH.
+- Current QA report refreshed from this verification run. Windows executables remain unsigned; verify `SHA256SUMS.txt`.
+
 ## [2.4.5] - 2026-08-23
 
 ### Added

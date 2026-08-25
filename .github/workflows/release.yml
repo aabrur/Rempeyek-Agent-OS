@@ -25,11 +25,7 @@ jobs:
       - run: npm run desktop:dist
       - run: npm run desktop:test-package
       - name: Generate SHA256SUMS.txt
-        shell: pwsh
-        run: |
-          Get-ChildItem -Path apps/desktop/dist/*.exe | Get-FileHash -Algorithm SHA256 | ForEach-Object {
-            "$($_.Hash.ToLower())  $($_.Path | Split-Path -Leaf)"
-          } | Out-File -FilePath apps/desktop/dist/SHA256SUMS.txt -Encoding utf8
+        run: node scripts/release-artifact-integrity.mjs --write apps/desktop/dist
       - name: Mark artifact as unsigned test output
         shell: pwsh
         run: |
@@ -143,11 +139,19 @@ jobs:
             }
           }
       - name: Generate SHA256SUMS.txt
+        run: node scripts/release-artifact-integrity.mjs --write apps/desktop/dist
+      - name: Replace same-named assets when republishing this tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: pwsh
         run: |
-          Get-ChildItem -Path apps/desktop/dist/*.exe | Get-FileHash -Algorithm SHA256 | ForEach-Object {
-            "$($_.Hash.ToLower())  $($_.Path | Split-Path -Leaf)"
-          } | Out-File -FilePath apps/desktop/dist/SHA256SUMS.txt -Encoding utf8
+          $tag = $env:GITHUB_REF_NAME
+          $view = gh release view $tag --json assets 2>$null
+          if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($view)) { exit 0 }
+          $release = $view | ConvertFrom-Json
+          foreach ($asset in @($release.assets)) {
+            gh release delete-asset $tag $asset.name --yes
+          }
       - uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           draft: false

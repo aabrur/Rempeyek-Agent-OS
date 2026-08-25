@@ -20,6 +20,8 @@ jobs:
       - run: npm run build
       - run: npm run audit:public
       - run: npm run audit:release
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
 
   desktop-package:
     runs-on: windows-latest

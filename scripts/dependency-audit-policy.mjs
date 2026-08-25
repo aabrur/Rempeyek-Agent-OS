@@ -121,6 +121,19 @@ function runAudit(args) {
 }
 
 function main() {
+  const versionSync = spawnSync(
+    process.execPath,
+    [path.join(ROOT, "scripts", "release-version-sync.mjs")],
+    { cwd: ROOT, encoding: "utf8", windowsHide: true },
+  );
+  if (versionSync.status !== 0) {
+    if (versionSync.stdout) process.stdout.write(versionSync.stdout);
+    if (versionSync.stderr) process.stderr.write(versionSync.stderr);
+    process.exitCode = 1;
+    return;
+  }
+  if (versionSync.stdout) process.stdout.write(versionSync.stdout);
+
   const policy = JSON.parse(fs.readFileSync(POLICY_PATH, "utf8"));
   const productionReport = runAudit(["--omit=dev"]);
   const fullReport = runAudit([]);

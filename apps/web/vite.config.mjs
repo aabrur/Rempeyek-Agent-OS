@@ -11,6 +11,7 @@ const pkg = p => fileURLToPath(new URL(`../../packages/${p}`, import.meta.url));
    workspaces create. Without them Vite treats the packages as prebundled deps and
    never runs the React plugin over their JSX (and HMR wouldn't see edits). */
 export default defineConfig({
+  root: fileURLToPath(new URL(".", import.meta.url)),
   plugins: [react()],
   resolve: {
     alias: {

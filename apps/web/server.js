@@ -27,6 +27,10 @@ const {
   registeredPrimaryAgents,
   renderOperationalSyncPrompt,
 } = require("./lib/operational-sync-prompt.cjs");
+const {
+  createHttpReadinessRegistry,
+  routeModuleError,
+} = require("./lib/http-readiness.cjs");
 
 /* Monorepo layout: this file lives in apps/web/, but runtime data (vault, config,
    telemetry, scripts, .env) stays at the repo ROOT so agent CLIs and bridges keep working. */
@@ -178,6 +182,43 @@ function getPublishingScheduler(services = DEFAULT_RUNTIME_SERVICES, approvalQue
   const store = getPublishingStore(services);
   const gateway = getPublishingGateway(services);
   return publishingSchedulerLib.createPublishingScheduler({ gateway, store, approvalQueue });
+}
+
+const httpReadiness = createHttpReadinessRegistry([
+  { id: "agent-detail", promise: AGENT_DETAIL, required: true },
+  { id: "agent-catalog", promise: AGENT_CATALOG_MOD, required: true },
+  { id: "marketplace-manifest", promise: MARKETPLACE_MOD, required: true },
+  { id: "process-adapters", promise: PROCESS_ADAPTERS_MOD, required: true },
+  { id: "process-manager", promise: PROCESS_MANAGER_MOD, required: true },
+  { id: "agent-lifecycle", promise: AGENT_LIFECYCLE_MOD, required: true },
+  { id: "managed-bundle", promise: MANAGED_BUNDLE_MOD, required: true },
+  { id: "runtime-settings", promise: RUNTIME_SETTINGS_MOD, required: true },
+  { id: "subagent-record", promise: SUBAGENT_RECORD_MOD, required: true },
+  { id: "release-check", promise: RELEASE_MOD, required: true },
+  { id: "source-update", promise: SOURCE_UPDATE_MOD, required: true },
+  { id: "switchboard", promise: SWITCHBOARD_MOD, required: true },
+  { id: "work-lifecycle", promise: WORK_LIFECYCLE_MOD, required: true },
+  { id: "publishing-domain", promise: PUBLISHING_DOMAIN_MOD, required: true },
+  { id: "publishing-gateway", promise: PUBLISHING_GATEWAY_MOD, required: true },
+  { id: "publishing-scheduler", promise: PUBLISHING_SCHEDULER_MOD, required: true },
+  { id: "bootstrap", promise: BOOTSTRAP_MOD, required: false },
+  { id: "unified-memory-graph", promise: UNIFIED_MEMORY_MOD, required: false },
+  { id: "system-doctor", promise: SYSTEM_DOCTOR_MOD, required: false },
+]);
+
+function whenHttpModulesReady() {
+  return httpReadiness.awaitReady();
+}
+
+function respondIfModuleBlocked(res, id, messages) {
+  const blocked = routeModuleError(httpReadiness, id, messages);
+  if (!blocked) return false;
+  json(res, 503, blocked);
+  return true;
+}
+
+function moduleLoadError(id, messages) {
+  return routeModuleError(httpReadiness, id, messages);
 }
 
 /* PUBLIC = tracked static source. Runtime avatars live in the ignored state root so
@@ -382,10 +423,18 @@ function scaffoldRuntimeVaultLane(agent, vaultPath) {
                                           silently dropped). No install.cmd is ever taken from the
                                           body - auto-install runs only vetted catalog commands. */
 function addAgent(body, services = DEFAULT_RUNTIME_SERVICES) {
-  if (!catalogLib) return { error: "catalog module still loading - retry in a moment" };
+  const catalogBlocked = moduleLoadError("agent-catalog", {
+    loading: "catalog module still loading - retry in a moment",
+    failed: "catalog module unavailable",
+  });
+  if (catalogBlocked) return catalogBlocked;
   const cat = body.catalogId ? catalogLib.catalogEntry(body.catalogId) : null;
   if (body.catalogId) {
-    if (!marketplaceLib) return { error: "marketplace module still loading - retry in a moment" };
+    const marketplaceBlocked = moduleLoadError("marketplace-manifest", {
+      loading: "marketplace module still loading - retry in a moment",
+      failed: "marketplace module unavailable",
+    });
+    if (marketplaceBlocked) return marketplaceBlocked;
     const marketplaceEntry = marketplaceLib.marketplaceEntry(body.catalogId);
     if (marketplaceEntry && !catalogInstalled(marketplaceEntry, services, { fresh: true })) {
       return {
@@ -1010,7 +1059,13 @@ function gwCtl(id, action, cb) {
   if (!agent) return cb({ error: `unknown agent '${id}'` });
   if (!agent.enabled) return cb({ error: agent.note || `gateway '${id}' is disabled` });
   const resolved = runtimeAdapter(agent, action);
-  if (!resolved) return cb({ error: "runtime adapters are still loading" });
+  if (!resolved) {
+    const adaptersBlocked = moduleLoadError("process-adapters", {
+      loading: "runtime adapters are still loading",
+      failed: "runtime adapters unavailable",
+    });
+    return cb(adaptersBlocked || { error: "runtime adapters unavailable" });
+  }
 
   /* Task status is an observation, not a guessed native command. */
   if (action === "status" && !resolved.available) {
@@ -1040,7 +1095,13 @@ function gwCtl(id, action, cb) {
   if (cwd && !fs.existsSync(cwd)) { try { fs.mkdirSync(cwd, { recursive: true }); } catch (_) {} }
   if (!cwd || !fs.existsSync(cwd)) return cb({ error: `cwd does not exist: ${cwd || "(unset)"}` });
   const manager = processManager();
-  if (!manager) return cb({ error: "process manager is still loading" });
+  if (!manager) {
+    const managerBlocked = moduleLoadError("process-manager", {
+      loading: "process manager is still loading",
+      failed: "process manager unavailable",
+    });
+    return cb(managerBlocked || { error: "process manager unavailable" });
+  }
   const actionType = ["start", "restart"].includes(action) ? "native-gateway-control" : `native-${action}`;
   const started = manager.start({
     agentId: id,
@@ -1096,14 +1157,26 @@ function gwRun(id) {
   if (!agent) return { error: `unknown agent '${id}'` };
   if (!agent.enabled) return { error: agent.note || `gateway '${id}' is disabled` };
   const resolved = runtimeAdapter(agent, "gateway-run");
-  if (!resolved) return { error: "runtime adapters are still loading" };
+  if (!resolved) {
+    const adaptersBlocked = moduleLoadError("process-adapters", {
+      loading: "runtime adapters are still loading",
+      failed: "runtime adapters unavailable",
+    });
+    return adaptersBlocked || { error: "runtime adapters unavailable" };
+  }
   if (!resolved.available) return { error: resolved.reason, runtimeState: "unavailable" };
   const profile = resolveSummonProfile(agent, { stateRoot: RUNTIME_PATHS.stateRoot });
   const cwd = profile.cwd || agent.gateway?.home || agent.gateway?.workdir || agent.gateway?.cwd || loadConfig().workdir;
   if (cwd && !fs.existsSync(cwd)) { try { fs.mkdirSync(cwd, { recursive: true }); } catch (_) {} }
   if (!cwd || !fs.existsSync(cwd)) return { error: `cwd does not exist: ${cwd || "(unset)"}` };
   const manager = processManager();
-  if (!manager) return { error: "process manager is still loading" };
+  if (!manager) {
+    const managerBlocked = moduleLoadError("process-manager", {
+      loading: "process manager is still loading",
+      failed: "process manager unavailable",
+    });
+    return managerBlocked || { error: "process manager unavailable" };
+  }
   const existing = procs.get(id);
   if (existing && existing.status === "running") return { error: `${id} already has an owned process running (pid ${existing.pid})` };
   const started = manager.start({
@@ -1450,8 +1523,17 @@ function catalogInstalled(entry, services = DEFAULT_RUNTIME_SERVICES, { fresh = 
    the run-log pane. SECURITY: installer selection comes ONLY from the reviewed Marketplace
    manifest and resolves to a fixed program plus argv. Caller input never becomes executable text. */
 function installAgent(id, adapterId) {
-  if (!catalogLib || !marketplaceLib || !processAdaptersLib)
-    return { error: "Marketplace modules still loading - retry in a moment" };
+  const marketplaceBlocked = moduleLoadError("marketplace-manifest", {
+    loading: "Marketplace modules still loading - retry in a moment",
+    failed: "Marketplace modules unavailable",
+  }) || moduleLoadError("agent-catalog", {
+    loading: "Marketplace modules still loading - retry in a moment",
+    failed: "Marketplace modules unavailable",
+  }) || moduleLoadError("process-adapters", {
+    loading: "Marketplace modules still loading - retry in a moment",
+    failed: "Marketplace modules unavailable",
+  });
+  if (marketplaceBlocked) return marketplaceBlocked;
   const entry = marketplaceLib.marketplaceEntry(id);
   if (!entry || entry.kind !== "agent") return { error: `unknown catalog agent '${id}'` };
   const available = entry.installers.filter(adapter =>
@@ -3486,7 +3568,7 @@ function requestHandler(req, res, services = DEFAULT_RUNTIME_SERVICES) {
       // === WORK LIFECYCLE API ===
       if (url === "/api/work/missions" && req.method === "GET") {
         const store = getWorkStore(services);
-        if (!store) return json(res, 503, { error: "work lifecycle store loading" });
+        if (respondIfModuleBlocked(res, "work-lifecycle", { loading: "work lifecycle store loading", failed: "work lifecycle store unavailable" })) return;
         const u = new URL(req.url, "http://localhost");
         const projectId = u.searchParams.get("projectId");
         return json(res, 200, { missions: store.listMissions(projectId) });
@@ -3495,7 +3577,7 @@ function requestHandler(req, res, services = DEFAULT_RUNTIME_SERVICES) {
         return readBody(req, res, body => {
           let d; try { d = JSON.parse(body); } catch { return json(res, 400, { error: "body must be JSON" }); }
           const store = getWorkStore(services);
-          if (!store) return json(res, 503, { error: "work lifecycle store loading" });
+          if (respondIfModuleBlocked(res, "work-lifecycle", { loading: "work lifecycle store loading", failed: "work lifecycle store unavailable" })) return;
           try {
             const m = store.saveMission(workLifecycleLib.createMission(d));
             json(res, 201, m);
@@ -3507,7 +3589,7 @@ function requestHandler(req, res, services = DEFAULT_RUNTIME_SERVICES) {
       m = url.match(/^\/api\/work\/missions\/([\w-]+)$/);
       if (m && req.method === "GET") {
         const store = getWorkStore(services);
-        if (!store) return json(res, 503, { error: "work lifecycle store loading" });
+        if (respondIfModuleBlocked(res, "work-lifecycle", { loading: "work lifecycle store loading", failed: "work lifecycle store unavailable" })) return;
         const mission = store.getMission(m[1]);
         return json(res, mission ? 200 : 404, mission || { error: "mission not found" });
       }
@@ -3516,7 +3598,7 @@ function requestHandler(req, res, services = DEFAULT_RUNTIME_SERVICES) {
         return readBody(req, res, body => {
           let d; try { d = JSON.parse(body); } catch { return json(res, 400, { error: "body must be JSON" }); }
           const store = getWorkStore(services);
-          if (!store) return json(res, 503, { error: "work lifecycle store loading" });
+          if (respondIfModuleBlocked(res, "work-lifecycle", { loading: "work lifecycle store loading", failed: "work lifecycle store unavailable" })) return;
           const mission = store.getMission(missionId);
           if (!mission) return json(res, 404, { error: "mission not found" });
           try {
@@ -3531,7 +3613,7 @@ function requestHandler(req, res, services = DEFAULT_RUNTIME_SERVICES) {
         return readBody(req, res, body => {
           let d; try { d = JSON.parse(body); } catch { return json(res, 400, { error: "body must be JSON" }); }
           const store = getWorkStore(services);
-          if (!store) return json(res, 503, { error: "work lifecycle store loading" });
+          if (respondIfModuleBlocked(res, "work-lifecycle", { loading: "work lifecycle store loading", failed: "work lifecycle store unavailable" })) return;
           try {
             const contract = store.saveWorkContract(workLifecycleLib.createWorkContract(d));
             json(res, 201, contract);
@@ -3544,7 +3626,7 @@ function requestHandler(req, res, services = DEFAULT_RUNTIME_SERVICES) {
         return readBody(req, res, body => {
           let d; try { d = JSON.parse(body); } catch { return json(res, 400, { error: "body must be JSON" }); }
           const store = getWorkStore(services);
-          if (!store) return json(res, 503, { error: "work lifecycle store loading" });
+          if (respondIfModuleBlocked(res, "work-lifecycle", { loading: "work lifecycle store loading", failed: "work lifecycle store unavailable" })) return;
           try {
             const run = store.saveRun(workLifecycleLib.createRun(d));
             json(res, 201, run);
@@ -3557,7 +3639,7 @@ function requestHandler(req, res, services = DEFAULT_RUNTIME_SERVICES) {
       // === SOCIAL PUBLISHING API ===
       if (url === "/api/social/campaigns" && req.method === "GET") {
         const store = getPublishingStore(services);
-        if (!store) return json(res, 503, { error: "publishing store loading" });
+        if (respondIfModuleBlocked(res, "publishing-domain", { loading: "publishing store loading", failed: "publishing store unavailable" })) return;
         const u = new URL(req.url, "http://localhost");
         const projectId = u.searchParams.get("projectId");
         return json(res, 200, { campaigns: store.listCampaigns(projectId) });
@@ -3567,7 +3649,8 @@ function requestHandler(req, res, services = DEFAULT_RUNTIME_SERVICES) {
           let d; try { d = JSON.parse(body); } catch { return json(res, 400, { error: "body must be JSON" }); }
           const store = getPublishingStore(services);
           const gateway = getPublishingGateway(services);
-          if (!store || !gateway) return json(res, 503, { error: "publishing modules loading" });
+          if (respondIfModuleBlocked(res, "publishing-domain", { loading: "publishing modules loading", failed: "publishing modules unavailable" })) return;
+          if (respondIfModuleBlocked(res, "publishing-gateway", { loading: "publishing modules loading", failed: "publishing modules unavailable" })) return;
           try {
             const campaign = store.saveCampaign(publishingDomainLib.createCampaign(d));
             const variants = gateway.generateVariants(campaign);
@@ -3580,7 +3663,7 @@ function requestHandler(req, res, services = DEFAULT_RUNTIME_SERVICES) {
       m = url.match(/^\/api\/social\/campaigns\/([\w-]+)$/);
       if (m && req.method === "GET") {
         const store = getPublishingStore(services);
-        if (!store) return json(res, 503, { error: "publishing store loading" });
+        if (respondIfModuleBlocked(res, "publishing-domain", { loading: "publishing store loading", failed: "publishing store unavailable" })) return;
         const campaign = store.getCampaign(m[1]);
         if (!campaign) return json(res, 404, { error: "campaign not found" });
         const variants = store.listVariantsForCampaign(m[1]);
@@ -3595,7 +3678,8 @@ function requestHandler(req, res, services = DEFAULT_RUNTIME_SERVICES) {
           let d = {}; try { if (body) d = JSON.parse(body); } catch {}
           const store = getPublishingStore(services);
           const scheduler = getPublishingScheduler(services);
-          if (!store || !scheduler) return json(res, 503, { error: "publishing scheduler loading" });
+          if (respondIfModuleBlocked(res, "publishing-domain", { loading: "publishing scheduler loading", failed: "publishing scheduler unavailable" })) return;
+          if (respondIfModuleBlocked(res, "publishing-scheduler", { loading: "publishing scheduler loading", failed: "publishing scheduler unavailable" })) return;
           const campaign = store.getCampaign(campaignId);
           if (!campaign) return json(res, 404, { error: "campaign not found" });
           try {
@@ -3614,7 +3698,8 @@ function requestHandler(req, res, services = DEFAULT_RUNTIME_SERVICES) {
           const store = getPublishingStore(services);
           const queue = await APPROVAL_QUEUE;
           const scheduler = getPublishingScheduler(services, queue);
-          if (!store || !scheduler) return json(res, 503, { error: "publishing scheduler loading" });
+          if (respondIfModuleBlocked(res, "publishing-domain", { loading: "publishing scheduler loading", failed: "publishing scheduler unavailable" })) return;
+          if (respondIfModuleBlocked(res, "publishing-scheduler", { loading: "publishing scheduler loading", failed: "publishing scheduler unavailable" })) return;
           try {
             const result = await scheduler.processCampaign(campaignId, { connectorConfigs: d.connectorConfigs || {}, approvalId: d.approvalId });
             json(res, 200, result);
@@ -3629,7 +3714,7 @@ function requestHandler(req, res, services = DEFAULT_RUNTIME_SERVICES) {
         return readBody(req, res, async body => {
           let d = {}; try { if (body) d = JSON.parse(body); } catch {}
           const scheduler = getPublishingScheduler(services);
-          if (!scheduler) return json(res, 503, { error: "publishing scheduler loading" });
+          if (respondIfModuleBlocked(res, "publishing-scheduler", { loading: "publishing scheduler loading", failed: "publishing scheduler unavailable" })) return;
           try {
             const result = await scheduler.retryFailedJobs(campaignId, { connectorConfigs: d.connectorConfigs || {} });
             json(res, 200, result);
@@ -3640,14 +3725,14 @@ function requestHandler(req, res, services = DEFAULT_RUNTIME_SERVICES) {
       }
       if (url === "/api/social/connectors" && req.method === "GET") {
         const store = getPublishingStore(services);
-        if (!store) return json(res, 503, { error: "publishing store loading" });
+        if (respondIfModuleBlocked(res, "publishing-domain", { loading: "publishing store loading", failed: "publishing store unavailable" })) return;
         return json(res, 200, { connectors: store.listConnectors() });
       }
       if (url === "/api/social/connectors" && req.method === "POST") {
         return readBody(req, res, body => {
           let d; try { d = JSON.parse(body); } catch { return json(res, 400, { error: "body must be JSON" }); }
           const store = getPublishingStore(services);
-          if (!store) return json(res, 503, { error: "publishing store loading" });
+          if (respondIfModuleBlocked(res, "publishing-domain", { loading: "publishing store loading", failed: "publishing store unavailable" })) return;
           try {
             const conn = store.saveConnectorProfile(publishingDomainLib.createConnectorProfile(d));
             json(res, 201, conn);
@@ -3665,7 +3750,7 @@ function requestHandler(req, res, services = DEFAULT_RUNTIME_SERVICES) {
         });
       if (url === "/api/schedule") return buildSchedule(r => json(res, 200, r));
       if (url.startsWith("/api/switchboard/messages") && req.method === "GET") {
-        if (!switchboardLib) return json(res, 503, { error: "switchboard module is still loading" });
+        if (respondIfModuleBlocked(res, "switchboard", { loading: "switchboard module is still loading", failed: "switchboard module unavailable" })) return;
         const u = new URL(url, "http://localhost");
         const agentId = u.searchParams.get("agentId") || u.searchParams.get("to");
         let list = readSwitchboardMessages();
@@ -3673,7 +3758,7 @@ function requestHandler(req, res, services = DEFAULT_RUNTIME_SERVICES) {
         return json(res, 200, { messages: list });
       }
       if (url === "/api/switchboard/messages" && req.method === "POST") return parseBody(req, body => {
-        if (!switchboardLib) return json(res, 503, { error: "switchboard module is still loading" });
+        if (respondIfModuleBlocked(res, "switchboard", { loading: "switchboard module is still loading", failed: "switchboard module unavailable" })) return;
         const created = switchboardLib.createSwitchboardMessage(body || {});
         if (created.error) return json(res, 400, { error: created.error });
         const list = readSwitchboardMessages();
@@ -3685,7 +3770,7 @@ function requestHandler(req, res, services = DEFAULT_RUNTIME_SERVICES) {
         return json(res, 200, { ok: true, message: created });
       });
       if (url === "/api/switchboard/read" && req.method === "POST") return parseBody(req, body => {
-        if (!switchboardLib) return json(res, 503, { error: "switchboard module is still loading" });
+        if (respondIfModuleBlocked(res, "switchboard", { loading: "switchboard module is still loading", failed: "switchboard module unavailable" })) return;
         const list = readSwitchboardMessages();
         const marked = switchboardLib.markSwitchboardRead(list, body || {});
         if (marked.updated) saveSwitchboardMessages(marked.messages);
@@ -3693,7 +3778,8 @@ function requestHandler(req, res, services = DEFAULT_RUNTIME_SERVICES) {
       });
       if (url === "/api/skills/sync" && req.method === "POST") return parseBody(req, body => {
         try {
-          if (!managedBundleLib || !marketplaceLib) return json(res, 503, { error: "modules still loading" });
+          if (respondIfModuleBlocked(res, "managed-bundle", { loading: "modules still loading", failed: "modules unavailable" })) return;
+          if (respondIfModuleBlocked(res, "marketplace-manifest", { loading: "modules still loading", failed: "modules unavailable" })) return;
           const pluginId = String(body?.pluginId || "hypertaks-agent");
           const agentId = String(body?.agentId || "").trim();
           const entry = marketplaceLib.marketplaceEntry(pluginId);
@@ -3896,19 +3982,14 @@ if (require.main === module) {
     process.exit(1);
   });
 
-  // Gate listen() on the ESM helper modules so telemetry windowing + catalog are ready before the first poll.
-  Promise.allSettled([
-    AGENT_DETAIL,
-    AGENT_CATALOG_MOD,
-    MARKETPLACE_MOD,
-    PROCESS_ADAPTERS_MOD,
-    AGENT_LIFECYCLE_MOD,
-    MANAGED_BUNDLE_MOD,
-    RUNTIME_SETTINGS_MOD,
-    SUBAGENT_RECORD_MOD,
-    RELEASE_MOD,
-    SOURCE_UPDATE_MOD,
-  ]).then(() => server.listen(PORT, process.env.DASH_HOST || "127.0.0.1", () => {
+  // Gate listen() until required HTTP modules are READY or FAILED — never announce
+  // rempeyek:ready while Work/Publishing/Switchboard are still loading.
+  whenHttpModulesReady().then(snapshot => {
+    const failed = Object.entries(snapshot.modules)
+      .filter(([, state]) => state === "failed")
+      .map(([id]) => id);
+    if (failed.length) console.error("[http-readiness] required or optional modules failed:", failed.join(", "));
+    server.listen(PORT, process.env.DASH_HOST || "127.0.0.1", () => {
   const listeningPort = server.address().port;
   if (typeof process.send === "function") {
     process.send({ type: "rempeyek:ready", port: listeningPort });
@@ -3927,10 +4008,11 @@ if (require.main === module) {
   setInterval(runDailyBridge, 3600000);  // R#2: then hourly (it existed before but was never invoked)
   setTimeout(captureMemory, 8000);       // project memory: telemetry task_done → decisions.md
   setInterval(captureMemory, 120000);    // watermarked, so re-runs never duplicate entries
-  }));
+    });
+  });
 }
 
-module.exports = { createRuntimeServices, createServer, legacyDecisionContext };
+module.exports = { createRuntimeServices, createServer, legacyDecisionContext, whenHttpModulesReady, httpReadiness };
 
 /* R#2: run scripts/hermes-daily-bridge.cjs (sync telemetry + vault daily note) */
 function runDailyBridge() {

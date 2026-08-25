@@ -6,13 +6,13 @@ import path from "node:path";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
-const { createServer } = require("../../apps/web/server.js");
+const { createServer, whenHttpModulesReady } = require("../../apps/web/server.js");
 
 let playwright;
 try {
-  playwright = require("playwright");
-} catch {
-  // If playwright module is loading via npx
+  playwright = require("@playwright/test");
+} catch (error) {
+  throw new Error(`Playwright Chromium is required: ${error.message}`);
 }
 
 async function withServer(run) {
@@ -46,6 +46,7 @@ async function withServer(run) {
     }),
   );
 
+  await whenHttpModulesReady();
   const server = createServer({
     configPath,
     stateRoot: root,
@@ -55,7 +56,6 @@ async function withServer(run) {
     bundleRoot: path.resolve("marketplace", "bundles"),
   });
   await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
-  await new Promise(resolve => setTimeout(resolve, 150));
   const base = `http://127.0.0.1:${server.address().port}`;
   try {
     await run({ base, root, server });
@@ -65,52 +65,21 @@ async function withServer(run) {
   }
 }
 
-test("Playwright UI test exercises real server endpoints and DOM/API action button contracts", () => withServer(async ({ base }) => {
-  if (playwright && playwright.chromium) {
-    let browser;
-    try {
-      browser = await playwright.chromium.launch({ headless: true });
-      const context = await browser.newContext();
-      const page = await context.newPage();
-      await page.goto(`${base}/api/state`);
-      const content = await page.content();
-      assert.ok(content.includes("Codex"));
-
-      await page.goto(`${base}/api/marketplace`);
-      const catContent = await page.content();
-      assert.ok(catContent.includes("catalog"));
-      await browser.close();
-      return;
-    } catch {
-      if (browser) await browser.close();
-    }
+test("Playwright UI test exercises the real renderer", async () => {
+  if (!playwright?.chromium) {
+    throw new Error("Playwright Chromium is required");
   }
-
-  // Verification via Playwright Request / HTTP API context exercising real UI controls
-  const stateRes = await fetch(`${base}/api/state`);
-  assert.equal(stateRes.status, 200);
-  const state = await stateRes.json();
-  assert.equal(state.agency, "Playwright UI OS");
-  assert.equal(state.agents[0].id, "codex");
-
-  // Verify Marketplace catalog endpoint returns full entries
-  const catRes = await fetch(`${base}/api/marketplace`);
-  assert.equal(catRes.status, 200);
-  const cat = await catRes.json();
-  assert.ok(cat.entries.length >= 20);
-
-  // Verify approvals endpoint handles UI decision button confirmation
-  const appReq = await fetch(`${base}/api/approvals`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ type: "proc.start", target: "codex", consequence: "Start gateway", actor: "playwright" }),
-  }).then(r => r.json());
-  assert.ok(appReq.id);
-
-  const decRes = await fetch(`${base}/api/approvals/${appReq.id}/decision`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ decision: "approved", confirmed: true }),
+  await withServer(async ({ base }) => {
+    const browser = await playwright.chromium.launch({ headless: true });
+    try {
+      const page = await browser.newPage();
+      await page.goto(base, { waitUntil: "domcontentloaded" });
+      const nav = await page.locator("nav#nav").count();
+      assert.ok(nav > 0, "primary navigation must render");
+      const body = await page.locator("body").innerText();
+      assert.ok(body.includes("Codex") || body.includes("Playwright UI OS") || body.includes("AGENTS"));
+    } finally {
+      await browser.close();
+    }
   });
-  assert.equal(decRes.status, 200);
-}));
+});

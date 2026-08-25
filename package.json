@@ -2,7 +2,6 @@
   "name": "rempeyek-agent-os",
   "version": "2.4.6",
   "description": "REMPEYEK AGENT OS - Neural Cosmos Edition. Agentic operating system: command center dashboard reading live from the Obsidian Vault.",
-
   "private": true,
   "bin": {
     "rempeyek-agent-os": "bin/rempeyek-agent-os.mjs"
@@ -16,16 +15,21 @@
     "test": "node --test apps/web/test/*.test.mjs",
     "dev": "npm run build && node apps/web/server.js",
     "start": "node apps/web/server.js",
-    "build": "npm run build --workspace @rempeyek/web",
-    "ui": "npm run dev --workspace @rempeyek/web",
+    "build": "node node_modules/vite/bin/vite.js --config apps/web/vite.config.mjs build",
+    "ui": "node node_modules/vite/bin/vite.js --config apps/web/vite.config.mjs",
     "server": "node apps/web/server.js",
-    "test:desktop": "npm test --workspace @rempeyek/desktop",
-    "desktop:dev": "npm run build && npm run dev --workspace @rempeyek/desktop",
-    "desktop:pack": "npm run build && npm run pack --workspace @rempeyek/desktop",
-    "desktop:dist": "npm run build && npm run dist --workspace @rempeyek/desktop",
+    "test:desktop": "node --test apps/desktop/test/*.test.mjs",
+    "desktop:dev": "node node_modules/vite/bin/vite.js --config apps/web/vite.config.mjs build && node node_modules/electron/cli.js apps/desktop",
+    "desktop:pack": "node scripts/desktop-pack.mjs",
+    "desktop:dist": "node scripts/desktop-pack.mjs --dist",
     "desktop:test-package": "node --test apps/desktop/test/package-contents.test.mjs",
     "audit:public": "node scripts/public-release-audit.mjs",
     "audit:release": "node scripts/dependency-audit-policy.mjs",
+    "audit:version": "node scripts/release-version-sync.mjs",
+    "test:e2e": "playwright test",
     "export:public": "node scripts/export-public-release.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.62.1"
   }
 }

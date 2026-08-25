@@ -1,41 +1,41 @@
-# Rempeyek Agent OS 2.3.0 Release QA Report
+# Rempeyek Agent OS 2.4.6 Release QA Report
 
 ## Executive Summary
-- **Release Version:** `2.3.0`
-- **Release Codename:** Unified Memory Neural Fabric Edition
-- **Target OS:** Windows x64 (Desktop Shell + Portable Mode)
-- **Classification:** `READY FOR PUBLIC DESKTOP UPDATE` (Pending authorization to publish)
+- **Release Version:** `2.4.6`
+- **Classification:** maintenance refresh of the existing `v2.4.6` GitHub Release (no `v2.4.7`)
+- **Target OS:** Windows x64 desktop + local Node server
+- **Signing:** unsigned public Windows executables; verify with published `SHA256SUMS.txt`
 
----
+## Source
+- **Pre-maintenance `origin/main`:** `9c5ef67424eee26472a30483236cf8242ca72278`
+- **Previous annotated tag `v2.4.6`:** `dadc5c9fbda3fe43338c3d48a530fba3c1e78f4e` (peeled `87cdf385b5e1916d465b91cc7dbb101b05716248`)
+- **Product version files:** `package.json`, `apps/web/package.json`, `apps/desktop/package.json`, `apps/web/lib/version.mjs` = `2.4.6`
+- Independently versioned packages remain `2.1.0` (`packages/ui`, `theme-engine`, `neural-engine`, `design-system`)
 
-## Acceptance Criteria Audit
+## Fresh verification (this maintenance)
 
-| Criteria | Result | Evidence |
+| Gate | Result | Evidence |
 |---|---|---|
-| 1. Unified Memory Visual Interface | PASSED | `Sidebar > Memory` route renders unified graph via `/api/memory/graph` |
-| 2. Canonical Vault Backend | PASSED | Stored under `%LOCALAPPDATA%\Rempeyek-Agent-OS\Vault` without Obsidian dependency |
-| 3. Obsidian Removal from Surface | PASSED | Zero setup warnings, zero app launch requirements, no external Obsidian UI buttons |
-| 4. Agent Activity Continuity | PASSED | Sessions stored in `Vault/Sessions/Active`, `Completed`, `Interrupted` |
-| 5. Whole Application Source Projection | PASSED | Projected under `Repo/` covering `.js`, `.mjs`, `.jsx`, `.ts`, `.json`, `.md` |
-| 6. Skill Safety Hardening | PASSED | Unconditional `|| true` removed, recursive folder copying, `unreviewed` default trust state |
-| 7. Graphify Security | PASSED | `access-policy-engine.mjs` path validation on all index targets |
-| 8. Desktop Click-to-Update Delivery | PASSED | Version synchronized to `2.3.0`, migration `002` created |
-| 9. Zero Hardcoded Personal Paths | PASSED | `npm run audit:public` passed cleanly (0 personal paths found) |
-| 10. Automated Test Suite | PASSED | `npm test` passed **314/314 tests (0 failures)** |
-| 11. Desktop Package Verification | PASSED | `npm run desktop:test-package` passed **3/3 tests** |
+| `npm test` | PASSED | **436/436** tests, 0 failed (10.84s) |
+| `npm run test:desktop` | PASSED | **42/42** tests, 0 failed |
+| `npm run build` | PASSED | Vite 6.4.3, **2103** modules |
+| `npm run audit:public` | PASSED | 425 tracked paths at audit time; 0 personal paths / secrets |
+| `npm run audit:release` | PASSED | lockfile workspaces `2.4.6`; production audit 0; reviewed high 0; expires 2026-08-31 |
+| `npm run test:e2e` | PASSED | Playwright Chromium **3/3** (shell/nav/API/themes + 1440x900 + 390x844) |
+| `npm run desktop:pack` | PASSED | electron-builder 26.15.3 dir pack via `scripts/desktop-pack.mjs` |
+| `npm run desktop:test-package` | PASSED | **4/4** package-content tests |
+| Startup readiness stress | PASSED | **20/20** clean forks; work/social never returned `* loading` after `rempeyek:ready` |
 
----
+## What this maintenance changed
+- HTTP listen/`rempeyek:ready` now waits for Work Lifecycle, Publishing, Switchboard, and process-manager modules (`apps/web/lib/http-readiness.cjs`)
+- Failed required modules report `unavailable`, not perpetual `loading`
+- Real Playwright E2E is a CI gate; missing browser fails
+- `package-lock.json` workspace metadata synchronized to `2.4.6`
+- Export/root installer copy is fail-closed and hash-checked; release workflow regenerates SHA256SUMS and deletes same-named assets before republish
+- Windows npm script runner no longer depends on shadowed `cmd` / scoped `@workspace` tokens
 
-## Test Verification Summary
-- **Unit & Integration Tests:** 314 passed, 0 failed (7.66s)
-- **Desktop Package Tests:** 3 passed, 0 failed (0.27s)
-- **Public Audit:** 270 tracked paths checked; 0 sensitive paths found
-- **AST Knowledge Graph:** 2,568 nodes, 3,435 edges, 251 communities
+## Security
+Existing suite still covers loopback vs remote token, desktop session header, child-env allowlist, path denylist, approval consume-once / fail-closed, durable-config recovery, and public-release hygiene. Approval queue remains in-memory.
 
----
-
-## Rollback & Recovery Strategy
-If an update encounters disk space or permission failures:
-1. Migration `002-unified-memory-neural-fabric.mjs` supports safe `down()` execution.
-2. `down()` rolls back version manifest entries and removes generated index files only.
-3. User notes, `.obsidian` metadata, and project files are guaranteed preserved.
+## Signing
+No Authenticode certificate is configured in this environment. Public installers stay unsigned. Users must verify `SHA256SUMS.txt`.

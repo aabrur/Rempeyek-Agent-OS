@@ -80,19 +80,19 @@ test("root workspace exposes desktop scripts", () => {
   assert.equal(pkg.workspaces.includes("apps/desktop"), true);
   assert.equal(
     pkg.scripts["test:desktop"],
-    "npm test --workspace @rempeyek/desktop",
+    "node --test apps/desktop/test/*.test.mjs",
   );
   assert.equal(
     pkg.scripts["desktop:dist"],
-    "npm run build && npm run dist --workspace @rempeyek/desktop",
+    "node scripts/desktop-pack.mjs --dist",
   );
   assert.equal(
     pkg.scripts["desktop:dev"],
-    "npm run build && npm run dev --workspace @rempeyek/desktop",
+    "node node_modules/vite/bin/vite.js --config apps/web/vite.config.mjs build && node node_modules/electron/cli.js apps/desktop",
   );
   assert.equal(
     pkg.scripts["desktop:pack"],
-    "npm run build && npm run pack --workspace @rempeyek/desktop",
+    "node scripts/desktop-pack.mjs",
   );
   assert.equal(
     pkg.scripts["desktop:test-package"],

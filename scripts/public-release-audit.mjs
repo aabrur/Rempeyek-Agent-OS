@@ -62,6 +62,7 @@ for (const gate of [
   "npm run audit:public",
   "npm run desktop:pack",
   "npm run desktop:test-package",
+  "npm run test:e2e",
 ]) {
   if (!ciWorkflow.includes(gate)) {
     errors.push(`ci.yml: missing required gate ${gate}`);
@@ -84,6 +85,7 @@ for (const boundary of [
   "npm run audit:release",
   "prerelease:",
   "make_latest:",
+  "delete-asset",
 ]) {
   if (!releaseWorkflow.includes(boundary)) {
     errors.push(`release.yml: missing signed-release boundary ${boundary}`);
