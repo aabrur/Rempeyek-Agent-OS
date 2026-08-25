@@ -38,4 +38,20 @@
 Existing suite still covers loopback vs remote token, desktop session header, child-env allowlist, path denylist, approval consume-once / fail-closed, durable-config recovery, and public-release hygiene. Approval queue remains in-memory.
 
 ## Signing
-No Authenticode certificate is configured in this environment. Public installers stay unsigned. Users must verify `SHA256SUMS.txt`.
+No Authenticode certificate is configured. Public installers stay unsigned. Users must verify `SHA256SUMS.txt`.
+
+## Public GitHub Release v2.4.6 (downloaded and re-hashed)
+
+- URL: https://github.com/aabrur/Rempeyek-Agent-OS/releases/tag/v2.4.6
+- Tag object: `5f050ffc054c40a006e7d058f5b87eaa2d8581a9`
+- Tag target (peeled): `c480f8b442055d6151cd992672988cbaaaa84a8d`
+- Draft: false / prerelease: false
+- Setup `Rempeyek-Agent-OS-Setup-2.4.6.exe` 101415954 bytes
+  SHA256 `23467c0ae3e4b9219d56616f2a3dc37d3306965fac2b81f58f7072abfbccc158`
+- Portable `Rempeyek-Agent-OS-Portable-2.4.6.exe` 101096566 bytes
+  SHA256 `a405146fedc6918de526998a60fea53109dae91becf9ae349a1d7070bafa256d`
+- `SHA256SUMS.txt` matches both downloaded executables
+- `latest.yml` version `2.4.6`, size 101415954, sha512 matches the downloaded Setup
+- Blockmap present for the current Setup
+- No duplicate v2.4.6 Setup asset
+- Local root Setup copy is byte-identical to the public Setup (gitignored convenience copy)
