@@ -6,7 +6,7 @@
 - **Date:** 2026-08-28
 - **Classification:** Windows agent-launcher reliability fix
 - **Target:** Windows x64 desktop with local Node server
-- **Signing:** unsigned local executables; users must verify `SHA256SUMS.txt`
+- **Signing:** unsigned public executables; users must verify `SHA256SUMS.txt`
 
 ## Source Scope
 
@@ -40,7 +40,7 @@
 
 The first post-bump web run exposed one stale hard-coded `2.4.6` fixture in the release-integrity test. The fixture now derives its names from `APP_VERSION`; its focused and complete web reruns passed.
 
-## Local Windows Artifacts
+## Local Pre-Publication Artifacts
 
 - Setup: `Rempeyek-Agent-OS-Setup-2.4.7.exe`
   - Size: 101416596 bytes
@@ -51,6 +51,27 @@ The first post-bump web run exposed one stale hard-coded `2.4.6` fixture in the 
 - Authenticode status: `NotSigned`
 - Local archive: `dist-release/v2.4.7-artifacts`
 
-## Publication Status
+The GitHub runner produced the canonical public artifacts below. Electron packaging is not byte-reproducible across separate build environments, so the root convenience installer was synchronized from the downloaded public asset instead of the local build.
 
-The source commit, tag, GitHub workflow, public asset hashes, and root installer synchronization are pending. This section must be replaced with observed public-release evidence after `v2.4.7` publication.
+## Public GitHub Release
+
+- URL: https://github.com/aabrur/Rempeyek-Agent-OS/releases/tag/v2.4.7
+- Workflow: https://github.com/aabrur/Rempeyek-Agent-OS/actions/runs/33168406069
+- Workflow result: passed, including tests, audits, packaging, package parity, integrity metadata, and release upload
+- Source commit: `d35b51f6f90f940ed17afbc14ea9c50da72cfa24`
+- Annotated tag object: `9df05c760507b9d2f4f7eb9a0e6af60062b2476d`
+- Tag target: `d35b51f6f90f940ed17afbc14ea9c50da72cfa24`
+- Draft: false
+- Prerelease: false
+- Latest release: true
+- Setup: `Rempeyek-Agent-OS-Setup-2.4.7.exe`
+  - Size: 101417092 bytes
+  - SHA-256: `F2214D7F9252014DCCF9254E28C539A3320E0217625B9F84265021C62F0B94E2`
+- Portable: `Rempeyek-Agent-OS-Portable-2.4.7.exe`
+  - Size: 101097700 bytes
+  - SHA-256: `0E2243231782293949BB3909F3F4D5F297C2331742E74C249017BB5BC1384932`
+- Blockmap, `latest.yml`, and `SHA256SUMS.txt`: present and verified
+- Authenticode status after download: `NotSigned`
+- Public download archive: `dist-release/v2.4.7-public`
+- Root installer: byte-identical to the downloaded public Setup
+- Previous root installer `2.4.6`: moved to `dist-release/archive` for recovery
