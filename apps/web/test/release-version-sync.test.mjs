@@ -11,14 +11,14 @@ function readJson(relative) {
   return JSON.parse(fs.readFileSync(path.join(ROOT, relative), "utf8"));
 }
 
-test("package-lock workspace metadata matches 2.4.6 product manifests only", () => {
+test("package-lock workspace metadata matches 2.4.7 product manifests only", () => {
   const lock = readJson("package-lock.json");
   const root = readJson("package.json");
   const web = readJson("apps/web/package.json");
   const desktop = readJson("apps/desktop/package.json");
   const ui = readJson("packages/ui/package.json");
 
-  assert.equal(APP_VERSION, "2.4.6");
+  assert.equal(APP_VERSION, "2.4.7");
   assert.equal(root.version, APP_VERSION);
   assert.equal(web.version, APP_VERSION);
   assert.equal(desktop.version, APP_VERSION);

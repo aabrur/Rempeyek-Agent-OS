@@ -89,3 +89,64 @@ test("desktop child announces an assigned loopback port and enforces its session
     fs.rmSync(stateRoot, { recursive: true, force: true });
   }
 });
+
+test("a missing Windows agent launcher does not terminate the desktop server", async () => {
+  const stateRoot = fs.mkdtempSync(path.join(os.tmpdir(), "rempeyek-desktop-missing-agent-"));
+  const emptyPath = path.join(stateRoot, "empty-path");
+  fs.mkdirSync(emptyPath);
+  fs.writeFileSync(
+    path.join(stateRoot, "agents.config.json"),
+    JSON.stringify({
+      agency: "Desktop Missing Agent Test",
+      agents: [{
+        id: "hermes",
+        name: "Hermes",
+        role: "Service Bridge",
+        enabled: true,
+        gateway: { home: stateRoot, trigger: "hermes", isService: true },
+      }],
+    }),
+  );
+  const child = fork(serverPath, [], {
+    env: {
+      ...process.env,
+      PATH: emptyPath,
+      PORT: "0",
+      DASH_HOST: "127.0.0.1",
+      AGENT_STATE_DIR: stateRoot,
+      AGENTS_CONFIG: path.join(stateRoot, "agents.config.json"),
+      VAULT_PATH: path.join(stateRoot, "Vault"),
+      DESKTOP_SESSION_TOKEN: "desktop-missing-agent-secret",
+    },
+    silent: true,
+  });
+  let childStderr = "";
+  child.stderr.on("data", chunk => { childStderr += String(chunk); });
+  try {
+    const ready = await new Promise((resolve, reject) => {
+      const timer = setTimeout(
+        () => reject(new Error("desktop child did not send ready IPC")),
+        15000,
+      );
+      child.on("message", message => {
+        if (message?.type !== "rempeyek:ready") return;
+        clearTimeout(timer);
+        resolve(message);
+      });
+      child.once("exit", code => {
+        clearTimeout(timer);
+        reject(new Error(`desktop child exited before ready (${code})`));
+      });
+    });
+    await new Promise(resolve => setTimeout(resolve, 4500));
+    assert.equal(child.exitCode, null, "initial status polling must not kill the server");
+    assert.doesNotMatch(childStderr, /\[uncaughtException\]/);
+    const response = await fetch(`http://127.0.0.1:${ready.port}/api/state`, {
+      headers: { "x-desktop-session": "desktop-missing-agent-secret" },
+    });
+    assert.equal(response.status, 200);
+  } finally {
+    child.kill();
+    fs.rmSync(stateRoot, { recursive: true, force: true });
+  }
+});

@@ -3,6 +3,18 @@
 All notable changes to Rempeyek Agent OS. The in-app update banner compares the local version
 against the latest GitHub Release of this repository - tag releases as `v<version>`.
 
+## [2.4.7] - 2026-08-28
+
+### Fixed
+- Windows managed-process failures such as `spawn hermes ENOENT` are contained inside the affected agent record instead of terminating the desktop API server.
+- Bare Windows launchers now resolve supported `.exe`, `.com`, `.cmd`, `.bat`, and `.ps1` files from the managed working directory and `PATH`, while ignoring extensionless Unix-style shims.
+- Windows command scripts run through absolute trusted system hosts with structured arguments and `shell: false`; unsafe command-script metacharacters fail closed.
+- Late process exit events no longer overwrite an earlier launch failure.
+
+### Verification
+- Added regression coverage for asynchronous pidless spawn errors, Windows launcher resolution, command-host safety, and server survival after the initial Hermes status poll.
+- Version synchronized to `2.4.7` across product manifests, runtime constants, desktop recovery, README release links, and lockfile workspace metadata.
+
 ## [2.4.6] - 2026-08-23
 
 ### Added

@@ -1,3 +1,6 @@
+import fs from "node:fs";
+import path from "node:path";
+
 const executable = (platform, windows, other) =>
   platform === "win32" ? windows : other;
 
@@ -77,6 +80,79 @@ export const BUILT_IN_RUNTIME = Object.freeze({
 
 const BARE_PROGRAM = /^[A-Za-z0-9._/-]+(?:\\[A-Za-z0-9._/-]+)*$/;
 const SAFE_ARGUMENT = value => typeof value === "string" && value.length <= 4096 && !/[\u0000-\u001f]/.test(value);
+const WINDOWS_EXTENSIONS = Object.freeze([".com", ".exe", ".bat", ".cmd", ".ps1"]);
+const WINDOWS_CMD_EXTENSIONS = new Set([".bat", ".cmd"]);
+const UNSAFE_CMD_ARGUMENT = /[\u0000-\u001f"&|<>^%!()]/;
+const UNSAFE_CMD_PROGRAM = /[\u0000-\u001f"&|<>^%!]/;
+
+function environmentValue(env, name) {
+  const source = env || process.env;
+  const key = Object.keys(source).find(candidate => candidate.toLowerCase() === name.toLowerCase());
+  return key ? source[key] : undefined;
+}
+
+function windowsSystemExecutable(relativePath, env) {
+  const systemRoot = environmentValue(env, "SystemRoot") || environmentValue(env, "WINDIR");
+  if (!systemRoot || !path.win32.isAbsolute(systemRoot)) {
+    throw new Error("trusted Windows system root is unavailable");
+  }
+  return path.win32.join(systemRoot, "System32", ...relativePath);
+}
+
+function existingWindowsProgram(program, { cwd, env, fsImpl = fs } = {}) {
+  const extension = path.win32.extname(program).toLowerCase();
+  if (WINDOWS_EXTENSIONS.includes(extension)) return program;
+
+  const pathValue = environmentValue(env, "PATH") || "";
+  const directories = [cwd, ...String(pathValue).split(";")]
+    .filter(Boolean)
+    .map(value => String(value).trim().replace(/^"(.*)"$/, "$1"));
+  const hasDirectory = /[\\/]/.test(program);
+  const roots = hasDirectory
+    ? [path.win32.isAbsolute(program) ? program : path.win32.resolve(cwd || process.cwd(), program)]
+    : directories.map(directory => path.win32.join(directory, program));
+
+  for (const root of roots) {
+    for (const candidateExtension of WINDOWS_EXTENSIONS) {
+      const candidate = `${root}${candidateExtension}`;
+      try {
+        if (fsImpl.statSync(candidate).isFile()) return candidate;
+      } catch {}
+    }
+  }
+  return program;
+}
+
+export function resolveSpawnSpec(spec, {
+  platform = process.platform,
+  cwd,
+  env,
+  fsImpl = fs,
+} = {}) {
+  if (!spec?.program || !Array.isArray(spec.args)) {
+    throw new Error("resolved process spec is required");
+  }
+  if (platform !== "win32") return { program: spec.program, args: [...spec.args] };
+
+  const program = existingWindowsProgram(spec.program, { cwd, env, fsImpl });
+  const extension = path.win32.extname(program).toLowerCase();
+  if (WINDOWS_CMD_EXTENSIONS.has(extension)) {
+    if (UNSAFE_CMD_PROGRAM.test(program) || spec.args.some(value => UNSAFE_CMD_ARGUMENT.test(value))) {
+      throw new Error("Windows command script contains unsupported shell metacharacters");
+    }
+    return {
+      program: windowsSystemExecutable(["cmd.exe"], env),
+      args: ["/d", "/s", "/c", "call", program, ...spec.args],
+    };
+  }
+  if (extension === ".ps1") {
+    return {
+      program: windowsSystemExecutable(["WindowsPowerShell", "v1.0", "powershell.exe"], env),
+      args: ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", program, ...spec.args],
+    };
+  }
+  return { program, args: [...spec.args] };
+}
 
 function commandSpec(value) {
   if (!value || typeof value !== "object") return null;
@@ -303,14 +379,18 @@ export function resolveAdapter({
   return null;
 }
 
-export function startResolvedProcess(spec, { spawnImpl, cwd, env, visible = false } = {}) {
-  if (!spec?.program || !Array.isArray(spec.args)) {
-    throw new Error("resolved process spec is required");
-  }
+export function startResolvedProcess(spec, {
+  spawnImpl,
+  cwd,
+  env,
+  visible = false,
+  platform = process.platform,
+} = {}) {
   if (typeof spawnImpl !== "function") {
     throw new Error("spawnImpl is required");
   }
-  return spawnImpl(spec.program, spec.args, {
+  const command = resolveSpawnSpec(spec, { platform, cwd, env });
+  return spawnImpl(command.program, command.args, {
     cwd,
     env,
     shell: false,

@@ -132,7 +132,7 @@ test("ManagedProcessManager prevents double start, handles zero exit, non-zero e
     assert.ok(res2.error.includes("already has a managed gateway-run process"));
 
     // 3. Log streaming
-    const child = activeChildren.get("node");
+    const child = [...activeChildren.values()][0];
     child.stdout.emit("data", "v24.15.0\n");
 
     const logRes = pm.logs("antigravity");

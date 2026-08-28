@@ -67,6 +67,52 @@ test("manager stores typed owned-process metadata and captures separate stdout/s
   });
 });
 
+test("manager contains an asynchronous spawn error when Windows returns no PID", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "rempeyek-process-spawn-error-"));
+  const failedChild = fakeChild(null);
+  const healthyChild = fakeChild(4412);
+  let spawnCount = 0;
+  const manager = createManagedProcessManager({
+    logDir: path.join(root, "logs"),
+    recordsPath: path.join(root, "processes.json"),
+    platform: "win32",
+    spawnImpl() {
+      spawnCount += 1;
+      return spawnCount === 1 ? failedChild : healthyChild;
+    },
+  });
+  try {
+    const failed = manager.start({
+      agentId: "hermes",
+      actionType: "status",
+      command: { program: "hermes", args: ["gateway", "status"] },
+      cwd: root,
+      env: { PATH: "" },
+    });
+    assert.equal(failed.ok, false);
+    const notFound = Object.assign(new Error("spawn hermes ENOENT"), { code: "ENOENT" });
+    assert.doesNotThrow(() => failedChild.emit("error", notFound));
+    assert.equal(manager.status("hermes", "status").runtimeState, "failed");
+    failedChild.emit("exit", 0);
+    assert.equal(
+      manager.status("hermes", "status").runtimeState,
+      "failed",
+      "a late exit must not erase the launch failure",
+    );
+
+    const healthy = manager.start({
+      agentId: "codex",
+      actionType: "gateway-run",
+      command: { program: "codex", args: [] },
+      cwd: root,
+      env: { PATH: "" },
+    });
+    assert.equal(healthy.ok, true, "one failed launcher must not poison later starts");
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("manager stops only an active managed process tree and never reports an idle stop as success", async () => {
   await withManager(async ({ child, manager, root, treeKills }) => {
     const idle = await manager.stop("codex");

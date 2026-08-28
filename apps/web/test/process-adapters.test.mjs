@@ -6,6 +6,7 @@ import {
   resolveAdapter,
   resolveProbe,
   resolveRuntimeAdapter,
+  resolveSpawnSpec,
   startResolvedProcess,
 } from "../lib/process-adapters.mjs";
 
@@ -190,7 +191,8 @@ test("resolved processes never delegate to a shell", () => {
     { program: "npm.cmd", args: ["install", "--global", "@openai/codex"] },
     {
       cwd: "C:\\repo",
-      env: { PATH: "test" },
+      env: { PATH: "test", SystemRoot: "C:\\Windows" },
+      platform: "win32",
       spawnImpl(program, args, options) {
         calls.push({ program, args, options });
         return { pid: 42 };
@@ -199,15 +201,113 @@ test("resolved processes never delegate to a shell", () => {
   );
   assert.equal(result.pid, 42);
   assert.deepEqual(calls, [{
-    program: "npm.cmd",
-    args: ["install", "--global", "@openai/codex"],
+    program: "C:\\Windows\\System32\\cmd.exe",
+    args: ["/d", "/s", "/c", "call", "npm.cmd", "install", "--global", "@openai/codex"],
     options: {
       cwd: "C:\\repo",
-      env: { PATH: "test" },
+      env: { PATH: "test", SystemRoot: "C:\\Windows" },
       shell: false,
       windowsHide: true,
     },
   }]);
+});
+
+test("resolved PowerShell scripts use an explicit host and structured argv", () => {
+  const calls = [];
+  startResolvedProcess(
+    { program: "C:\\Agents\\runner.ps1", args: ["status"] },
+    {
+      platform: "win32",
+      env: { SystemRoot: "C:\\Windows" },
+      spawnImpl(program, args, options) {
+        calls.push({ program, args, options });
+        return { pid: 43 };
+      },
+    },
+  );
+  assert.deepEqual(calls, [{
+    program: "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+    args: ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", "C:\\Agents\\runner.ps1", "status"],
+    options: {
+      cwd: undefined,
+      env: { SystemRoot: "C:\\Windows" },
+      shell: false,
+      windowsHide: true,
+    },
+  }]);
+});
+
+test("Windows bare commands prefer executable PATH entries and ignore extensionless shims", () => {
+  const files = new Set([
+    "c:\\shims\\codex.cmd",
+    "c:\\bin\\hermes.ps1",
+  ]);
+  const fsImpl = {
+    statSync(candidate) {
+      if (!files.has(candidate.toLowerCase())) throw Object.assign(new Error("missing"), { code: "ENOENT" });
+      return { isFile: () => true };
+    },
+  };
+  const env = {
+    Path: "C:\\Shims;C:\\Bin",
+    SystemRoot: "C:\\Windows",
+  };
+
+  assert.deepEqual(resolveSpawnSpec(
+    { program: "codex", args: ["exec"] },
+    { platform: "win32", cwd: "C:\\State", env, fsImpl },
+  ), {
+    program: "C:\\Windows\\System32\\cmd.exe",
+    args: ["/d", "/s", "/c", "call", "C:\\Shims\\codex.cmd", "exec"],
+  });
+  assert.deepEqual(resolveSpawnSpec(
+    { program: "hermes", args: ["status"] },
+    { platform: "win32", cwd: "C:\\State", env, fsImpl },
+  ), {
+    program: "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+    args: ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", "C:\\Bin\\hermes.ps1", "status"],
+  });
+});
+
+test("Windows command scripts reject tokens interpreted by cmd.exe", () => {
+  assert.throws(
+    () => resolveSpawnSpec(
+      { program: "tool.cmd", args: ["safe", "&&", "unexpected"] },
+      { platform: "win32", env: { SystemRoot: "C:\\Windows" } },
+    ),
+    /unsupported shell metacharacters/,
+  );
+});
+
+test("Windows command scripts allow a quoted Program Files (x86) path", () => {
+  assert.deepEqual(resolveSpawnSpec(
+    { program: "C:\\Program Files (x86)\\Agent\\tool.cmd", args: ["status"] },
+    { platform: "win32", env: { SystemRoot: "C:\\Windows" } },
+  ), {
+    program: "C:\\Windows\\System32\\cmd.exe",
+    args: ["/d", "/s", "/c", "call", "C:\\Program Files (x86)\\Agent\\tool.cmd", "status"],
+  });
+});
+
+test("Windows script hosts fail closed without an absolute system root", () => {
+  assert.throws(
+    () => resolveSpawnSpec(
+      { program: "tool.cmd", args: [] },
+      { platform: "win32", env: { SystemRoot: "relative\\windows" } },
+    ),
+    /trusted Windows system root is unavailable/,
+  );
+});
+
+test("native executables and non-Windows process specs remain direct", () => {
+  assert.deepEqual(resolveSpawnSpec(
+    { program: "C:\\Tools\\agent.exe", args: ["status"] },
+    { platform: "win32" },
+  ), { program: "C:\\Tools\\agent.exe", args: ["status"] });
+  assert.deepEqual(resolveSpawnSpec(
+    { program: "agent", args: ["status"] },
+    { platform: "linux" },
+  ), { program: "agent", args: ["status"] });
 });
 
 test("resolved installer processes can open a visible Windows terminal", () => {

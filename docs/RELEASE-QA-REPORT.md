@@ -1,57 +1,56 @@
-# Rempeyek Agent OS 2.4.6 Release QA Report
+# Rempeyek Agent OS 2.4.7 Release QA Report
 
 ## Executive Summary
-- **Release Version:** `2.4.6`
-- **Classification:** maintenance refresh of the existing `v2.4.6` GitHub Release (no `v2.4.7`)
-- **Target OS:** Windows x64 desktop + local Node server
-- **Signing:** unsigned public Windows executables; verify with published `SHA256SUMS.txt`
 
-## Source
-- **Pre-maintenance `origin/main`:** `9c5ef67424eee26472a30483236cf8242ca72278`
-- **Previous annotated tag `v2.4.6`:** `dadc5c9fbda3fe43338c3d48a530fba3c1e78f4e` (peeled `87cdf385b5e1916d465b91cc7dbb101b05716248`)
-- **Product version files:** `package.json`, `apps/web/package.json`, `apps/desktop/package.json`, `apps/web/lib/version.mjs` = `2.4.6`
-- Independently versioned packages remain `2.1.0` (`packages/ui`, `theme-engine`, `neural-engine`, `design-system`)
+- **Release version:** `2.4.7`
+- **Date:** 2026-08-28
+- **Classification:** Windows agent-launcher reliability fix
+- **Target:** Windows x64 desktop with local Node server
+- **Signing:** unsigned local executables; users must verify `SHA256SUMS.txt`
 
-## Fresh verification (this maintenance)
+## Source Scope
+
+- Base `origin/main`: `92848c077dba08253008c9f30be444b8243f537c`
+- Product versions: root, web, desktop, runtime constant, and lockfile workspaces are `2.4.7`
+- Independently versioned `packages/*` remain `2.1.0`
+- No UI or design changes are included
+
+## Fixes
+
+- A pidless Windows `spawn()` followed by asynchronous `ENOENT` is contained in the affected process record instead of reaching the server-level `uncaughtException` shutdown path.
+- Managed runtime and Marketplace execution use the same Windows launcher resolver.
+- Bare commands resolve supported `.com`, `.exe`, `.bat`, `.cmd`, and `.ps1` files from the managed working directory and `PATH`; extensionless Unix shims are ignored.
+- `.cmd` and `.bat` files use the absolute `SystemRoot\System32\cmd.exe`; `.ps1` files use the absolute Windows PowerShell host with structured arguments and `shell: false`.
+- Unsafe command-script metacharacters fail closed, and late exit events cannot erase an earlier launch failure.
+
+## Verification
 
 | Gate | Result | Evidence |
 |---|---|---|
-| `npm test` | PASSED | **436/436** tests, 0 failed (10.84s) |
-| `npm run test:desktop` | PASSED | **42/42** tests, 0 failed |
-| `npm run build` | PASSED | Vite 6.4.3, **2103** modules |
-| `npm run audit:public` | PASSED | 425 tracked paths at audit time; 0 personal paths / secrets |
-| `npm run audit:release` | PASSED | lockfile workspaces `2.4.6`; production audit 0; reviewed high 0; expires 2026-08-31 |
-| `npm run test:e2e` | PASSED | Playwright Chromium **3/3** (shell/nav/API/themes + 1440x900 + 390x844) |
-| `npm run desktop:pack` | PASSED | electron-builder 26.15.3 dir pack via `scripts/desktop-pack.mjs` |
-| `npm run desktop:test-package` | PASSED | **4/4** package-content tests |
-| Startup readiness stress | PASSED | **20/20** clean forks; work/social never returned `* loading` after `rempeyek:ready` |
+| `npm test` after version bump and fixture repair | PASSED | 444/444 |
+| `npm run test:desktop` after version bump | PASSED | 42/42 |
+| Focused Windows runtime regression | PASSED | 33/33 |
+| `npm run desktop:dist` | PASSED | Vite 6.4.3, 2103 modules, electron-builder 26.15.3 |
+| `npm run desktop:test-package` | PASSED | 4/4 |
+| `npm run test:e2e` | PASSED | Playwright Chromium 3/3, desktop 1440x900 and mobile 390x844 |
+| `npm run audit:public` | PASSED | 439 tracked paths |
+| `npm run audit:release` | PASSED | production 0, reviewed development high 0 |
+| `npm run audit:version` | PASSED | all product workspaces `2.4.7` |
+| Release artifact integrity | PASSED | Setup, Portable, blockmap, `latest.yml`, and checksums |
 
-## What this maintenance changed
-- HTTP listen/`rempeyek:ready` now waits for Work Lifecycle, Publishing, Switchboard, and process-manager modules (`apps/web/lib/http-readiness.cjs`)
-- Failed required modules report `unavailable`, not perpetual `loading`
-- Real Playwright E2E is a CI gate; missing browser fails
-- `package-lock.json` workspace metadata synchronized to `2.4.6`
-- Export/root installer copy is fail-closed and hash-checked; release workflow regenerates SHA256SUMS and deletes same-named assets before republish
-- Windows npm script runner no longer depends on shadowed `cmd` / scoped `@workspace` tokens
+The first post-bump web run exposed one stale hard-coded `2.4.6` fixture in the release-integrity test. The fixture now derives its names from `APP_VERSION`; its focused and complete web reruns passed.
 
-## Security
-Existing suite still covers loopback vs remote token, desktop session header, child-env allowlist, path denylist, approval consume-once / fail-closed, durable-config recovery, and public-release hygiene. Approval queue remains in-memory.
+## Local Windows Artifacts
 
-## Signing
-No Authenticode certificate is configured. Public installers stay unsigned. Users must verify `SHA256SUMS.txt`.
+- Setup: `Rempeyek-Agent-OS-Setup-2.4.7.exe`
+  - Size: 101416596 bytes
+  - SHA-256: `0C9B2DB4BADFEAAE5146DD8A3DF055AD3FC4ED6450921361848A85975DBA82AE`
+- Portable: `Rempeyek-Agent-OS-Portable-2.4.7.exe`
+  - Size: 101097095 bytes
+  - SHA-256: `01D3F1BA0FE74E7C85E037620D2EA535DDC5D956839796BD186EA8F3A40E33A2`
+- Authenticode status: `NotSigned`
+- Local archive: `dist-release/v2.4.7-artifacts`
 
-## Public GitHub Release v2.4.6 (downloaded and re-hashed)
+## Publication Status
 
-- URL: https://github.com/aabrur/Rempeyek-Agent-OS/releases/tag/v2.4.6
-- Tag object: `5f050ffc054c40a006e7d058f5b87eaa2d8581a9`
-- Tag target (peeled): `c480f8b442055d6151cd992672988cbaaaa84a8d`
-- Draft: false / prerelease: false
-- Setup `Rempeyek-Agent-OS-Setup-2.4.6.exe` 101415954 bytes
-  SHA256 `23467c0ae3e4b9219d56616f2a3dc37d3306965fac2b81f58f7072abfbccc158`
-- Portable `Rempeyek-Agent-OS-Portable-2.4.6.exe` 101096566 bytes
-  SHA256 `a405146fedc6918de526998a60fea53109dae91becf9ae349a1d7070bafa256d`
-- `SHA256SUMS.txt` matches both downloaded executables
-- `latest.yml` version `2.4.6`, size 101415954, sha512 matches the downloaded Setup
-- Blockmap present for the current Setup
-- No duplicate v2.4.6 Setup asset
-- Local root Setup copy is byte-identical to the public Setup (gitignored convenience copy)
+The source commit, tag, GitHub workflow, public asset hashes, and root installer synchronization are pending. This section must be replaced with observed public-release evidence after `v2.4.7` publication.

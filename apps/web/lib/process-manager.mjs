@@ -3,6 +3,8 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
+import { resolveSpawnSpec } from "./process-adapters.mjs";
+
 export const RUNTIME_STATES = Object.freeze([
   "idle", "starting", "running", "waiting", "stopping", "stopped", "failed", "unavailable",
 ]);
@@ -195,21 +197,28 @@ export function createManagedProcessManager({
       fs.closeSync(fs.openSync(record.stderrPath, "a"));
       records.set(key, record);
       persist();
-      const child = spawnImpl(record.command, record.args, {
+      const command = resolveSpawnSpec(
+        { program: record.command, args: record.args },
+        { platform, cwd: record.workingDirectory, env: spec.env },
+      );
+      const child = spawnImpl(command.program, command.args, {
         cwd: record.workingDirectory,
         env: spec.env,
         shell: false,
         windowsHide: true,
         stdio: ["ignore", "pipe", "pipe"],
       });
-      if (!Number.isInteger(child?.pid) || child.pid <= 0) throw new Error("spawn returned no PID");
-      record.pid = child.pid;
-      record.runtimeState = "running";
-      children.set(key, child);
       child.stdout?.on?.("data", chunk => append(record, "out", chunk));
       child.stderr?.on?.("data", chunk => append(record, "err", chunk));
       child.on?.("error", error => {
-        if (!ACTIVE_STATES.has(record.runtimeState)) return;
+        if (!ACTIVE_STATES.has(record.runtimeState)) {
+          if (record.runtimeState === "failed" && record.reason === "spawn returned no PID") {
+            record.reason = error.message;
+            append(record, "err", error.message);
+            persist();
+          }
+          return;
+        }
         record.runtimeState = "failed";
         record.exitCode = -1;
         record.reason = error.message;
@@ -219,6 +228,7 @@ export function createManagedProcessManager({
         settle(record);
       });
       child.on?.("exit", code => {
+        if (!ACTIVE_STATES.has(record.runtimeState)) return;
         record.exitCode = Number.isInteger(code) ? code : null;
         record.runtimeState = record.stopRequested || code === 0 ? "stopped" : "failed";
         if (record.runtimeState === "failed") record.reason = `process exited with code ${code}`;
@@ -226,6 +236,10 @@ export function createManagedProcessManager({
         persist();
         settle(record);
       });
+      if (!Number.isInteger(child?.pid) || child.pid <= 0) throw new Error("spawn returned no PID");
+      record.pid = child.pid;
+      record.runtimeState = "running";
+      children.set(key, child);
       persist();
       return { ok: true, record: status(record.agentId, record.actionType) };
     } catch (error) {

@@ -1,8 +1,8 @@
 # Rempeyek Agent OS Checkpoint
 
-**Updated:** 2026-08-25
+**Updated:** 2026-08-28
 
-**Status:** v2.4.6 MAINTENANCE RECONCILIATION — verification recorded in `docs/RELEASE-QA-REPORT.md`
+**Status:** v2.4.7 WINDOWS AGENT SPAWN FIX - verification recorded in `docs/RELEASE-QA-REPORT.md`
 
 ## Contract & Core Principles
 
