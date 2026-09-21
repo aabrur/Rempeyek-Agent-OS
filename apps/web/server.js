@@ -3987,7 +3987,7 @@ function requestHandler(req, res, services = DEFAULT_RUNTIME_SERVICES) {
       ...BASE_SECURITY_HEADERS,
     };
     if (isHtml) {
-      headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' ws: wss:; font-src 'self' data:;";
+      headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' ws: wss: https://api.github.com; font-src 'self' data:;";
     }
     res.writeHead(200, headers);
     res.end(fs.readFileSync(file));
