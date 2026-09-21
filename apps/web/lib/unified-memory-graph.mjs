@@ -12,6 +12,15 @@ const CODE_EXTENSIONS = new Set([
 
 const REPO_ROOT_FILES = ['README.md', 'CHANGELOG.md', 'CLAUDE.md', 'CONTEXT.md', 'LICENSE', 'package.json', 'agents.config.example.json'];
 
+function fastHash(str) {
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return (h >>> 0).toString(16).padStart(8, '0');
+}
+
 function sha256Short(str) {
   return crypto.createHash('sha256').update(String(str)).digest('hex').substring(0, 12);
 }
@@ -97,7 +106,7 @@ export function buildUnifiedMemoryGraph({ vaultPath, rootDir, configDir } = {}) 
   const addEdge = ({ source, target, type = 'RELATED_TO', confidence = 'verified', provenance = 'system' }) => {
     if (!source || !target || source === target) return;
     if (!nodesMap.has(source) || !nodesMap.has(target)) return;
-    const edgeId = `edge:${sha256Short(`${source}->${target}:${type}`)}`;
+    const edgeId = `edge:${fastHash(`${source}->${target}:${type}`)}`;
     if (!edgesMap.has(edgeId)) {
       edgesMap.set(edgeId, {
         id: edgeId,

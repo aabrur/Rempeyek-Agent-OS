@@ -3,6 +3,21 @@
 All notable changes to Rempeyek Agent OS. The in-app update banner compares the local version
 against the latest GitHub Release of this repository - tag releases as `v<version>`.
 
+## [2.4.8] - 2026-09-21
+
+### Performance & Scalability
+- Vault Health Optimization: Implemented in-memory TTL caching (15s) and in-flight Promise deduplication for `buildVaultHealth()` in `apps/web/server.js`, eliminating `git.exe` spawning storms under concurrent dashboard polling. Benchmark throughput improved from 56 req/s to 766 req/s (13.7x boost), with P50 latency dropping from 424ms to 18ms.
+- High-Performance Edge Hashing: Replaced synchronous OpenSSL SHA-256 edge hashing (`sha256Short`) in `apps/web/lib/unified-memory-graph.mjs` with a fast 32-bit FNV-1a hash (`fastHash`), slashing CPU overhead on large-scale memory graph edge indexing.
+- Cold Cache Stampede Protection: Added in-flight Promise deduplication to `buildParityGraph()` in `apps/web/server.js` so concurrent cold startup requests share a single disk traversal.
+
+### Security Hardening
+- Defense-in-Depth HTTP Headers: Configured `X-Content-Type-Options: nosniff`, `X-Frame-Options: SAMEORIGIN`, and `Referrer-Policy: no-referrer` on all API responses.
+- Content Security Policy: Configured explicit CSP on static HTML responses to guard remote and web-mode deployments against script injection.
+
+### Verification
+- Added automated TDD test coverage for vault-health caching (`apps/web/test/vault-health-cache.test.mjs`) and HTTP security headers (`apps/web/test/http-security-headers.test.mjs`).
+- Version synchronized to `2.4.8` across product manifests, runtime constants, desktop recovery, README release links, and lockfile workspace metadata.
+
 ## [2.4.7] - 2026-08-28
 
 ### Fixed

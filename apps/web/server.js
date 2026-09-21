@@ -5,7 +5,7 @@
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
-const APP_VERSION = "2.4.7";
+const APP_VERSION = "2.4.8";
 const APP_TITLE = "REMPEYEK AGENT OS";
 const net = require("net");
 const os = require("os");
@@ -1671,27 +1671,37 @@ function resolveLink(raw, fromRel, byPath, byBase) {
 }
 
 let graphCache = { t: 0, data: null };
-let parityGraphCache = { t: 0, data: null };
+let parityGraphCache = { t: 0, data: null, inFlight: null };
 async function buildParityGraph() {
   if (parityGraphCache.data && Date.now() - parityGraphCache.t < 60000) return parityGraphCache.data;
-  if (unifiedMemoryLib?.buildUnifiedMemoryGraph) {
+  if (parityGraphCache.inFlight) return parityGraphCache.inFlight;
+  parityGraphCache.inFlight = (async () => {
     try {
-      const configDir = path.join(RUNTIME_PATHS.runtimeRoot || path.dirname(VAULT), 'Config');
-      const data = unifiedMemoryLib.buildUnifiedMemoryGraph({ vaultPath: VAULT, rootDir: ROOT, configDir });
-      parityGraphCache = { t: Date.now(), data };
+      if (unifiedMemoryLib?.buildUnifiedMemoryGraph) {
+        try {
+          const configDir = path.join(RUNTIME_PATHS.runtimeRoot || path.dirname(VAULT), 'Config');
+          const data = unifiedMemoryLib.buildUnifiedMemoryGraph({ vaultPath: VAULT, rootDir: ROOT, configDir });
+          parityGraphCache.data = data;
+          parityGraphCache.t = Date.now();
+          return data;
+        } catch (e) { console.error('[buildParityGraph]', e.message); }
+      }
+      const { buildVaultGraph } = await VAULT_GRAPH;
+      // Full fidelity: every vault file (only .md gets read + link-parsed) + repo source as `code`.
+      const files = walkVaultAll().map((file) => {
+        if (!file.rel.toLowerCase().endsWith(".md")) return file;
+        try { return { ...file, text: fs.readFileSync(path.join(VAULT, file.rel), "utf8") }; }
+        catch { return null; }
+      }).filter(Boolean).concat(walkRepo());
+      const data = buildVaultGraph({ files });
+      parityGraphCache.data = data;
+      parityGraphCache.t = Date.now();
       return data;
-    } catch (e) { console.error('[buildParityGraph]', e.message); }
-  }
-  const { buildVaultGraph } = await VAULT_GRAPH;
-  // Full fidelity: every vault file (only .md gets read + link-parsed) + repo source as `code`.
-  const files = walkVaultAll().map((file) => {
-    if (!file.rel.toLowerCase().endsWith(".md")) return file;
-    try { return { ...file, text: fs.readFileSync(path.join(VAULT, file.rel), "utf8") }; }
-    catch { return null; }
-  }).filter(Boolean).concat(walkRepo());
-  const data = buildVaultGraph({ files });
-  parityGraphCache = { t: Date.now(), data };
-  return data;
+    } finally {
+      parityGraphCache.inFlight = null;
+    }
+  })();
+  return parityGraphCache.inFlight;
 }
 
 function legacyDecisionContext(slug, entries) {
@@ -2311,17 +2321,29 @@ function buildSchedule(cb) {
   }));
 }
 
-/* R#9: vault health - age of the last git commit + age of the last backup (prevent losing the brain).
-   Backup optional via env BACKUP_PATH (folder/file); if unset, only git is reported. */
+let vaultHealthCache = { t: 0, data: null, inFlight: null };
 function buildVaultHealth(cb) {
-  const res = { vault: VAULT, gitCommitAt: null, gitAgeH: null, gitOk: false, backupAt: null, backupAgeH: null, backup: null };
-  const backup = process.env.BACKUP_PATH || null;
-  if (backup) { try { const st = fs.statSync(backup); res.backupAt = new Date(st.mtimeMs).toISOString(); res.backupAgeH = Math.round((Date.now() - st.mtimeMs) / 3600000); res.backup = backup; } catch { res.backup = backup + " (not found)"; } }
-  execFile("git", ["-C", VAULT, "log", "-1", "--format=%cI"], { windowsHide: true }, (e, out) => {
-    if (!e && out && out.trim()) { const t = Date.parse(out.trim()); if (!Number.isNaN(t)) { res.gitCommitAt = out.trim(); res.gitAgeH = Math.round((Date.now() - t) / 3600000); res.gitOk = true; } }
-    else res.gitError = e ? String(e.message).split("\n")[0].slice(0, 120) : "no commits";
-    cb(res);
+  if (vaultHealthCache.data && Date.now() - vaultHealthCache.t < 15000) {
+    return cb(vaultHealthCache.data);
+  }
+  if (vaultHealthCache.inFlight) {
+    vaultHealthCache.inFlight.then(data => cb(data));
+    return;
+  }
+  vaultHealthCache.inFlight = new Promise(resolve => {
+    const res = { vault: VAULT, gitCommitAt: null, gitAgeH: null, gitOk: false, backupAt: null, backupAgeH: null, backup: null };
+    const backup = process.env.BACKUP_PATH || null;
+    if (backup) { try { const st = fs.statSync(backup); res.backupAt = new Date(st.mtimeMs).toISOString(); res.backupAgeH = Math.round((Date.now() - st.mtimeMs) / 3600000); res.backup = backup; } catch { res.backup = backup + " (not found)"; } }
+    execFile("git", ["-C", VAULT, "log", "-1", "--format=%cI"], { windowsHide: true }, (e, out) => {
+      if (!e && out && out.trim()) { const t = Date.parse(out.trim()); if (!Number.isNaN(t)) { res.gitCommitAt = out.trim(); res.gitAgeH = Math.round((Date.now() - t) / 3600000); res.gitOk = true; } }
+      else res.gitError = e ? String(e.message).split("\n")[0].slice(0, 120) : "no commits";
+      vaultHealthCache.data = res;
+      vaultHealthCache.t = Date.now();
+      vaultHealthCache.inFlight = null;
+      resolve(res);
+    });
   });
+  vaultHealthCache.inFlight.then(data => cb(data));
 }
 
 /* Bonus (two-way): mark a task done from the dashboard → change `- [ ]` to `- [x]` in the vault file. */
@@ -2791,8 +2813,16 @@ function authorized(req) {
   if (/^(127\.0\.0\.1|::1|::ffff:127\.0\.0\.1)$/.test(remote)) return true;
   return safeEq(req.headers["x-dash-token"] || "", TOKEN);
 }
+const BASE_SECURITY_HEADERS = {
+  "X-Content-Type-Options": "nosniff",
+  "X-Frame-Options": "SAMEORIGIN",
+  "Referrer-Policy": "no-referrer",
+};
 function json(res, code, obj) {
-  res.writeHead(code, { "Content-Type": "application/json; charset=utf-8" });
+  res.writeHead(code, {
+    "Content-Type": "application/json; charset=utf-8",
+    ...BASE_SECURITY_HEADERS,
+  });
   res.end(JSON.stringify(obj));
 }
 
@@ -3945,7 +3975,15 @@ function requestHandler(req, res, services = DEFAULT_RUNTIME_SERVICES) {
     return res.end(hint);
   }
   try {
-    res.writeHead(200, { "Content-Type": MIME[path.extname(file)] || "application/octet-stream" });
+    const isHtml = path.extname(file) === ".html";
+    const headers = {
+      "Content-Type": MIME[path.extname(file)] || "application/octet-stream",
+      ...BASE_SECURITY_HEADERS,
+    };
+    if (isHtml) {
+      headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' ws: wss:; font-src 'self' data:;";
+    }
+    res.writeHead(200, headers);
     res.end(fs.readFileSync(file));
   } catch { res.writeHead(500, { "Content-Type": "text/plain" }); res.end("error"); }
 }
