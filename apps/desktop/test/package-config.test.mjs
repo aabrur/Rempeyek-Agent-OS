@@ -31,7 +31,7 @@ test("desktop package pins the reviewed runtime and packages only required app f
   assert.equal(pkg.main, "main.mjs");
   assert.equal(pkg.devDependencies.electron, "43.2.0");
   assert.equal(pkg.devDependencies["electron-builder"], "26.15.3");
-  assert.equal(pkg.devDependencies.sharp, "0.35.3");
+  assert.equal(pkg.devDependencies.sharp, "0.35.4");
   assert.equal(pkg.devDependencies["png-to-ico"], "3.0.2");
   assert.equal(pkg.dependencies["electron-updater"], "6.8.9");
   assert.equal(pkg.build.appId, "com.rempeyek.agentos");
