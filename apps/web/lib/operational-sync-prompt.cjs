@@ -2,7 +2,7 @@ const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
 
-const PROMPT_VERSION = 1;
+const PROMPT_VERSION = 2;
 const PROMPT_RELATIVE_PATH = "System/Operational Synchronization.md";
 const TASK_RELATIVE_PATH = "Tasks/Inbox Tasks.md";
 
