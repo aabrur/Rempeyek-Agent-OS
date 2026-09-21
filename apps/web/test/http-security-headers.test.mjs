@@ -25,14 +25,21 @@ test("API and static responses include defense-in-depth security headers and CSP
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "rempeyek-sec-test-"));
   const configPath = path.join(root, "agents.config.json");
   const vaultPath = path.join(root, "Vault");
+  const distDir = path.join(root, "dist");
   fs.mkdirSync(vaultPath, { recursive: true });
+  fs.mkdirSync(distDir, { recursive: true });
   fs.writeFileSync(configPath, JSON.stringify({ agency: "Test", agents: [] }));
+  fs.writeFileSync(
+    path.join(distDir, "index.html"),
+    "<!doctype html><html><head><title>Test</title></head><body><h1>Rempeyek</h1></body></html>",
+  );
 
   const server = createServer({
     configPath,
     stateRoot: root,
     vaultPath,
     telemetryDir: path.join(root, "telemetry"),
+    distDir,
   });
 
   await whenHttpModulesReady();
@@ -54,6 +61,12 @@ test("API and static responses include defense-in-depth security headers and CSP
     assert.equal(htmlRes.headers["x-frame-options"], "SAMEORIGIN");
     assert.ok(htmlRes.headers["content-security-policy"], "CSP header must be present on HTML");
     assert.ok(htmlRes.headers["content-security-policy"].includes("default-src 'self'"));
+
+    // 3. Fallback / 404 response includes base security headers
+    const notFoundRes = await fetchResponse(port, "/missing-file.xyz");
+    assert.equal(notFoundRes.status, 404);
+    assert.equal(notFoundRes.headers["x-content-type-options"], "nosniff");
+    assert.equal(notFoundRes.headers["x-frame-options"], "SAMEORIGIN");
   } finally {
     server.close();
     fs.rmSync(root, { recursive: true, force: true });

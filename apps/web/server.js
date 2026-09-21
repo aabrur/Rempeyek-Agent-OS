@@ -283,6 +283,8 @@ function createRuntimeServices(runtime = {}) {
   const bundleRoot = runtime.bundleRoot || RUNTIME_PATHS.bundleRoot;
   const userHome = runtime.userHome || os.homedir();
   const logDir = path.join(telemetryDir, "logs");
+  const distDir = runtime.distDir || DIST;
+  const publicDir = runtime.publicDir || PUBLIC;
   const completedMutations = new Map();
   const ownedMutations = new Map();
 
@@ -310,10 +312,12 @@ function createRuntimeServices(runtime = {}) {
     bundleRoot,
     completedMutations,
     configPath,
+    distDir,
     loadConfig: readConfig,
     logDir,
     ownedMutations,
     probeCatalogInstalled: runtime.probeCatalogInstalled || null,
+    publicDir,
     receiptDir,
     startResolvedProcess: runtime.startResolvedProcess || null,
     stateRoot,
@@ -3960,18 +3964,20 @@ function requestHandler(req, res, services = DEFAULT_RUNTIME_SERVICES) {
 
   // /avatars/* is runtime-written and always served from the ignored state directory.
   let file = null;
+  const distDir = (services && services.distDir) || DIST;
+  const publicDir = (services && services.publicDir) || PUBLIC;
   if (rel.startsWith("avatars/")) {
     file = resolve(AVATAR_DIR, rel.slice("avatars/".length));
   } else {
-    for (const root of [DIST, PUBLIC]) { file = resolve(root, rel); if (file) break; }
+    for (const root of [distDir, publicDir]) { file = resolve(root, rel); if (file) break; }
   }
 
   // SPA fallback: unknown non-asset path → the built index.html (client-side routing)
-  if (!file && !path.extname(rel)) file = resolve(DIST, "index.html");
+  if (!file && !path.extname(rel)) file = resolve(distDir, "index.html");
 
   if (!file) {
-    const hint = fs.existsSync(DIST) ? "not found" : "not built - run: npm run build";
-    res.writeHead(404, { "Content-Type": "text/plain" });
+    const hint = fs.existsSync(distDir) ? "not found" : "not built - run: npm run build";
+    res.writeHead(404, { "Content-Type": "text/plain", ...BASE_SECURITY_HEADERS });
     return res.end(hint);
   }
   try {
@@ -3985,7 +3991,7 @@ function requestHandler(req, res, services = DEFAULT_RUNTIME_SERVICES) {
     }
     res.writeHead(200, headers);
     res.end(fs.readFileSync(file));
-  } catch { res.writeHead(500, { "Content-Type": "text/plain" }); res.end("error"); }
+  } catch { res.writeHead(500, { "Content-Type": "text/plain", ...BASE_SECURITY_HEADERS }); res.end("error"); }
 }
 
 function createServer(runtime) {
