@@ -10,9 +10,9 @@ React + Vite, split into components across an npm-workspaces monorepo.
 
 ![Platform](https://img.shields.io/badge/platform-Windows-blue) ![Node](https://img.shields.io/badge/node-%E2%89%A518-green) ![Server deps](https://img.shields.io/badge/server%20deps-0-brightgreen) ![UI](https://img.shields.io/badge/ui-React%20%2B%20Vite-61DAFB)
 
-## Preview: Supervisor composer (v2.4.9-rc.1)
+## Preview: Supervisor composer (v2.4.9)
 
-The Windows preview is staged as a draft GitHub release (`v2.4.9-rc.1`);
+The Windows preview is staged as a draft GitHub release (`v2.4.9`);
 it is not available as a public download until the release gates pass.
 This unsigned prerelease adds Supervisor tasks, media/file attachments, local
 plugin and skill references, project-root selection, and a starting-branch picker.
@@ -20,7 +20,7 @@ Worktrees remain mandatory. Plugin references do not enable tools or hooks.
 Images support PNG, JPEG and WebP; attachments are limited to 12 items,
 2 MB each and 8 MB total. Other binary files require a compatible agent tool.
 
-The local installer is `Rempeyek-Agent-OS-Setup-2.4.9-rc.1.exe` in the project root.
+The local installer is `Rempeyek-Agent-OS-Setup-2.4.9.exe` in the project root.
 Release assets include `SHA256SUMS.txt`. The existing stable download remains below.
 QA is pending: the previous CI has shutdown-cleanup failures, and the existing
 version test is pinned to 2.4.8. Those tests were not edited or run in this change.
@@ -30,7 +30,7 @@ clean-machine installation is certified.
 
 ## Download for Windows
 
-|[![Download v2.4.9-rc.1](https://img.shields.io/badge/Download-v2.4.9--rc.1-ff8a00?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/aabrur/Rempeyek-Agent-OS/releases/tag/v2.4.9-rc.1)
+|[![Download v2.4.9](https://img.shields.io/badge/Download-v2.4.9-ff8a00?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/aabrur/Rempeyek-Agent-OS/releases/tag/v2.4.9)
 
 **The installer and direct download are free.** Most users only need to click
 the button above. No GitHub account, Git, Node.js, npm, or repository clone is
@@ -47,12 +47,12 @@ required.
 
 ### Install
 
-1. Open the public **v2.4.9-rc.1** release above.
+1. Open the public **v2.4.9** release above.
 2. Download the NSIS installer and the published `SHA256SUMS.txt` from that same release.
 3. Verify the downloaded installer against `SHA256SUMS.txt` in PowerShell:
 
    ```powershell
-   Get-FileHash "$HOME\Downloads\Rempeyek-Agent-OS-Setup-2.4.9-rc.1.exe" -Algorithm SHA256
+   Get-FileHash "$HOME\Downloads\Rempeyek-Agent-OS-Setup-2.4.9.exe" -Algorithm SHA256
    ```
 
 4. Open the installer only when the hash and release publisher match.

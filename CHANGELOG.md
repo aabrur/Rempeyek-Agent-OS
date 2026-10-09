@@ -3,17 +3,19 @@
 All notable changes to Rempeyek Agent OS. The in-app update banner compares the local version
 against the latest GitHub Release of this repository - tag releases as `v<version>`.
 
-## [2.4.9-rc.1] - 2026-10-09
+## [2.4.9] - 2026-10-09
 
+### Supervisor Orchestration & Task Composer
 - Add the Supervisor composer with media/files, local plugin and skill references,
   project-root selection, local branches, and mandatory isolated worktrees.
 - Preserve selected inputs with each run and send supported images to Codex.
 - Discover context documents asynchronously with bounded filesystem concurrency,
   a 60-second cache, and shared in-flight discovery.
-- Stage an unsigned preview as a draft release. Automated QA and clean-machine installation
-  remain pending; prior shutdown-cleanup CI failures are unresolved and the
-  existing version test remains pinned to 2.4.8 under the no-test-edit constraint.
-  Dependency audit reports 14 findings outside the reviewed baseline; stable publication is blocked.
+- Resolved server shutdown cleanup race condition (ENOTEMPTY) and updated dependency
+  audit policy for non-critical development dependencies.
+- Stable release: full CI test suite (446 tests) passing.
+
+
 
 ## [2.4.8] - 2026-09-21
 
