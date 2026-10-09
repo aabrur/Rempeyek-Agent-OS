@@ -14,6 +14,21 @@ const serverPath = path.resolve(
   "server.js",
 );
 
+async function terminateChild(child, stateRoot) {
+  if (child && child.exitCode === null) {
+    const exited = new Promise(resolve => child.once("exit", resolve));
+    child.kill();
+    await Promise.race([exited, new Promise(resolve => setTimeout(resolve, 5000))]);
+    if (child.exitCode === null) {
+      try { child.kill("SIGKILL"); } catch {}
+      await Promise.race([exited, new Promise(resolve => setTimeout(resolve, 2000))]);
+    }
+  }
+  if (stateRoot) {
+    fs.rmSync(stateRoot, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+  }
+}
+
 test("importing the server does not bind a listening socket", () => {
   const serverModule = require("../server.js");
   assert.equal(typeof serverModule.createServer, "function");
@@ -85,8 +100,7 @@ test("desktop child announces an assigned loopback port and enforces its session
       headers: { "x-desktop-session": "desktop-test-secret" },
     })).status, 200);
   } finally {
-    child.kill();
-    fs.rmSync(stateRoot, { recursive: true, force: true });
+    await terminateChild(child, stateRoot);
   }
 });
 
@@ -146,7 +160,6 @@ test("a missing Windows agent launcher does not terminate the desktop server", a
     });
     assert.equal(response.status, 200);
   } finally {
-    child.kill();
-    fs.rmSync(stateRoot, { recursive: true, force: true });
+    await terminateChild(child, stateRoot);
   }
 });

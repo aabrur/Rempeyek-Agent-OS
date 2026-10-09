@@ -661,7 +661,9 @@ export function createProviderRegistry({ stateDir, onEvent = () => {} }) {
   async function shutdown() {
     closed = true;
     await Promise.all([...new Set([...active.values()].map(job => job.runId))].map(cancel));
-    persist();
+    if (active.size > 0 || staleProcesses.length > 0) {
+      persist();
+    }
   }
 
   if (staleProcesses.length) publish({ type: 'provider.recovery_required', processes: staleProcesses });

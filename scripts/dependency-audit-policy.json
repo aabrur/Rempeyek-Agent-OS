@@ -1,9 +1,24 @@
 {
   "schema": 1,
-  "reviewedAt": "2026-09-21",
+  "reviewedAt": "2026-10-09",
   "expiresOn": "2026-10-31",
-  "scope": "No known production or development dependency findings in the pinned release lockfile.",
-  "reviewedFindingCount": 0,
-  "reviewedFingerprint": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-  "reviewedPackages": []
+  "scope": "No known production dependency findings; 14 non-critical development dependency findings in the pinned release lockfile reviewed.",
+  "reviewedFindingCount": 14,
+  "reviewedFingerprint": "d27e28eb4edaaf99e711fb09c906905973979768555f732bc85734ee6aa5bd49",
+  "reviewedPackages": [
+    "@electron/get",
+    "app-builder-lib",
+    "brace-expansion",
+    "dmg-builder",
+    "electron",
+    "electron-builder",
+    "electron-builder-squirrel-windows",
+    "global-agent",
+    "http-cache-semantics",
+    "roarr",
+    "sharp",
+    "source-map-js",
+    "sprintf-js",
+    "undici"
+  ]
 }

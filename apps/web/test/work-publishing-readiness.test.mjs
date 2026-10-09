@@ -9,6 +9,21 @@ import { fileURLToPath } from "node:url";
 const serverPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "server.js");
 const src = fs.readFileSync(serverPath, "utf8");
 
+async function terminateChild(child, stateRoot) {
+  if (child && child.exitCode === null) {
+    const exited = new Promise(resolve => child.once("exit", resolve));
+    child.kill();
+    await Promise.race([exited, new Promise(resolve => setTimeout(resolve, 5000))]);
+    if (child.exitCode === null) {
+      try { child.kill("SIGKILL"); } catch {}
+      await Promise.race([exited, new Promise(resolve => setTimeout(resolve, 2000))]);
+    }
+  }
+  if (stateRoot) {
+    fs.rmSync(stateRoot, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+  }
+}
+
 test("listen gate awaits work and publishing modules", () => {
   assert.match(src, /createHttpReadinessRegistry/);
   assert.match(src, /WORK_LIFECYCLE_MOD/);
@@ -67,8 +82,7 @@ test("after rempeyek:ready, work and social routes are not loading", async () =>
     assert.notEqual(socialBody.error, "publishing store loading");
     assert.equal(socialRes.status, 200);
   } finally {
-    child.kill();
-    fs.rmSync(stateRoot, { recursive: true, force: true });
+    await terminateChild(child, stateRoot);
   }
 });
 
@@ -81,8 +95,7 @@ test("20 clean startups never return work/social loading after ready", async () 
       assert.notEqual(work.error, "work lifecycle store loading", `iter ${i}`);
       assert.notEqual(social.error, "publishing store loading", `iter ${i}`);
     } finally {
-      child.kill();
-      fs.rmSync(stateRoot, { recursive: true, force: true });
+      await terminateChild(child, stateRoot);
     }
   }
 });
