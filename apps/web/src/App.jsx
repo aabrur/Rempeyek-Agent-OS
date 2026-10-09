@@ -5,6 +5,7 @@ import { TokenLogin } from "./components/TokenLogin";
 import { ConfigBanner } from "./components/Panels";
 import { UpdateBanner } from "./components/UpdateBanner";
 import { AgentsView } from "./views/AgentsView";
+import { SupervisorView } from "./views/SupervisorView";
 import { NeuralVaultView } from "./views/SimpleViews";
 import { WorkspaceView } from "./views/Workspace";
 import { ProtocolsView } from "./views/ProtocolsView";
@@ -87,6 +88,8 @@ export default function App() {
               agents={state.agents} gw={gw} openAgent={openAgent}
               onOpenAgent={setOpenAgent} refresh={refresh}
             />
+          ) : view === "supervisor" ? (
+            <SupervisorView />
           ) : view === "teams" ? (
             <WorkspaceView projects={state.projects} agents={state.agents} agentsById={agentsById} refresh={refresh} />
           ) : view === "memory" ? (

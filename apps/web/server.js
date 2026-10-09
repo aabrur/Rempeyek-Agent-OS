@@ -137,6 +137,8 @@ let sourceUpdateLib = null;
 SOURCE_UPDATE_MOD.then(m => { sourceUpdateLib = m; }).catch(e => console.error("[source-update]", e.message));
 
 const WORK_LIFECYCLE_MOD = import("./lib/work-lifecycle.mjs");
+const SUPERVISOR_MOD = import("./lib/supervisor/controller.mjs");
+const SUPERVISOR_ROUTES = import("./lib/supervisor/routes.mjs");
 let workLifecycleLib = null;
 WORK_LIFECYCLE_MOD.then(m => { workLifecycleLib = m; }).catch(e => console.error("[work-lifecycle]", e.message));
 
@@ -158,6 +160,29 @@ function getWorkStore(services = DEFAULT_RUNTIME_SERVICES) {
     services._workStore = workLifecycleLib.createWorkLifecycleStore({ vaultRoot: services.vaultPath, stateRoot: services.stateRoot });
   }
   return services._workStore;
+}
+
+function getSupervisor(services = DEFAULT_RUNTIME_SERVICES) {
+  if (!services._supervisorPromise) {
+    services._supervisorPromise = Promise.all([SUPERVISOR_MOD, WORK_LIFECYCLE_MOD, APPROVAL_QUEUE]).then(([{ createSupervisor }, , approvalQueue]) => {
+      const supervisor = createSupervisor({
+        stateDir: services.supervisorStateDir,
+        vaultPath: services.vaultPath,
+        approvalQueue,
+        workStore: getWorkStore(services),
+        listProjects: () => {
+          if (services !== DEFAULT_RUNTIME_SERVICES) return [];
+          return buildProjects(walkVault()).map(project => {
+            const { fm } = parseFM(readDoc(path.join(services.vaultPath, project.rel)) || "");
+            return { id: project.slug, name: project.name, repositoryPath: fm.repositorypath || fm.repository || fm.path || "" };
+          });
+        },
+      });
+      services._supervisor = supervisor;
+      return supervisor;
+    });
+  }
+  return services._supervisorPromise;
 }
 
 function getPublishingStore(services = DEFAULT_RUNTIME_SERVICES) {
@@ -198,6 +223,7 @@ const httpReadiness = createHttpReadinessRegistry([
   { id: "source-update", promise: SOURCE_UPDATE_MOD, required: true },
   { id: "switchboard", promise: SWITCHBOARD_MOD, required: true },
   { id: "work-lifecycle", promise: WORK_LIFECYCLE_MOD, required: true },
+  { id: "supervisor", promise: Promise.all([SUPERVISOR_MOD, SUPERVISOR_ROUTES]), required: true },
   { id: "publishing-domain", promise: PUBLISHING_DOMAIN_MOD, required: true },
   { id: "publishing-gateway", promise: PUBLISHING_GATEWAY_MOD, required: true },
   { id: "publishing-scheduler", promise: PUBLISHING_SCHEDULER_MOD, required: true },
@@ -320,6 +346,7 @@ function createRuntimeServices(runtime = {}) {
     publicDir,
     receiptDir,
     startResolvedProcess: runtime.startResolvedProcess || null,
+    supervisorStateDir: path.join(runtime.stateRoot || path.dirname(RUNTIME_PATHS.receiptDir), "Supervisor"),
     stateRoot,
     store,
     telemetryDir,
@@ -2892,6 +2919,14 @@ function requestHandler(req, res, services = DEFAULT_RUNTIME_SERVICES) {
   if (url.startsWith("/api/")) {
     if (!authorized(req)) return json(res, 401, { error: "invalid/missing token - set the x-dash-token header" });
     try {
+      if (url.startsWith("/api/supervisor/")) {
+        return Promise.all([getSupervisor(services), SUPERVISOR_ROUTES])
+          .then(([supervisor, routes]) => routes.handleSupervisor(req, res, supervisor, json))
+          .catch(error => {
+            console.error("[supervisor]", error.message);
+            if (!res.headersSent) json(res, 503, { error: "Supervisor service unavailable" });
+          });
+      }
       if (url === "/api/today" && req.method === "GET")
         return TODAY_PROJECTION.then(({ buildTodayProjection }) => {
           const files = walkVault();
@@ -4007,9 +4042,13 @@ function shutdown(sig) {
   if (shuttingDown) return; shuttingDown = true;
   console.error(`[agentic-os] shutdown (${sig}) - stopping owned processes`);
   try { processManager()?.stopAll(); } catch {}
+  const supervisorShutdown = DEFAULT_RUNTIME_SERVICES._supervisor?.shutdown();
   for (const id of procs.keys()) killOwned(id);
   try { server.close(); } catch {}
-  setTimeout(() => process.exit(0), 500);   // give async taskkill time to finish
+  if (supervisorShutdown) {
+    const deadline = setTimeout(() => process.exit(0), 12000);
+    supervisorShutdown.catch(error => console.error("[supervisor-shutdown]", error.message)).finally(() => { clearTimeout(deadline); process.exit(0); });
+  } else setTimeout(() => process.exit(0), 500);   // give async taskkill time to finish
 }
 for (const sig of ["SIGINT", "SIGTERM", "SIGHUP"]) process.on(sig, () => shutdown(sig));
 process.on("uncaughtException", e => { console.error("[uncaughtException]", (e && e.stack) || e); shutdown("uncaughtException"); });
@@ -4028,11 +4067,12 @@ if (require.main === module) {
 
   // Gate listen() until required HTTP modules are READY or FAILED — never announce
   // rempeyek:ready while Work/Publishing/Switchboard are still loading.
-  whenHttpModulesReady().then(snapshot => {
+  whenHttpModulesReady().then(async snapshot => {
     const failed = Object.entries(snapshot.modules)
       .filter(([, state]) => state === "failed")
       .map(([id]) => id);
     if (failed.length) console.error("[http-readiness] required or optional modules failed:", failed.join(", "));
+    try { await getSupervisor(); } catch (error) { console.error("[supervisor-startup]", error.message); }
     server.listen(PORT, process.env.DASH_HOST || "127.0.0.1", () => {
   const listeningPort = server.address().port;
   if (typeof process.send === "function") {

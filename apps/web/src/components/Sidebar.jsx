@@ -1,6 +1,6 @@
 import {
   ChevronRight, Cpu, Database, Eye, HeartHandshake, Map as MapIcon, Network,
-  Settings as SettingsIcon, ShoppingBag, Users,
+  Settings as SettingsIcon, ShoppingBag, Users, Workflow,
 } from "lucide-react";
 import { useClock } from "../hooks/useDashboard";
 import { obsUri } from "../lib/obsidian";
@@ -8,6 +8,7 @@ import { obsUri } from "../lib/obsidian";
 const NAV = [
   { id: "map", label: "Agent Map", Icon: MapIcon },
   { id: "agents", label: "Agents", Icon: Cpu },
+  { id: "supervisor", label: "Supervisor", Icon: Workflow },
   { id: "teams", label: "Projects", Icon: Users },
   { id: "memory", label: "Memory", Icon: Database },
   { id: "protocols", label: "Switchboard", Icon: Network },
