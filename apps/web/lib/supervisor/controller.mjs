@@ -7,6 +7,7 @@ import { isPathAllowed, redactSecrets } from '../access-policy-engine.mjs';
 import * as work from '../work-lifecycle.mjs';
 import { createProviderRegistry } from './providers.mjs';
 import { createWorktreeManager } from './worktrees.mjs';
+import { contextCatalog, prepareContext, saveContext, CONTEXT_LIMITS } from './context.mjs';
 import { MAX_REPAIR_ROUNDS, ROLES, SAFE_ID, validatePlan, parseStructured, selectProvider, promptFor } from './planner.mjs';
 
 const terminal = new Set(['READY_FOR_QA', 'FAILED', 'CANCELLED']);
@@ -154,7 +155,7 @@ export function createSupervisor({ stateDir, vaultPath, approvalQueue, workStore
       phase(run, unit.role === 'HEAD' ? 'PLANNING' : unit.role === 'TAIL' ? 'REVIEWING' : unit.repairFindings ? 'REPAIRING' : 'RUNNING', `${selected.name} assigned to ${unit.id}`);
       const cwd = unit.role === 'TAIL' ? run.integration.path : await workspace(run, unit);
       if (closing || run.cancelRequested || run.status === 'CANCELLED') { unit.status = 'CANCELLED'; return; }
-      const result = await providers.execute(selected.id, { runId: run.id, unitId: unit.id, role: unit.role, cwd, prompt: promptFor(run, unit), timeoutMs: 20 * 60 * 1000,
+      const result = await providers.execute(selected.id, { runId: run.id, unitId: unit.id, role: unit.role, cwd, prompt: promptFor(run, unit), images: (run.context || []).filter(item => item.image).map(item => item.path), timeoutMs: 20 * 60 * 1000,
         onEvent: e => event(run, 'provider', typeof e === 'string' ? e : JSON.stringify(e)) });
       unit.result = clean({ runId: run.id, agentId: selected.id, role: unit.role, filesChanged: [], artifacts: [], reviewFindings: [],
         ...result, verification: { status: 'NOT_RUN', evidence: [] } });
@@ -276,6 +277,8 @@ export function createSupervisor({ stateDir, vaultPath, approvalQueue, workStore
   return {
     async providerList() { await providers.discover(); return providers.snapshot(); },
     configureProvider(id, input) { return providers.configure(id, input); },
+    async contextCatalog() { return { items: await contextCatalog(), limits: CONTEXT_LIMITS }; },
+    inspectProject(input) { return worktrees.inspect(input.repositoryPath, input.branch || ''); },
     config() { return { maxConcurrency: 3, maxRepairRounds: MAX_REPAIR_ROUNDS, projects: listProjects(), limitations: [
       'Independent QA is not run by Supervisor V1.', 'Git worktrees separate changes; they are not OS security sandboxes.',
       'WSL execution is unavailable until a separate reviewed adapter is configured. Windows paths are never translated automatically.',
@@ -300,7 +303,9 @@ export function createSupervisor({ stateDir, vaultPath, approvalQueue, workStore
         const canonical = fs.realpathSync(repositoryPath);
         const access = isPathAllowed(canonical, { allowed_roots: [canonical] });
         if (!access.allowed) throw new Error(access.reason);
-        const inspected = await worktrees.inspect(canonical);
+        if (input.newWorktree === false) throw new Error('Supervisor requires an isolated worktree');
+        const inspected = await worktrees.inspect(canonical, input.branch || '');
+        const contextEntries = prepareContext(input.context, input.context?.some(item => item?.catalogId) ? await contextCatalog() : []);
         if (inspected.dirty) throw new Error('Repository has uncommitted changes. Commit or preserve them before starting an isolated run; Supervisor will not discard them.');
         const available = await providers.discover();
         const assignments = {}, locks = {};
@@ -316,6 +321,7 @@ export function createSupervisor({ stateDir, vaultPath, approvalQueue, workStore
         const run = { id, objective: redactSecrets(input.objective.trim()), projectId, repositoryPath: inspected.repositoryPath, baseline: inspected.baseline,
           sourceBranch: inspected.branch, status: 'CREATED', phase: 'CREATED', mode: input.mode || 'AUTO', executionMode: input.executionMode || 'review', assignments, locks,
           maxConcurrency: clamp(input.maxConcurrency, 2, 1, 3), repairRound: 0, paused: false, executionApproved: false,
+          context: saveContext(stateDir, id, contextEntries), newWorktree: true,
           units: [], artifacts: [], events: [], conflicts: [], createdAt: iso(), updatedAt: iso(), verification: { status: 'NOT_RUN', evidence: [] } };
         const mission = workStore.saveMission(work.createMission({ projectId, title: run.objective.slice(0, 160), goal: run.objective }));
         run.missionId = mission.missionId;

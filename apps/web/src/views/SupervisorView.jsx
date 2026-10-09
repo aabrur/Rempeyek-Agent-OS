@@ -3,6 +3,7 @@ import { PageHead } from "@rempeyek/ui";
 import { ArrowRight, FileText, Pause, Play, RefreshCw, Square, Workflow } from "lucide-react";
 import { api } from "../api";
 import "./supervisor.css";
+import { SupervisorComposer } from "../components/SupervisorComposer";
 
 const ROLES = ["HEAD", "BODY", "TAIL"];
 const ROLE_NAMES = { HEAD: "Plan", BODY: "Implement", TAIL: "Review" };
@@ -38,6 +39,8 @@ export function SupervisorView() {
   const [objective, setObjective] = useState("");
   const [projectId, setProjectId] = useState("");
   const [repositoryPath, setRepositoryPath] = useState("");
+  const [branch, setBranch] = useState("");
+  const [context, setContext] = useState([]);
   const [mode, setMode] = useState("AUTO");
   const [executionMode, setExecutionMode] = useState("review");
   const [maxConcurrency, setMaxConcurrency] = useState(1);
@@ -112,8 +115,8 @@ export function SupervisorView() {
     }));
     const submittedLocks = Object.fromEntries(ROLES.map(role => [role, requiredRoles.includes(role) && locks[role]]));
     const result = await mutate("create", "/api/supervisor/runs", { objective: objective.trim(), projectId: projectId || undefined,
-      repositoryPath: repositoryPath.trim(), mode, executionMode, assignments: submittedAssignments, locks: submittedLocks, maxConcurrency });
-    if (result?.run?.id) { setSelected(result.run.id); setObjective(""); }
+      repositoryPath: repositoryPath.trim(), branch, context, newWorktree: true, mode, executionMode, assignments: submittedAssignments, locks: submittedLocks, maxConcurrency });
+    if (result?.run?.id) { setSelected(result.run.id); setObjective(""); setContext([]); }
   }
 
   async function openArtifact(artifact) {
@@ -172,11 +175,13 @@ export function SupervisorView() {
     {config?.limitations?.length > 0 && <details className="sup-card"><summary>Current execution limits</summary><ul className="sup-list">{config.limitations.map((limit, index) => <li key={index}>{readable(limit)}</li>)}</ul></details>}
     <form className="sup-card sup-composer" onSubmit={submit}><fieldset disabled={!canMutate} className="sup-composer-fields">
       <div className="sup-row"><h2><Workflow size={17} /> New task</h2><span className="sup-muted">{executionMode === "single" ? "Single agent" : "Plan → implement → review"}</span></div>
-      <label>What should the agents accomplish?<textarea rows={3} required maxLength={12000} value={objective} onChange={event => setObjective(event.target.value)} placeholder="Describe the outcome, scope, and constraints." /></label>
-      <div className="sup-form-grid"><label>Project<select value={projectId} onChange={event => { const id = event.target.value; setProjectId(id); setRepositoryPath(config?.projects?.find(project => project.id === id)?.repositoryPath || ""); }}><option value="">Choose a repository directly</option>{(config?.projects || []).map(project => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label><label>Repository path<input required value={repositoryPath} onChange={event => setRepositoryPath(event.target.value)} placeholder="Absolute path to the local repository" /></label></div>
+      <SupervisorComposer objective={objective} setObjective={setObjective} projectId={projectId} setProjectId={setProjectId}
+        repositoryPath={repositoryPath} setRepositoryPath={setRepositoryPath} projects={config?.projects || []}
+        branch={branch} setBranch={setBranch} context={context} setContext={setContext} canStart={canStart} busy={busy}
+        assignment={mode === "AUTO" ? "Auto assignment" : "Manual assignment"} />
       <div className="sup-form-grid sup-three"><label>Assignment<select value={mode} onChange={event => setMode(event.target.value)}><option value="AUTO">Automatic</option><option value="MANUAL">Manual</option></select></label><label>Workflow<select value={executionMode} onChange={event => setExecutionMode(event.target.value)}><option value="single">Single agent</option><option value="review">Implementation with review</option><option value="parallel">Parallel work units</option></select></label><label>Maximum parallel jobs<select value={maxConcurrency} onChange={event => setMaxConcurrency(Number(event.target.value))}>{[1, 2, 3].filter(number => number <= (config?.maxConcurrency || 3)).map(number => <option key={number}>{number}</option>)}</select></label></div>
       <div className="sup-role-grid">{requiredRoles.map(role => <div className="sup-role" key={role}><label><span>{role} <small>{ROLE_NAMES[role]}</small></span><select value={assignments[role]} required={mode === "MANUAL" || locks[role]} onChange={event => setAssignments(previous => ({ ...previous, [role]: event.target.value }))}><option value="">Select automatically</option>{providerOptions(role)}</select></label><label className="sup-check"><input type="checkbox" checked={locks[role]} onChange={event => setLocks(previous => ({ ...previous, [role]: event.target.checked }))} /> Lock provider</label></div>)}</div>
-      <div className="sup-row"><p className="sup-muted">Unlocked roles can switch when a provider becomes unavailable. Unknown quota is not a guarantee of capacity.</p><button type="submit" className="btn btn-primary" disabled={!canStart}><Play size={14} />{busy === "create" ? "Starting…" : "Start task"}</button></div>
+      <div className="sup-row"><p className="sup-muted">Unlocked roles can switch when a provider becomes unavailable. Unknown quota is not a guarantee of capacity.</p></div>
     </fieldset></form>
     <div className="sup-workspace">
       <section className="sup-card sup-runs"><h2>Task history <span className="sup-muted">{runs.length}</span></h2>{runs.length === 0 ? <p className="sup-empty">No tasks yet. Submit an objective above to begin.</p> : <div className="sup-run-list">{runs.map(item => <button type="button" key={item.id} className={`sup-run-item ${selected === item.id ? "is-selected" : ""}`} aria-pressed={selected === item.id} onClick={() => setSelected(item.id)}><Status value={item.status} /><strong>{item.objective}</strong><small>{date(item.updatedAt || item.createdAt)}</small><span>{item.phase || "Waiting"}</span></button>)}</div>}</section>
@@ -185,7 +190,8 @@ export function SupervisorView() {
         {!selected ? <div className="sup-empty"><Workflow size={28} /><h2>Select a task</h2><p>Work units, decisions, and results appear here.</p></div> : !run ? <p role="status">Loading task…</p> : <>
           <div className="sup-row"><h2>{run.objective}</h2><Status value={run.status} /></div>
           <p className="sup-muted">{run.phase || "Waiting"} · Updated {date(run.updatedAt)}</p>
-          <p className="sup-path">{run.repositoryPath}</p>
+          <p className="sup-path">{run.repositoryPath} · {run.sourceBranch || "HEAD"}</p>
+          {run.context?.length > 0 && <div className="sup-context-history" aria-label="Task references">{run.context.map((item, index) => <span key={index}><FileText size={13} /> {item.name} <small>{item.kind}{item.truncated ? " · text excerpt" : ""}</small></span>)}</div>}
           {run.error && <p className="sup-notice sup-error">{readable(run.error)}</p>}
           {run.nextAction && <p className="sup-notice"><strong>Next action:</strong> {readable(run.nextAction)}</p>}
           {active && <fieldset disabled={!canMutate || !!detailError} className="sup-controls"><legend className="sr-only">Task controls</legend>

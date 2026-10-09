@@ -10,6 +10,24 @@ React + Vite, split into components across an npm-workspaces monorepo.
 
 ![Platform](https://img.shields.io/badge/platform-Windows-blue) ![Node](https://img.shields.io/badge/node-%E2%89%A518-green) ![Server deps](https://img.shields.io/badge/server%20deps-0-brightgreen) ![UI](https://img.shields.io/badge/ui-React%20%2B%20Vite-61DAFB)
 
+## Preview: Supervisor composer (v2.4.9-rc.1)
+
+The Windows preview is staged as a draft GitHub release (`v2.4.9-rc.1`);
+it is not available as a public download until the release gates pass.
+This unsigned prerelease adds Supervisor tasks, media/file attachments, local
+plugin and skill references, project-root selection, and a starting-branch picker.
+Worktrees remain mandatory. Plugin references do not enable tools or hooks.
+Images support PNG, JPEG and WebP; attachments are limited to 12 items,
+2 MB each and 8 MB total. Other binary files require a compatible agent tool.
+
+The local installer is `Rempeyek-Agent-OS-Setup-2.4.9-rc.1.exe` in the project root.
+Release assets include `SHA256SUMS.txt`. The existing stable download remains below.
+QA is pending: the previous CI has shutdown-cleanup failures, and the existing
+version test is pinned to 2.4.8. Those tests were not edited or run in this change.
+The release dependency audit also reports 14 findings outside the reviewed baseline
+(the production audit reports none). No live agent execution with attachments or
+clean-machine installation is certified.
+
 ## Download for Windows
 
 |[![Download v2.4.8](https://img.shields.io/badge/Download-v2.4.8-ff8a00?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/aabrur/Rempeyek-Agent-OS/releases/tag/v2.4.8)
@@ -54,7 +72,7 @@ The desktop updater supports automated background checks, release manifest verif
   Neural Vault core with glowing, provenance-verified relationship lines, travelling
   particles, live status, and a right-hand inspector (connections, measured signals,
   metadata). Fully keyboard-navigable, honest by design - no synthetic edges
-- **8-destination command deck** - Agent Map · Agents · Projects (project workspaces) ·
+- **9-destination command deck** - Agent Map · Agents · Supervisor · Projects (project workspaces) ·
   Memory (vault graph) · Switchboard (approvals, agent messages, workflows, schedule) · Marketplace
   (vetted agent catalog) · Observatory (telemetry + reports) · Settings
 - **Project memory capture** - agents' `task_done` telemetry is auto-captured into the

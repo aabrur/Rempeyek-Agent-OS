@@ -5,7 +5,7 @@
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
-const APP_VERSION = "2.4.8";
+const APP_VERSION = "2.4.9-rc.1";
 const APP_TITLE = "REMPEYEK AGENT OS";
 const net = require("net");
 const os = require("os");

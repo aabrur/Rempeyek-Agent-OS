@@ -484,13 +484,15 @@ export function createProviderRegistry({ stateDir, onEvent = () => {} }) {
     }
   }
 
-  async function execute(providerId, { runId, unitId, role, cwd, prompt, onEvent: listener, timeoutMs = 900000 }) {
+  async function execute(providerId, { runId, unitId, role, cwd, prompt, images = [], onEvent: listener, timeoutMs = 900000 }) {
     if (closed) return result('failed', 'Provider registry is shut down.');
     const descriptor = snapshot().find(item => item.id === providerId);
     if (!descriptor || descriptor.availability !== 'AVAILABLE') return result('failed', `Provider ${providerId} is not available: ${descriptor?.diagnostic || 'unknown provider'}`);
     const adapter = adapters.get(providerId);
     if (!['HEAD', 'BODY', 'TAIL'].includes(role) || !descriptor.capabilities.roles.includes(role)) return result('failed', 'Unsupported provider role.');
     if (!runId || !unitId || !path.isAbsolute(cwd || '') || typeof prompt !== 'string' || !prompt.trim() || prompt.length > 512000) return result('failed', 'Invalid execution input.');
+    if (!Array.isArray(images) || images.length > 12 || images.some(file => typeof file !== 'string' || !path.isAbsolute(file))) return result('failed', 'Invalid image input.');
+    if (images.length && providerId !== 'codex') return result('failed', 'This provider does not support image attachments.');
     const key = `${runId}:${unitId}`;
     if (active.has(key)) return result('failed', 'Unit already has an owned process.');
     const boundedTimeout = Math.max(1000, Math.min(Number(timeoutMs) || 900000, 3600000));
@@ -503,6 +505,7 @@ export function createProviderRegistry({ stateDir, onEvent = () => {} }) {
       if (providerId === 'codex') rejectProjectConfiguration(cwd);
       const env = childEnv.buildAgentEnv({ id: providerId }, process.env, cwd);
       const prepared = adapter.prepare ? adapter.prepare({ stateDir, cwd, prompt, role, timeoutMs: boundedTimeout }) : { args: adapter.args(role), input: prompt, cleanup() {} };
+      if (images.length) prepared.args.splice(prepared.args.length - 1, 0, ...images.flatMap(file => ['--image', file]));
       cleanup = prepared.cleanup || (() => {});
       processRun = runProcess({
         program: descriptor.executablePath,

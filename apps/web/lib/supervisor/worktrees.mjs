@@ -103,7 +103,7 @@ export function createWorktreeManager({ root }) {
     }
   }
 
-  async function inspect(repositoryPath) {
+  async function inspect(repositoryPath, selectedBranch = '') {
     if (typeof repositoryPath !== 'string' || !path.isAbsolute(repositoryPath)) throw new Error('Repository path must be absolute');
     await rejectLinks(repositoryPath);
     const canonical = await fs.realpath(repositoryPath);
@@ -116,7 +116,10 @@ export function createWorktreeManager({ root }) {
     const staged = await git(canonical, ['diff', '--cached', '--name-only', '--no-renames', '-z', baseline, '--']);
     const untracked = await git(canonical, ['ls-files', '--others', '--exclude-standard', '-z']);
     const dirtyFiles = [...new Set(`${tracked}${staged}${untracked}`.split('\0').filter(Boolean))];
-    return { repositoryPath: canonical, baseline, branch, dirty: dirtyFiles.length > 0, dirtyFiles };
+    const branches = (await git(canonical, ['for-each-ref', '--format=%(refname:short)', 'refs/heads/'])).trim().split('\n').map(value => value.trim()).filter(Boolean);
+    if (selectedBranch && !branches.includes(selectedBranch)) throw new Error('Select an existing local branch');
+    const selectedBaseline = selectedBranch ? (await git(canonical, ['rev-parse', '--verify', `refs/heads/${selectedBranch}^{commit}`])).trim() : baseline;
+    return { repositoryPath: canonical, baseline: selectedBaseline, branch: selectedBranch || branch, branches, dirty: dirtyFiles.length > 0, dirtyFiles };
   }
 
   async function create({ runId, unitId, repositoryPath, baseline }) {
