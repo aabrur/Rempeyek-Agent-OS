@@ -9,17 +9,23 @@ export function parseRepoUrl(remote) {
   return m ? { owner: m[1], repo: m[2], slug: `${m[1]}/${m[2]}` } : null;
 }
 
-/* parseVersion: [major, minor, patch] from "2.1.0" / "v2.1.0" / "2.1.0-beta.1", else null. */
+/* parseVersion: numeric segments from "2.1.0" / "v2.1.0" / "2.1.0-beta.1" / "2.4.10", else null. */
 export function parseVersion(v) {
-  const m = String(v || "").trim().replace(/^v/i, "").match(/^(\d+)\.(\d+)\.(\d+)/);
-  return m ? [Number(m[1]), Number(m[2]), Number(m[3])] : null;
+  const clean = String(v || "").trim().replace(/^v/i, "").replace(/-.*$/, "");
+  const parts = clean.split(".").map(Number);
+  return parts.length >= 3 && parts.every(n => !isNaN(n)) ? parts : null;
 }
 
 /* compareVersions: 1 if a>b, -1 if a<b, 0 if equal OR either side is malformed. */
 export function compareVersions(a, b) {
   const pa = parseVersion(a), pb = parseVersion(b);
   if (!pa || !pb) return 0;
-  for (let i = 0; i < 3; i++) if (pa[i] !== pb[i]) return pa[i] > pb[i] ? 1 : -1;
+  const len = Math.max(pa.length, pb.length);
+  for (let i = 0; i < len; i++) {
+    const na = pa[i] ?? 0;
+    const nb = pb[i] ?? 0;
+    if (na !== nb) return na > nb ? 1 : -1;
+  }
   return 0;
 }
 

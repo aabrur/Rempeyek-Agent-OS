@@ -18,7 +18,7 @@ test("package-lock workspace metadata matches product manifests", () => {
   const desktop = readJson("apps/desktop/package.json");
   const ui = readJson("packages/ui/package.json");
 
-  assert.equal(APP_VERSION, "2.4.9");
+  assert.equal(APP_VERSION, "2.4.10");
   assert.equal(root.version, APP_VERSION);
   assert.equal(web.version, APP_VERSION);
   assert.equal(desktop.version, APP_VERSION);

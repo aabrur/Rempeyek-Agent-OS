@@ -5,7 +5,7 @@
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
-const APP_VERSION = "2.4.9";
+const APP_VERSION = "2.4.10";
 const APP_TITLE = "REMPEYEK AGENT OS";
 const net = require("net");
 const os = require("os");
@@ -4065,7 +4065,7 @@ if (require.main === module) {
     process.exit(1);
   });
 
-  // Gate listen() until required HTTP modules are READY or FAILED — never announce
+  // Gate listen() until required HTTP modules are READY or FAILED - never announce
   // rempeyek:ready while Work/Publishing/Switchboard are still loading.
   whenHttpModulesReady().then(async snapshot => {
     const failed = Object.entries(snapshot.modules)

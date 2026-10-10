@@ -2,6 +2,13 @@
 
 All notable changes to Rempeyek Agent OS. The in-app update banner compares the local version
 against the latest GitHub Release of this repository - tag releases as `v<version>`.
+## [2.4.10] - 2026-10-10
+
+### Supervisor Multi-Agent Runtime & OAuth Unlocks
+- Unlock Antigravity (`agy`) and Grok Build (`grok`) adapters in Supervisor orchestrator.
+- Add native OAuth and model authentication auto-discovery for Antigravity and Grok Build.
+- Add `XAI_API_KEY` to default provider environment whitelist for Grok Build.
+- Support multi-segment sub-patch version comparisons in in-app update checker.
 
 ## [2.4.9] - 2026-10-09
 

@@ -8,6 +8,7 @@ const DEFAULT_PROVIDER_ENV = {
   "claude-code": ["ANTHROPIC_API_KEY", "CLAUDE_CODE_OAUTH_TOKEN"],
   codex: ["OPENAI_API_KEY"],
   antigravity: ["GEMINI_API_KEY", "GOOGLE_API_KEY"],
+  "grok-build": ["XAI_API_KEY"],
   hermes: ["GEMINI_API_KEY", "GOOGLE_API_KEY"],
 };
 

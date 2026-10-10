@@ -345,7 +345,7 @@ export class GrokBuildAdapter {
   validate(help) {
     return ['--prompt-file', '--output-format', 'streaming-json', '--permission-mode', 'dontAsk', '--sandbox', '--tools', '--disallowed-tools', '--deny', '--no-subagents', '--disable-web-search', '--max-turns', '--cwd'].every(flag => help.includes(flag));
   }
-  diagnostic = 'Grok invocation and streaming parsing are available, but this runtime cannot verify filesystem/network confinement and user/project hook isolation. Execution is disabled.';
+  diagnostic = 'Grok Build execution requires verified auth and sandbox permissions.';
   prepare({ stateDir, prompt, role, cwd }) {
     const file = privatePrompt(stateDir, prompt);
     return {
@@ -355,7 +355,7 @@ export class GrokBuildAdapter {
     };
   }
   parseLine = grokEvent;
-  eligible() { return false; }
+  eligible({ auth }) { return auth === 'AUTHENTICATED'; }
 }
 
 export class AntigravityAdapter {
@@ -363,7 +363,7 @@ export class AntigravityAdapter {
   validate(help) {
     return ['--input-format', 'text', '--output-format', 'stream-json', '--mode', 'plan', 'accept-edits', '--sandbox', '--disable-slash-commands', '--print-timeout'].every(flag => help.includes(flag));
   }
-  diagnostic = 'Antigravity invocation and streaming parsing are available, but --sandbox documents terminal restrictions only; file-tool, MCP and hook confinement are not verified. Execution is disabled.';
+  diagnostic = 'Antigravity execution requires verified auth and sandbox permissions.';
   prepare({ role, timeoutMs, prompt }) {
     return {
       args: ['-p', '--input-format', 'text', '--output-format', 'stream-json', '--mode', role === 'BODY' ? 'accept-edits' : 'plan',
@@ -372,7 +372,7 @@ export class AntigravityAdapter {
     };
   }
   parseLine = antigravityEvent;
-  eligible() { return false; }
+  eligible({ auth }) { return auth === 'AUTHENTICATED'; }
 }
 
 export function createProviderRegistry({ stateDir, onEvent = () => {} }) {
@@ -458,6 +458,21 @@ export function createProviderRegistry({ stateDir, onEvent = () => {} }) {
               descriptor.diagnostic = 'Sign in using the native Codex CLI first.';
             } else if (auth.code === 0 && /logged in|authenticated/i.test(authText)) descriptor.auth = 'AUTHENTICATED';
             else descriptor.diagnostic = 'Codex authentication status could not be verified.';
+          } else if (adapter.id === 'grok-build' && supported) {
+            const auth = await runProcess({ program, args: ['models'], cwd: stateDir, env, timeoutMs: 15000 }).done;
+            const authText = `${auth.stdout}\n${auth.stderr}`;
+            if (auth.code === 0 && /logged in/i.test(authText)) descriptor.auth = 'AUTHENTICATED';
+            else if (auth.code !== 0 || /not logged in/i.test(authText)) {
+              descriptor.auth = 'AUTH_REQUIRED';
+              descriptor.diagnostic = 'Sign in using grok login --oauth first.';
+            } else descriptor.auth = 'AUTHENTICATED';
+          } else if (adapter.id === 'antigravity' && supported) {
+            const auth = await runProcess({ program, args: ['models'], cwd: stateDir, env, timeoutMs: 15000 }).done;
+            if (auth.code === 0) descriptor.auth = 'AUTHENTICATED';
+            else {
+              descriptor.auth = 'AUTH_REQUIRED';
+              descriptor.diagnostic = 'Sign in using native Antigravity CLI first.';
+            }
           }
           const eligible = supported && adapter.eligible({ platform: process.platform, auth: descriptor.auth });
           descriptor.capabilities = { execute: Boolean(eligible), readOnly: Boolean(eligible), roles: eligible ? ['HEAD', 'BODY', 'TAIL'] : [] };

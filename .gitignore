@@ -25,6 +25,7 @@ dist-release/
 __pycache__/
 *.pyc
 .venv/
+.pytest_cache/
 
 # Config backup written by the dashboard's Add Agent
 agents.config.json.bak
