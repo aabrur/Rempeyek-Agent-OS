@@ -100,7 +100,7 @@ export function SupervisorComposer({ objective, setObjective, projectId, setProj
     </div>}
     <div className="sup-chat-box">
       <label className="sr-only" htmlFor="sup-objective">What should the agents accomplish?</label>
-      <textarea id="sup-objective" rows={3} required maxLength={12000} value={objective} onChange={event => setObjective(event.target.value)} placeholder="Do anything" />
+      <textarea id="sup-objective" rows={2} required maxLength={12000} value={objective} onChange={event => setObjective(event.target.value)} placeholder="Do anything" />
       {context.length > 0 && <ul className="sup-context-chips" aria-label="Task attachments">{context.map(item => <li key={item.id}>
         {item.kind === 'media' ? <img src={`data:${item.type};base64,${item.data}`} alt="" /> : item.kind === 'skill' ? <BookOpen size={16} /> : item.kind === 'plugin' ? <Puzzle size={16} /> : <File size={16} />}
         <span title={item.name}>{item.name}<small>{item.kind === 'plugin' || item.kind === 'skill' ? 'Reference' : `${Math.ceil(item.size / 1024)} KB`}</small></span>

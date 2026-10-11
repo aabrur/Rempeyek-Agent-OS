@@ -2,6 +2,17 @@
 
 All notable changes to Rempeyek Agent OS. The in-app update banner compares the local version
 against the latest GitHub Release of this repository - tag releases as `v<version>`.
+## [2.4.11] - 2026-10-11
+
+### Supervisor UI Redesign & Rich Text Rendering
+- Redesign Supervisor orchestration layout for space efficiency and responsiveness.
+- Auto-collapse composer into a slim '+ New task' bar when a task is running or selected.
+- Compact provider cards into interactive status chips with on-demand settings popovers.
+- Replace static role boxes with an interactive pipeline stepper (Plan -> Implement -> Review).
+- Organize task inspection into dedicated tabs: Work units, Activity, and Artifacts.
+- Add SupervisorRichText: dependency-free Markdown and JSON envelope unwrap/renderer to eliminate raw prompt text.
+- Deduplicate concurrent service unavailability notices and add single-click retry.
+
 ## [2.4.10] - 2026-10-10
 
 ### Supervisor Multi-Agent Runtime & OAuth Unlocks
