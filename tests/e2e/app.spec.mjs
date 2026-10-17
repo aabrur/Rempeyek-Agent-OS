@@ -22,6 +22,7 @@ test("shell renders, navigation works, APIs answer, themes switch", async ({ pag
   });
 
   await page.goto(app.origin, { waitUntil: "domcontentloaded" });
+  await page.getByRole("button", { name: "Maybe later", exact: true }).click();
   await expect(page.getByRole("navigation", { name: "Primary" })).toBeVisible({ timeout: 15000 });
   await expect(page.getByRole("heading", { name: "Opening your workspace" })).toHaveCount(0);
   await expect(page.locator(".brand-name")).toContainText("E2E");

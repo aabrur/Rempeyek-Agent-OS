@@ -4,6 +4,7 @@ import { VortexBackdrop } from "./components/VortexBackdrop";
 import { TokenLogin } from "./components/TokenLogin";
 import { ConfigBanner } from "./components/Panels";
 import { UpdateBanner } from "./components/UpdateBanner";
+import { SupportPopup } from "./components/SupportPopup";
 import { AgentsView } from "./views/AgentsView";
 import { SupervisorView } from "./views/SupervisorView";
 import { NeuralVaultView } from "./views/SimpleViews";
@@ -109,6 +110,7 @@ export default function App() {
       </div>
 
       <TokenLogin open={locked} onSignedIn={signedIn} />
+      <SupportPopup ready={Boolean(state) && !locked} />
     </>
   );
 }

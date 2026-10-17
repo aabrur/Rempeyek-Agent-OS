@@ -2,6 +2,14 @@
 
 All notable changes to Rempeyek Agent OS. The in-app update banner compares the local version
 against the latest GitHub Release of this repository - tag releases as `v<version>`.
+## [2.4.12] - 2026-10-17
+
+### Trakteer Support Popup
+- Show an optional support popup after each refresh and once per hour while the workspace stays open.
+- Open the Trakteer tip form for @aabrur only after the user selects Trakteer.
+- Include keyboard dismissal, responsive layout, reduced motion, and an external browser fallback.
+- Allow Trakteer frames through the runtime content security policy and validate embed close messages.
+
 ## [2.4.11] - 2026-10-11
 
 ### Supervisor UI Redesign & Rich Text Rendering

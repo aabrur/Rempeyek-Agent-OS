@@ -12,6 +12,7 @@ for (const viewport of VIEWPORTS) {
     try {
       await page.setViewportSize({ width: viewport.width, height: viewport.height });
       await page.goto(app.origin, { waitUntil: "domcontentloaded" });
+      await page.getByRole("button", { name: "Maybe later", exact: true }).click();
       await expect(page.getByRole("navigation", { name: "Primary" })).toBeVisible({ timeout: 15000 });
       await expect(page.getByRole("button", { name: "Agents", exact: true })).toBeVisible();
       await page.getByRole("button", { name: "Agents", exact: true }).click();

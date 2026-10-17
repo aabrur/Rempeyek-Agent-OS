@@ -5,7 +5,7 @@
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
-const APP_VERSION = "2.4.11";
+const APP_VERSION = "2.4.12";
 const APP_TITLE = "REMPEYEK AGENT OS";
 const net = require("net");
 const os = require("os");
@@ -4022,7 +4022,7 @@ function requestHandler(req, res, services = DEFAULT_RUNTIME_SERVICES) {
       ...BASE_SECURITY_HEADERS,
     };
     if (isHtml) {
-      headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' ws: wss: https://api.github.com; font-src 'self' data:;";
+      headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' ws: wss: https://api.github.com; font-src 'self' data:; frame-src https://trakteer.id;";
     }
     res.writeHead(200, headers);
     res.end(fs.readFileSync(file));

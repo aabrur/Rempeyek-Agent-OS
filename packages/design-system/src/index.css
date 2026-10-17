@@ -160,6 +160,30 @@ body {
   transition: transform .15s ease, filter .15s ease;
 }
 .trakteer-button:hover { color: #fff; filter: brightness(1.08); transform: translateY(-1px); }
+
+.support-popup { margin: auto; padding: 0; width: min(480px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow: auto; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: var(--surface-radius, 16px); box-shadow: 0 24px 80px #0006; }
+.support-popup::backdrop { background: #0009; }
+.support-popup[open] { animation: support-enter 220ms ease-out; }
+.support-content { position: relative; padding: 32px; }
+.support-close { position: absolute; top: 8px; right: 8px; display: grid; place-items: center; width: 44px; height: 44px; border: 0; background: transparent; color: var(--text); cursor: pointer; border-radius: 8px; }
+.support-close:hover { background: var(--card-hi); }
+.support-mark { display: grid; place-items: center; width: 56px; height: 56px; margin-bottom: 24px; border: 1px solid var(--line); border-radius: 16px; color: var(--acc); background: var(--card); }
+.support-eyebrow { margin-bottom: 12px; font: 600 12px/1.5 var(--mono); letter-spacing: .08em; }
+.support-popup h2 { padding-right: 16px; font: 600 26px/1.25 var(--disp); }
+#support-description { margin-top: 16px; font-size: 16px; line-height: 1.6; }
+.support-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px; }
+.support-actions button { min-height: 44px; }
+.support-cta { display: inline-flex; align-items: center; justify-content: center; gap: 12px; padding: 10px 20px; border: 1px solid #be1e2d; border-radius: var(--surface-radius, 8px); color: #fff; background: #be1e2d; font-family: inherit; font-size: 15px; font-weight: 600; line-height: 1.5; cursor: pointer; transition: filter 150ms ease-out; }
+.support-cta:hover { filter: brightness(1.1); }
+.support-cta:active { filter: brightness(.9); }
+.support-popup :focus-visible { outline: 2px solid var(--acc); outline-offset: 3px; }
+.support-popup-tipping { width: min(760px, calc(100vw - 32px)); }
+.support-popup-tipping h2 { padding-right: 28px; font-size: 20px; }
+.support-frame { display: block; width: 100%; height: min(640px, calc(100dvh - 200px)); min-height: 180px; margin-top: 16px; border: 0; background: #fff; border-radius: 8px; }
+.support-fallback { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; margin-top: 8px; color: var(--text); }
+@keyframes support-enter { from { opacity: 0; transform: translateY(8px) scale(.98); } to { opacity: 1; transform: none; } }
+@media (max-width: 480px) { .support-content { padding: 24px; } .support-popup h2 { font-size: 24px; } .support-popup-tipping h2 { font-size: 18px; } }
+@media (prefers-reduced-motion: reduce) { .support-popup[open] { animation: none; } .support-cta { transition: none; } }
 .side-health { display: flex; flex-direction: column; gap: 5px; padding-bottom: 8px; }
 .side-health-label { font-family: var(--mono); font-size: 7.5px; letter-spacing: .1em; color: var(--muted); }
 .side-health-row { display: flex; align-items: center; gap: 8px; }
