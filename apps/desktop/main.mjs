@@ -16,7 +16,9 @@ import {
 import electronUpdater from "electron-updater";
 
 import {
+  assertTrustedIpcSender,
   isAllowedExternalUrl,
+  isAllowedIpcSender,
   isAllowedLocalNavigation,
   withDesktopSessionHeader,
 } from "./security.mjs";
@@ -292,18 +294,29 @@ function registerIpcHandlers() {
     args: ["--hidden"],
   });
 
-  ipcMain.handle("desktop:get-runtime", () => ({
-    desktop: true,
-    packaged: app.isPackaged,
-    version: app.getVersion(),
-    platform: process.platform,
-    arch: process.arch,
-    userDataPath: paths.userDataPath,
-    vaultPath: paths.vaultPath,
-    stateRoot: paths.stateRoot,
-  }));
-  ipcMain.handle("desktop:get-settings", () => settingsStore.read());
-  ipcMain.handle("desktop:update-settings", (_event, patch) => {
+  function assertTrustedSender(event) {
+    assertTrustedIpcSender(event, ownedServer?.origin);
+  }
+
+  ipcMain.handle("desktop:get-runtime", event => {
+    assertTrustedSender(event);
+    return {
+      desktop: true,
+      packaged: app.isPackaged,
+      version: app.getVersion(),
+      platform: process.platform,
+      arch: process.arch,
+      userDataPath: paths.userDataPath,
+      vaultPath: paths.vaultPath,
+      stateRoot: paths.stateRoot,
+    };
+  });
+  ipcMain.handle("desktop:get-settings", event => {
+    assertTrustedSender(event);
+    return settingsStore.read();
+  });
+  ipcMain.handle("desktop:update-settings", (event, patch) => {
+    assertTrustedSender(event);
     const next = settingsStore.update(patch);
     closeBehavior = next.closeBehavior;
     startMinimized = next.startMinimized;
@@ -313,11 +326,13 @@ function registerIpcHandlers() {
     });
     return next;
   });
-  ipcMain.handle("desktop:notify-app-ready", () => {
+  ipcMain.handle("desktop:notify-app-ready", event => {
+    assertTrustedSender(event);
     bootWatchdog?.notifyReady();
     return true;
   });
-  ipcMain.handle("desktop:send-boot-incident", (_event, payload) => {
+  ipcMain.handle("desktop:send-boot-incident", (event, payload) => {
+    assertTrustedSender(event);
     const incident = createIncidentRecord({
       phase: payload?.phase || "renderer",
       error: new Error(payload?.userSafeMessage || payload?.error || "Renderer incident reported"),
@@ -328,7 +343,8 @@ function registerIpcHandlers() {
     appendIncidentLog(incident);
     return true;
   });
-  ipcMain.handle("desktop:open-path", async (_event, kind) => {
+  ipcMain.handle("desktop:open-path", async (event, kind) => {
+    assertTrustedSender(event);
     const targets = {
       state: paths.stateRoot,
       vault: paths.vaultPath,
@@ -340,14 +356,16 @@ function registerIpcHandlers() {
     fs.mkdirSync(targets[kind], { recursive: true });
     return shell.openPath(targets[kind]);
   });
-  ipcMain.handle("desktop:open-external", async (_event, url) => {
+  ipcMain.handle("desktop:open-external", async (event, url) => {
+    assertTrustedSender(event);
     if (!isAllowedExternalUrl(url)) {
       throw new Error("unsupported external URL");
     }
     await shell.openExternal(url);
     return true;
   });
-  ipcMain.handle("desktop:check-for-updates", () => {
+  ipcMain.handle("desktop:check-for-updates", event => {
+    assertTrustedSender(event);
     if (!app.isPackaged) {
       return { phase: "idle", development: true };
     }
@@ -356,7 +374,8 @@ function registerIpcHandlers() {
     }
     return updateService.checkNow();
   });
-  ipcMain.handle("desktop:download-update", () => {
+  ipcMain.handle("desktop:download-update", event => {
+    assertTrustedSender(event);
     if (!app.isPackaged) {
       throw new Error("desktop updates are disabled in development");
     }
@@ -365,7 +384,8 @@ function registerIpcHandlers() {
     }
     return updateService.downloadNow();
   });
-  ipcMain.handle("desktop:restart-to-update", () => {
+  ipcMain.handle("desktop:restart-to-update", event => {
+    assertTrustedSender(event);
     if (!app.isPackaged) {
       throw new Error("desktop updates are disabled in development");
     }

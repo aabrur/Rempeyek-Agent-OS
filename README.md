@@ -10,17 +10,17 @@ React + Vite, split into components across an npm-workspaces monorepo.
 
 ![Platform](https://img.shields.io/badge/platform-Windows-blue) ![Node](https://img.shields.io/badge/node-%E2%89%A518-green) ![Server deps](https://img.shields.io/badge/server%20deps-0-brightgreen) ![UI](https://img.shields.io/badge/ui-React%20%2B%20Vite-61DAFB)
 
-## Supervisor Composer & Multi-Agent Runtime (v2.4.12)
+## Supervisor Composer & Multi-Agent Runtime (v2.4.13)
 
 Rempeyek Agent OS orchestrates Codex, Antigravity, and Grok Build via native CLI contracts,
 OAuth and account subscription authentication, and isolated Git worktrees.
 
-The Windows installer is `Rempeyek-Agent-OS-Setup-2.4.12.exe` in the release assets.
+The Windows installer is `Rempeyek-Agent-OS-Setup-2.4.13.exe` in the release assets.
 Release assets include `SHA256SUMS.txt`.
 
 ## Download for Windows
 
-|[![Download v2.4.12](https://img.shields.io/badge/Download-v2.4.12-ff8a00?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/aabrur/Rempeyek-Agent-OS/releases/tag/v2.4.12)
+|[![Download v2.4.13](https://img.shields.io/badge/Download-v2.4.13-ff8a00?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/aabrur/Rempeyek-Agent-OS/releases/tag/v2.4.13)
 
 **The installer and direct download are free.** Most users only need to click
 the button above. No GitHub account, Git, Node.js, npm, or repository clone is
@@ -37,12 +37,12 @@ required.
 
 ### Install
 
-1. Open the public **v2.4.12** release above.
+1. Open the public **v2.4.13** release above.
 2. Download the NSIS installer and the published `SHA256SUMS.txt` from that same release.
 3. Verify the downloaded installer against `SHA256SUMS.txt` in PowerShell:
 
    ```powershell
-   Get-FileHash "$HOME\Downloads\Rempeyek-Agent-OS-Setup-2.4.12.exe" -Algorithm SHA256
+   Get-FileHash "$HOME\Downloads\Rempeyek-Agent-OS-Setup-2.4.13.exe" -Algorithm SHA256
    ```
 
 4. Open the installer only when the hash and release publisher match.

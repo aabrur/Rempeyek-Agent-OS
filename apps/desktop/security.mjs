@@ -26,3 +26,30 @@ export function withDesktopSessionHeader(details, origin, token) {
   }
   return headers;
 }
+
+export function isAllowedIpcSender(event, origin) {
+  if (!event || typeof origin !== "string" || !origin) return false;
+  if (event.senderFrame) {
+    if (typeof event.senderFrame.origin === "string" && event.senderFrame.origin.length > 0) {
+      return event.senderFrame.origin === origin;
+    }
+    if (typeof event.senderFrame.url === "string" && event.senderFrame.url.length > 0) {
+      return isAllowedLocalNavigation(event.senderFrame.url, origin);
+    }
+    return false;
+  }
+  if (typeof event.sender?.getURL === "function") {
+    const senderUrl = event.sender.getURL();
+    if (typeof senderUrl === "string" && senderUrl.length > 0) {
+      return isAllowedLocalNavigation(senderUrl, origin);
+    }
+  }
+  return false;
+}
+
+export function assertTrustedIpcSender(event, origin) {
+  if (!origin || !isAllowedIpcSender(event, origin)) {
+    throw new Error("unauthorized IPC sender");
+  }
+}
+

@@ -2,6 +2,14 @@
 
 All notable changes to Rempeyek Agent OS. The in-app update banner compares the local version
 against the latest GitHub Release of this repository - tag releases as `v<version>`.
+## [2.4.13] - 2026-10-19
+
+### Desktop IPC Security Hardening
+- Enforce strict origin validation across all 10 privileged Electron IPC handlers.
+- Implement fail-closed assertTrustedIpcSender to block unauthorized frame callers and prevent uninitialized origin bypass.
+- Isolate frame origins to prevent opaque iframes or about:blank frames from falling back to top-level window URL.
+- Add comprehensive regression test suite verifying origin checks and frame isolation.
+
 ## [2.4.12] - 2026-10-17
 
 ### Trakteer Support Popup
